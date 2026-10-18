@@ -806,6 +806,7 @@ export interface ShaderParameter {
   components: number;
   value: (number | null)[];
   free: boolean;
+  depends?: string[];
 }
 
 /**

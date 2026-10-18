@@ -485,6 +485,12 @@ class ShaderParameter(Strict):
     # buffer; see ``ShaderParameter.as_dict`` in the WGSL backend.
     value: list[float | None]
     free: bool
+    # For a slot derived from parameters rather than one of them — a culling
+    # box, ``__cull<n>.center`` / ``.half`` — the parameter slots it was
+    # computed from.  While a drag overrides any of them the box no longer
+    # holds its operand, so the client opens it (half extents to a huge
+    # value) until the compile that ends the drag brings a box that does.
+    depends: list[str] = []
 
 
 class ShaderProgram(Strict):

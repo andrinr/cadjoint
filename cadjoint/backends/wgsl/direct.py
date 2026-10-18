@@ -32,14 +32,16 @@ because WGSL cannot type an ``(N, 2)`` array.
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
 import numpy as np
 
+from cadjoint.backends.wgsl._culling import CULL_MARGIN
 from cadjoint.backends.wgsl.codegen import (
     DEFAULT_PARAMETER_BINDING,
     DEFAULT_PARAMETER_GROUP,
+    PARAMETER_ADDRESS_SPACE,
     PARAMETER_SLOT_BYTES,
     RESERVED_PARAMETER_SLOTS,
 )
@@ -73,6 +75,12 @@ class DirectProgram:
     #: `(name, components, value)` per uniform slot, empty in the literal
     #: form. In the same order the buffer expects them.
     parameters: tuple[tuple[str, int, list[float]], ...] = ()
+    #: Slots holding values derived from the parameters — the culling boxes —
+    #: rather than design parameters a handle can move.
+    derived: tuple[str, ...] = ()
+    #: Per derived slot, the parameter slots it was computed from, so a
+    #: client overriding one of them knows which boxes it has made stale.
+    depends: dict[str, tuple[str, ...]] = field(default_factory=dict)
 
     def __str__(self) -> str:  # so callers can treat it as source
         return self.wgsl
@@ -189,10 +197,11 @@ _PROFILE_FROM_BUFFER = """fn profile_vertex(i: u32) -> vec2<f32> {
 _PROFILE_DISTANCE = """fn profile_distance(p: vec2<f32>, offset: u32, count: u32) -> f32 {
     var d = dot(p - profile_vertex(offset), p - profile_vertex(offset));
     var s = 1.0;
+    // The previous vertex is carried rather than re-read: one buffer load per
+    // edge instead of two, and no modulo. Edge for edge the same arithmetic.
+    var vj = profile_vertex(offset + count - 1u);
     for (var i: u32 = 0u; i < count; i = i + 1u) {
-        let j = (i + count - 1u) % count;
         let vi = profile_vertex(offset + i);
-        let vj = profile_vertex(offset + j);
         let e = vj - vi;
         let w = p - vi;
         let t = clamp(dot(w, e) / dot(e, e), 0.0, 1.0);
@@ -202,6 +211,7 @@ _PROFILE_DISTANCE = """fn profile_distance(p: vec2<f32>, offset: u32, count: u32
         let c2 = p.y < vj.y;
         let c3 = (e.x * w.y) > (e.y * w.x);
         if ((c1 == c2) && (c2 == c3)) { s = -s; }
+        vj = vi;
     }
     return s * sqrt(d);
 }"""
@@ -235,10 +245,11 @@ _PROFILE_DISTANCE_REVOLVED = """fn on_axis(x: f32, axis: f32) -> bool {
 fn profile_distance_revolved(p: vec2<f32>, offset: u32, count: u32, axis: f32) -> f32 {
     var d = 1e30;
     var s = 1.0;
+    // The previous vertex is carried rather than re-read: one buffer load per
+    // edge instead of two, and no modulo. Edge for edge the same arithmetic.
+    var vj = profile_vertex(offset + count - 1u);
     for (var i: u32 = 0u; i < count; i = i + 1u) {
-        let j = (i + count - 1u) % count;
         let vi = profile_vertex(offset + i);
-        let vj = profile_vertex(offset + j);
         let e = vj - vi;
         let w = p - vi;
         if (!(on_axis(vi.x, axis) && on_axis(vj.x, axis))) {
@@ -250,6 +261,7 @@ fn profile_distance_revolved(p: vec2<f32>, offset: u32, count: u32, axis: f32) -
         let c2 = p.y < vj.y;
         let c3 = (e.x * w.y) > (e.y * w.x);
         if ((c1 == c2) && (c2 == c3)) { s = -s; }
+        vj = vi;
     }
     return s * sqrt(d);
 }"""
@@ -282,10 +294,9 @@ _PROFILE_LERPED = """fn profile_distance_lerped(
     let first = mix(profile_vertex(a), profile_vertex(b), t);
     var d = dot(p - first, p - first);
     var s = 1.0;
+    var vj = mix(profile_vertex(a + count - 1u), profile_vertex(b + count - 1u), t);
     for (var i: u32 = 0u; i < count; i = i + 1u) {
-        let j = (i + count - 1u) % count;
         let vi = mix(profile_vertex(a + i), profile_vertex(b + i), t);
-        let vj = mix(profile_vertex(a + j), profile_vertex(b + j), t);
         let e = vj - vi;
         let w = p - vi;
         let u = clamp(dot(w, e) / dot(e, e), 0.0, 1.0);
@@ -295,6 +306,7 @@ _PROFILE_LERPED = """fn profile_distance_lerped(
         let c2 = p.y < vj.y;
         let c3 = (e.x * w.y) > (e.y * w.x);
         if ((c1 == c2) && (c2 == c3)) { s = -s; }
+        vj = vi;
     }
     return s * sqrt(d);
 }"""
@@ -327,6 +339,16 @@ fn material_optics(p: vec3<f32>) -> vec4<f32> {
 
 _SHARED: dict[str, str] = {}
 
+#: Distance from ``p`` to an axis-aligned box, zero inside it — the WGSL
+#: spelling of :func:`cadjoint.sdf._lowering.box_distance`.
+_CULL_BOX = """fn cull_box(p: vec3<f32>, center: vec3<f32>, half_size: vec3<f32>) -> f32 {
+    let q = max(abs(p - center) - half_size, vec3<f32>(0.0));
+    return sqrt(dot(q, q));
+}"""
+
+#: Stands in for the cull margin until the module's slot count is known.
+_MARGIN_TOKEN = "__CADJOINT_CULL_MARGIN__"
+
 # ── transforms ───────────────────────────────────────────────────────────────
 #
 # A transform is a map on the query point, so it needs no function of its own:
@@ -353,6 +375,7 @@ _SHARED.update(
         "prim_extrudedpolygon": _EXTRUDED,
         "prim_revolvedpolygon": _REVOLVED,
         "rotate_about": _ROTATE,
+        "cull_box": _CULL_BOX,
         **{
             f"prim_{name.lower()}": (
                 "fn prim_{sym}(p: vec3<f32>, {args}) -> f32 {{\n{body}\n}}".format(
@@ -433,8 +456,17 @@ class _Emitter:
     `vmap` would give it.
     """
 
-    def __init__(self, uniforms: bool = False) -> None:
+    def __init__(self, uniforms: bool = False, culling: bool = False) -> None:
         self.uniforms = uniforms
+        self.culling = culling
+        self._bounds: dict[int, Any] = {}
+        #: `(center, half)` WGSL expressions per culled operand, by node id.
+        self._boxes: dict[int, tuple[str, str, float]] = {}
+        #: Slots holding derived values (the boxes), not design parameters.
+        self.derived: list[str] = []
+        #: Per derived slot, the parameter slots it was computed from.
+        self.depends: dict[str, tuple[str, ...]] = {}
+        self._reads: dict[int, frozenset[str]] = {}
         self.slots: list[tuple[str, int, list[float]]] = []
         self._slot_of: dict[str, int] = {}
         self.functions: list[str] = []
@@ -629,6 +661,112 @@ class _Emitter:
         bindings = {parameter: self.read(node, parameter, arity[parameter]) for parameter in names}
         return template.format(p="p", **bindings)
 
+    # ── culling ──────────────────────────────────────────────────────────
+    #
+    # The same exact skips `_culling.culled_scene_sdf` gives the traced form:
+    # before a union, difference or pattern evaluates an operand it compares
+    # the distance to the operand's bounding box against what it already
+    # holds, and skips the call when the operand provably cannot change the
+    # result. Each test is `box >= threshold + margin`; the margin is the
+    # buffer's reserved slot, so an infinite one turns every test off without
+    # a recompile — which is what the viewer does while a drag's overrides
+    # make the boxes stale.
+
+    def _node_bounds(self, node: Any):
+        """The node's bounds at its current values, or None for no promise."""
+        key = id(node)
+        if key in self._bounds:
+            return self._bounds[key]
+        from cadjoint.sdf._lowering import Bounds, node_bounds
+
+        self._bounds[key] = None
+        children = [
+            self._node_bounds(child) for child in node.children() if hasattr(type(child), "sdf")
+        ]
+        values = {
+            name: np.asarray(getattr(parameter, "value", parameter), dtype=np.float32)
+            for name, parameter in node.params.items()
+        }
+        try:
+            bounds = node_bounds(node, values, children)
+        except Exception:  # noqa: BLE001 - no bounds is always a safe answer
+            bounds = None
+        if bounds is not None:
+            center = np.asarray(bounds.center, dtype=np.float64).reshape(3)
+            half = np.asarray(bounds.half, dtype=np.float64).reshape(3)
+            scale = float(np.asarray(bounds.scale))
+            if np.all(np.isfinite(center)) and np.all(np.isfinite(half)) and scale > 0:
+                bounds = Bounds(center=center, half=half, scale=scale)
+            else:
+                bounds = None
+        self._bounds[key] = bounds
+        return bounds
+
+    def box_for(self, node: Any) -> tuple[str, str, float] | None:
+        """WGSL `(center, half, scale)` of an operand's box, or None.
+
+        In the uniform form the box is two buffer slots rather than literals:
+        it moves with the free parameters, and the module has to stay
+        byte-identical across their values.
+        """
+        if not self.culling:
+            return None
+        key = id(node)
+        if key in self._boxes:
+            return self._boxes[key]
+        bounds = self._node_bounds(node)
+        if bounds is None:
+            return None
+        self._need("cull_box")
+        if self.uniforms:
+            index = len(self._boxes)
+            expressions = []
+            reads = tuple(sorted(self._slots_read(node)))
+            for part, values in (("center", bounds.center), ("half", bounds.half)):
+                name = f"__cull{index}.{part}"
+                self._slot_of[name] = len(self.slots)
+                self.slots.append((name, 3, [float(v) for v in values]))
+                self.derived.append(name)
+                self.depends[name] = reads
+                expressions.append(f"sdf_parameters.values[{self._slot_of[name]}].xyz")
+            box = (expressions[0], expressions[1], bounds.scale)
+        else:
+            box = (_literal(bounds.center, 3), _literal(bounds.half, 3), bounds.scale)
+        self._boxes[key] = box
+        return box
+
+    def _slots_read(self, node: Any) -> frozenset[str]:
+        """Every parameter slot *node*'s subtree reads — what its box rests on.
+
+        Called once the subtree is emitted, so every one of its slots, a
+        sketch's literal vertices included, already has its name.
+        """
+        key = id(node)
+        if key in self._reads:
+            return self._reads[key]
+        names: set[str] = set()
+        ordinal = self._sketches.get(key)
+        for name in node.params:
+            declared = _free_name(node, name)
+            if declared is not None and declared in self._slot_of:
+                names.add(declared)
+            elif ordinal is not None and f"sketch{ordinal}.{name}" in self._slot_of:
+                names.add(f"sketch{ordinal}.{name}")
+        for child in node.children():
+            if hasattr(type(child), "sdf"):
+                names |= self._slots_read(child)
+        self._reads[key] = frozenset(names)
+        return self._reads[key]
+
+    @staticmethod
+    def box_test(point: str, box: tuple[str, str, float], threshold: str) -> str:
+        """The skip condition: the operand's box is beyond `threshold`."""
+        center, half, scale = box
+        distance = f"cull_box({point}, {center}, {half})"
+        if scale != 1.0:
+            distance = f"{scale:.9g} * {distance}"
+        return f"{distance} >= {threshold} + {_MARGIN_TOKEN}"
+
     def _body(self, node: Any) -> str:
         name = type(node).__name__
 
@@ -698,6 +836,37 @@ class _Emitter:
 
         raise UnsupportedNode(f"{name} has no direct WGSL kernel. Supported: {supported_nodes()}")
 
+    def _culled_boolean_body(self, name: str, nodes: list, children: list[str], k: float) -> str:
+        """A union or difference whose operands are skipped where they cannot matter.
+
+        Smooth union: ``smin(d, e) = d`` once ``e >= d + k``. Smooth difference:
+        ``smax(d, -e) = d`` once ``e >= k - d``. The box distance bounds ``e``
+        from below outside the box, so either threshold reached by the box is
+        reached by the operand. Same arithmetic as the unculled body otherwise.
+        """
+        lines = [f"    var d = {children[0]}(p);"]
+        for index, (node, child) in enumerate(zip(nodes[1:], children[1:]), start=1):
+            if name == "Union":
+                operand, threshold = f"{child}(p)", f"max(d + {k:.9g}, 0.0)"
+                update = f"d = min(d, e{index}) - h{index} * h{index} * 0.25 / {k:.9g};"
+            else:
+                operand, threshold = f"(-{child}(p))", f"max({k:.9g} - d, 0.0)"
+                update = f"d = max(d, e{index}) + h{index} * h{index} * 0.25 / {k:.9g};"
+            body = [
+                f"let e{index} = {operand};",
+                f"let h{index} = max({k:.9g} - abs(d - e{index}), 0.0);",
+                update,
+            ]
+            box = self.box_for(node)
+            if box is None:
+                lines += [f"    {line}" for line in body]
+            else:
+                lines.append(f"    if (!({self.box_test('p', box, threshold)})) {{")
+                lines += [f"        {line}" for line in body]
+                lines.append("    }")
+        lines.append("    return d;")
+        return "\n".join(lines)
+
     def _profile_body(self, node: Any, name: str) -> str:
         if name == "ExtrudedPolygon":
             # Draft tapers the walls and twist rotates the query by an angle
@@ -760,7 +929,15 @@ class _Emitter:
             axis = axis / (np.linalg.norm(axis) or 1.0)
             lines.append(f"        let theta = -6.283185307179586 * i / {count:.9g};")
             lines.append(f"        let q = rotate_about(p, {origin}, {_literal(axis, 3)}, theta);")
-        lines.append(f"        d = min(d, {child}(q));")
+        box = self.box_for(node.sdf)
+        if box is None:
+            lines.append(f"        d = min(d, {child}(q));")
+        else:
+            # The instance is the child at `q`, an isometry of `p`, so the
+            # distance from `q` to the child's own box bounds it exactly.
+            lines.append(f"        if (!({self.box_test('q', box, 'max(d, 0.0)')})) {{")
+            lines.append(f"            d = min(d, {child}(q));")
+            lines.append("        }")
         lines.append("    }")
         lines.append("    return d;")
         return "\n".join(lines)
@@ -768,7 +945,10 @@ class _Emitter:
     def _boolean_body(self, node: Any, name: str) -> str:
         smoothness = float(_value(node, "smoothness")[0]) if "smoothness" in node.params else 0.0
         k = max(smoothness * 4.0, 1e-10)
-        children = [self.function_for(child) for child in node.children()]
+        nodes = node.children()
+        children = [self.function_for(child) for child in nodes]
+        if name in ("Union", "Difference") and self.culling:
+            return self._culled_boolean_body(name, nodes, children, k)
         lines = [f"    var d = {children[0]}(p);"]
         for child in children[1:]:
             operand = f"(-{child}(p))" if name == "Difference" else f"{child}(p)"
@@ -798,7 +978,11 @@ def _unique_lets(lines: list[str]) -> list[str]:
 
 
 def compile_sdf_direct(
-    geometry: Any, *, entry_point: str = "sdf", uniforms: bool = False
+    geometry: Any,
+    *,
+    entry_point: str = "sdf",
+    uniforms: bool = False,
+    culling: bool = False,
 ) -> DirectProgram:
     """Emit WGSL for *geometry* by walking it, with no JAX in the path.
 
@@ -810,6 +994,13 @@ def compile_sdf_direct(
             rather than a new module. The module is then byte-identical for
             every value of every free parameter, which is what lets a handle
             drag run at frame rate.
+        culling: Skip union, difference and pattern operands whose bounding
+            box shows they cannot change the result — exact, the same tests
+            :mod:`cadjoint.backends.wgsl._culling` gives the traced form. In
+            the uniform form the boxes are extra slots (named in
+            ``DirectProgram.derived``) and the tests read the buffer's
+            reserved cull margin, so the viewer can switch them off while a
+            drag's values have outrun the boxes.
 
     Returns:
         A :class:`DirectProgram`: the module, and the profile vertices its
@@ -818,7 +1009,7 @@ def compile_sdf_direct(
     Raises:
         UnsupportedNode: For a node kind this backend has no kernel for.
     """
-    emitter = _Emitter(uniforms=uniforms)
+    emitter = _Emitter(uniforms=uniforms, culling=culling)
     root = emitter.function_for(geometry)
     material_root = emitter.material_for(geometry)
     entry = "\n\n".join(
@@ -841,10 +1032,17 @@ def compile_sdf_direct(
         sections.insert(0, _uniform_block(emitter.slots))
     elif emitter.vertices:
         sections.insert(0, _PROFILE_BUFFER)
+    # The margin is the second reserved slot after every parameter, which is
+    # only known now that the walk has added the boxes.
+    margin = (
+        f"sdf_parameters.values[{len(emitter.slots) + 1}].x" if uniforms else f"{CULL_MARGIN:.9g}"
+    )
     return DirectProgram(
-        wgsl="\n\n".join([*sections, entry]),
+        wgsl="\n\n".join([*sections, entry]).replace(_MARGIN_TOKEN, margin),
         vertices=np.asarray(emitter.vertices, dtype=np.float32).reshape(-1, 2),
         parameters=tuple(emitter.slots),
+        derived=tuple(emitter.derived),
+        depends=dict(emitter.depends),
     )
 
 
@@ -859,19 +1057,16 @@ def _uniform_block(slots: list[tuple[str, int, list[float]]]) -> str:
     lines = [f"// {len(slots)} free parameters, one vec4<f32> slot each."]
     for index, (name, components, _values) in enumerate(slots):
         lines.append(f"// {index * PARAMETER_SLOT_BYTES:6d}  {components}f  free   {name}")
-    # The two reserved slots the traced form ends with are declared but never
-    # read here: this module spells no NaN constant and does no bounds
-    # culling. They exist so the buffer layout is the one contract the
-    # frontend already writes, rather than a second one it has to learn.
+    # The two reserved slots the traced form ends with. This module spells no
+    # NaN constant, so the first is never read; the second is the margin every
+    # culling test adds, read only when the module was built with culling.
     lines.append(f"// {len(slots) * PARAMETER_SLOT_BYTES:6d}  1f  reserved  NaN (unread)")
-    lines.append(
-        f"// {(len(slots) + 1) * PARAMETER_SLOT_BYTES:6d}  1f  reserved  cull margin (unread)"
-    )
+    lines.append(f"// {(len(slots) + 1) * PARAMETER_SLOT_BYTES:6d}  1f  reserved  cull margin")
     lines.append("struct SdfParameters {")
     lines.append(f"    values: array<vec4<f32>, {len(slots) + RESERVED_PARAMETER_SLOTS}>,")
     lines.append("};")
     lines.append(
         f"@group({DEFAULT_PARAMETER_GROUP}) @binding({DEFAULT_PARAMETER_BINDING}) "
-        "var<uniform> sdf_parameters: SdfParameters;"
+        f"var<{PARAMETER_ADDRESS_SPACE}> sdf_parameters: SdfParameters;"
     )
     return "\n".join(lines)

@@ -75,6 +75,7 @@ import {
   createOverlayPipelines,
   type DepthPair,
   createSimulationPipelines,
+  createUpscalePipeline,
   sharedLayout,
 } from "./pipelines";
 import {
@@ -208,6 +209,19 @@ const GRATICULE = {
   axisWidth: 1.6,
 } as const;
 
+/**
+ * What one preview frame may cost while a gesture is in flight, in GPU ms.
+ *
+ * A frame predicted to cost more is raymarched at a reduced resolution for
+ * the length of the gesture and stretched back over the framebuffer, so an
+ * orbit or a drag stays interactive on a scene that is slow at full size.
+ * At rest — and on every scene cheap enough to fit — nothing changes.
+ */
+const GESTURE_FRAME_BUDGET_MS = 12;
+
+/** The smallest linear scale a gesture preview drops to. */
+const MIN_GESTURE_SCALE = 0.4;
+
 export interface RendererCallbacks {
   onStatus?: (kind: string, text: string) => void;
   onError?: (message: string) => void;
@@ -251,6 +265,8 @@ export class Renderer {
   private shaderModules = new ShaderModuleCache();
   /** The sources currently installed, or null before the first compile. */
   private installedShaders: Shaders | null = null;
+  /** The preview source the installed preview pipeline was built from. */
+  private installedPreview: string | null = null;
   /** The scene's uniform contract; null in the literal form. */
   private program: ShaderProgramPayload | null = null;
   private parameterBuffer: GPUBuffer | null = null;
@@ -387,7 +403,17 @@ export class Renderer {
   quality: QualityPreset = QUALITY_PRESETS[DEFAULT_QUALITY];
   pathTracing = false;
   pathReady = false;
-  interacting = false;
+  private _interacting = false;
+
+  // ── The gesture preview ───────────────────────────────────────────────
+  /** Measured GPU cost of a preview frame per pixel, smoothed; null until seen. */
+  private previewMsPerPixel: number | null = null;
+  /** Linear scale of the preview while the current gesture lasts; 1 at rest. */
+  private gestureScale = 1;
+  private upscalePipeline: GPURenderPipeline | null = null;
+  private gestureColor: GPUTexture | null = null;
+  private gestureDepth: GPUTexture | null = null;
+  private gestureBindGroup: GPUBindGroup | null = null;
 
   private profiles: readonly ConstructionNode[] = [];
   private planes: readonly PlaneFrame[] = [];
@@ -397,6 +423,77 @@ export class Renderer {
   private hover: Selection | null = null;
 
   constructor(private callbacks: RendererCallbacks = {}) {}
+
+  /**
+   * Whether a gesture — an orbit, a pan, a gizmo or vertex drag — is in
+   * flight. Starting one fixes the preview scale for its length from what
+   * frames have been measured to cost; ending one restores full resolution
+   * and redraws, so the frame left on screen is always the full one.
+   */
+  get interacting(): boolean {
+    return this._interacting;
+  }
+
+  set interacting(active: boolean) {
+    if (active === this._interacting) return;
+    this._interacting = active;
+    this.gestureScale = active ? this.chooseGestureScale() : 1;
+    if (!active) this.invalidate();
+  }
+
+  /** The preview scale a gesture can afford, from the measured frame cost. */
+  private chooseGestureScale(): number {
+    if (!this.canvas || this.previewMsPerPixel === null) return 1;
+    const predicted = this.previewMsPerPixel * this.canvas.width * this.canvas.height;
+    if (predicted <= GESTURE_FRAME_BUDGET_MS) return 1;
+    // Cost goes with pixel count, so with the square of the linear scale;
+    // eighths, so a size is reused rather than nudged from gesture to gesture.
+    const scale = Math.sqrt(GESTURE_FRAME_BUDGET_MS / predicted);
+    return Math.max(MIN_GESTURE_SCALE, Math.floor(scale * 8) / 8);
+  }
+
+  /** Fold one preview frame's measured GPU time into the per-pixel cost. */
+  private recordPreviewCost(milliseconds: number, pixels: number): void {
+    const sample = milliseconds / Math.max(pixels, 1);
+    this.previewMsPerPixel =
+      this.previewMsPerPixel === null ? sample : this.previewMsPerPixel * 0.7 + sample * 0.3;
+  }
+
+  /** The small targets a gesture frame is raymarched into, sized to `scale`. */
+  private ensureGestureTargets(scale: number): { width: number; height: number } {
+    const device = this.device!;
+    const width = Math.max(1, Math.ceil(this.canvas.width * scale));
+    const height = Math.max(1, Math.ceil(this.canvas.height * scale));
+    if (this.gestureColor?.width !== width || this.gestureColor?.height !== height) {
+      this.gestureColor?.destroy();
+      this.gestureDepth?.destroy();
+      this.gestureColor = device.createTexture({
+        label: "gesture preview colour",
+        size: [width, height],
+        format: this.format,
+        usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
+      });
+      this.gestureDepth = device.createTexture({
+        label: "gesture preview depth",
+        size: [width, height],
+        format: DEPTH_FORMAT,
+        usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
+      });
+      this.upscalePipeline ??= createUpscalePipeline(device, this.format);
+      this.gestureBindGroup = device.createBindGroup({
+        layout: this.upscalePipeline.getBindGroupLayout(0),
+        entries: [
+          { binding: 0, resource: this.gestureColor.createView() },
+          { binding: 1, resource: this.gestureDepth.createView() },
+          {
+            binding: 2,
+            resource: device.createSampler({ magFilter: "linear", minFilter: "linear" }),
+          },
+        ],
+      });
+    }
+    return { width, height };
+  }
 
   get rendererLabel(): string {
     return this.adapterLabel;
@@ -849,6 +946,9 @@ export class Renderer {
     this.parameterOverrides = null;
     this.adoptParameterBuffer();
     this.previewPipeline = colorPipeline;
+    this.installedPreview = shaders.preview;
+    // A different scene costs differently; measure it afresh.
+    this.previewMsPerPixel = null;
     this.previewDepthPipeline = depthOnlyPipeline;
     this.previewBindGroup = this.device.createBindGroup({
       layout: preview.bindGroupLayout,
@@ -955,7 +1055,9 @@ export class Renderer {
         {
           binding: program.binding,
           visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT,
-          buffer: { type: "uniform" },
+          // Storage, not uniform: `PARAMETER_ADDRESS_SPACE` in
+          // `cadjoint/backends/wgsl/codegen.py` has the measurements.
+          buffer: { type: "read-only-storage" },
         },
       ],
     });
@@ -1021,7 +1123,7 @@ export class Renderer {
       ? this.device.createBuffer({
           label: "SDF parameters",
           size,
-          usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+          usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
         })
       : null;
   }
@@ -1840,6 +1942,8 @@ export class Renderer {
     // The path tracer draws the SDF scene, which simulation display replaces.
     const tracing =
       this.pathTracing && this.pathReady && !this.interacting && !this._simulationActive;
+    /** Pixels the preview march ran at this frame; 0 when it did not run. */
+    let previewPixels = 0;
 
     if (tracing) {
       this.ensureAccumulation();
@@ -1890,16 +1994,58 @@ export class Renderer {
       presentPass.end();
       this.readIndex = writeIndex;
     } else {
+      // A gesture on a scene too slow for the frame budget: raymarch into the
+      // small targets, then let the upscale pass stand in for the preview
+      // draw. The FEM surface is a mesh and draws at full size regardless.
+      const scale = this._simulationActive ? 1 : this.gestureScale;
+      if (scale < 1) {
+        const size = this.ensureGestureTargets(scale);
+        // The march derives its rays from `u.resolution`, so the small pass
+        // has to be told its own size; the next frame's `writeUniforms`
+        // restores the full one.
+        device.queue.writeBuffer(this.uniformBuffer, 0, new Float32Array([size.width, size.height]));
+        const smallPass = encoder.beginRenderPass({
+          colorAttachments: [
+            {
+              view: this.gestureColor!.createView(),
+              clearValue: BACKGROUND,
+              loadOp: "clear",
+              storeOp: "store",
+            },
+          ],
+          depthStencilAttachment: {
+            view: this.gestureDepth!.createView(),
+            depthClearValue: 1,
+            depthLoadOp: "clear",
+            depthStoreOp: "store",
+          },
+        });
+        smallPass.setPipeline(this.previewPipeline);
+        smallPass.setBindGroup(0, this.previewBindGroup);
+        if (this.previewParameterGroup) {
+          smallPass.setBindGroup(this.program!.group, this.previewParameterGroup);
+        }
+        smallPass.draw(3);
+        smallPass.end();
+      }
+      previewPixels = scale < 1
+        ? this.gestureColor!.width * this.gestureColor!.height
+        : this.canvas.width * this.canvas.height;
       const previewPass = encoder.beginRenderPass({
         colorAttachments: [
           { view: swapchain, clearValue: BACKGROUND, loadOp: "clear", storeOp: "store" },
         ],
         depthStencilAttachment: depthAttachment,
       });
-      previewPass.setPipeline(this.previewPipeline);
-      previewPass.setBindGroup(0, this.previewBindGroup);
-      if (this.previewParameterGroup) {
-        previewPass.setBindGroup(this.program!.group, this.previewParameterGroup);
+      if (scale < 1) {
+        previewPass.setPipeline(this.upscalePipeline!);
+        previewPass.setBindGroup(0, this.gestureBindGroup);
+      } else {
+        previewPass.setPipeline(this.previewPipeline);
+        previewPass.setBindGroup(0, this.previewBindGroup);
+        if (this.previewParameterGroup) {
+          previewPass.setBindGroup(this.program!.group, this.previewParameterGroup);
+        }
       }
       previewPass.draw(3);
       this.drawSimulation(previewPass);
@@ -1912,6 +2058,15 @@ export class Renderer {
     }
 
     device.queue.submit([encoder.finish()]);
+    if (previewPixels > 0) {
+      // Submit to completion: the GPU's time on this frame, plus whatever was
+      // still queued ahead of it — an overestimate when frames pile up, which
+      // only ever errs toward a smaller gesture preview.
+      const submitted = performance.now();
+      void device.queue
+        .onSubmittedWorkDone()
+        .then(() => this.recordPreviewCost(performance.now() - submitted, previewPixels));
+    }
 
     if (tracing) {
       this.sampleCount += 1;
@@ -1933,8 +2088,94 @@ export class Renderer {
     }
   }
 
+  /**
+   * Time the preview: `frames` redraws while the camera turns, each waited
+   * on until the GPU has finished it.
+   *
+   * Serialising on `onSubmittedWorkDone` costs the pipelining a live orbit
+   * would get, so the number is an upper bound on frame time — but it is the
+   * same bound before and after a change, which is what it is for. Published
+   * as `__cadjointBench` for the performance study and the e2e tests.
+   *
+   * @param frames Frames to time after two warm-up frames.
+   * @param interacting Draw as during a drag rather than at rest.
+   * @returns Per-frame milliseconds and the framebuffer they were drawn at.
+   */
+  async benchmark(
+    frames = 30,
+    interacting = false,
+  ): Promise<{ medianMs: number; meanMs: number; samples: number[]; width: number; height: number }> {
+    const device = this.device;
+    if (!device || !this.previewPipeline) {
+      return { medianMs: NaN, meanMs: NaN, samples: [], width: 0, height: 0 };
+    }
+    const wasInteracting = this.interacting;
+    const startYaw = this.camera.yaw;
+    this.interacting = interacting;
+    const samples: number[] = [];
+    let width = 0;
+    let height = 0;
+    for (let index = -2; index < frames; index++) {
+      this.camera = { ...this.camera, yaw: startYaw + (index + 2) * 0.01 };
+      this.sampleCount = 0;
+      const started = performance.now();
+      this.renderFrame();
+      await device.queue.onSubmittedWorkDone();
+      if (index >= 0) samples.push(performance.now() - started);
+      width = this.canvas.width;
+      height = this.canvas.height;
+    }
+    this.interacting = wasInteracting;
+    this.camera = { ...this.camera, yaw: startYaw };
+    this.invalidate();
+    const sorted = [...samples].sort((a, b) => a - b);
+    return {
+      medianMs: sorted[Math.floor(sorted.length / 2)],
+      meanMs: samples.reduce((sum, value) => sum + value, 0) / samples.length,
+      samples,
+      width,
+      height,
+    };
+  }
+
+  /**
+   * Time a cold compile of the installed scene: to the first preview frame
+   * finished on the GPU, and to the path tracer being ready.
+   *
+   * A comment unique to this call is appended to every source so neither
+   * this cache nor the browser's own shader cache can serve it.
+   */
+  async benchmarkCompile(): Promise<{ firstFrameMs: number; pathReadyMs: number }> {
+    const shaders = this.installedShaders;
+    const device = this.device;
+    if (!shaders || !device) return { firstFrameMs: NaN, pathReadyMs: NaN };
+    const salt = `\n// bench ${performance.now()} ${Math.random()}\n`;
+    const started = performance.now();
+    const done = this.setShaders({
+      ...shaders,
+      preview: shaders.preview + salt,
+      path: shaders.path + salt,
+      present: shaders.present + salt,
+    });
+    let firstFrameMs = NaN;
+    const firstFrame = (async () => {
+      while (this.installedPreview !== shaders.preview + salt) {
+        await new Promise((resolve) => requestAnimationFrame(resolve));
+      }
+      this.renderFrame();
+      await device.queue.onSubmittedWorkDone();
+      firstFrameMs = performance.now() - started;
+    })();
+    await done;
+    const pathReadyMs = performance.now() - started;
+    await firstFrame;
+    return { firstFrameMs, pathReadyMs };
+  }
+
   destroy(): void {
     this.destroyAccumulation();
+    this.gestureColor?.destroy();
+    this.gestureDepth?.destroy();
     this.depthTexture?.destroy();
     this.edgeBuffer?.destroy();
     this.faceFillBuffer?.destroy();

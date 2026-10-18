@@ -25,6 +25,7 @@ import {
 import GRATICULE_WGSL from "./graticule.wgsl?raw";
 import OVERLAY_WGSL from "./overlay.wgsl?raw";
 import SIMULATION_WGSL from "./simulation.wgsl?raw";
+import UPSCALE_WGSL from "./upscale.wgsl?raw";
 import { wgslTokens } from "../tokens";
 
 /**
@@ -351,6 +352,30 @@ export function createOverlayPipelines(
 
 /** Bytes of the graticule uniform: ten vec4s, see `Graticule` in the WGSL. */
 export const GRATICULE_UNIFORM_SIZE = 160;
+
+/**
+ * The pass that stretches a reduced-resolution preview over the framebuffer.
+ *
+ * Colour and depth both come from the small targets, so it stands in for the
+ * full-size preview draw exactly: it writes every pixel, depth included, with
+ * `depthCompare: "always"`, and everything drawn after it is unchanged.
+ */
+export function createUpscalePipeline(
+  device: GPUDevice,
+  format: GPUTextureFormat,
+): GPURenderPipeline {
+  const module = device.createShaderModule({ code: UPSCALE_WGSL, label: "Upscale WGSL" });
+  return device.createRenderPipeline({
+    label: "Interaction preview upscale",
+    // Its bind group is its own and rebuilt with the targets, so the one
+    // case where an automatic layout is harmless.
+    layout: "auto",
+    vertex: { module, entryPoint: "vs_upscale" },
+    fragment: { module, entryPoint: "fs_upscale", targets: [{ format }] },
+    primitive: { topology: "triangle-list" },
+    depthStencil: { format: DEPTH_FORMAT, depthWriteEnabled: true, depthCompare: "always" },
+  });
+}
 
 export interface GraticulePipeline {
   graticulePipeline: GPURenderPipeline;

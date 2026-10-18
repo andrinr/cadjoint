@@ -91,6 +91,10 @@ declare global {
     ) => boolean;
     __cadjointBindings?: () => HandleBinding[];
     __cadjointCamera?: () => { yaw: number; pitch: number };
+    __cadjointBench?: Renderer["benchmark"];
+    __cadjointBenchCompile?: Renderer["benchmarkCompile"];
+    __cadjointProgram?: () => Renderer["parameterProgram"];
+    __cadjointGesture?: (active: boolean) => void;
   }
 }
 
@@ -110,6 +114,15 @@ export function App() {
     window.__cadjointShaders = () => renderer.shaderStats;
     // Where the camera is, so a recording can turn it by a known angle.
     window.__cadjointCamera = () => cameraAngles();
+    // Frame and compile timings, for the performance study.
+    window.__cadjointBench = (frames, interacting) => renderer.benchmark(frames, interacting);
+    window.__cadjointBenchCompile = () => renderer.benchmarkCompile();
+    window.__cadjointProgram = () => renderer.parameterProgram;
+    // Hold the renderer in its gesture state, to see what a drag draws.
+    window.__cadjointGesture = (active) => {
+      renderer.interacting = active;
+      renderer.invalidate();
+    };
     window.__cadjointSetParameters = (overrides) =>
       renderer.setParameterOverrides(overrides);
     // The same classification the overlay draws each handle with, published

@@ -45,7 +45,21 @@ export interface ShaderParameterSlot {
    */
   value: (number | null)[];
   free: boolean;
+  /**
+   * For a culling box (`__cull<n>.center` / `.half`), the parameter slots
+   * it was computed from. Absent for an ordinary parameter.
+   */
+  depends?: string[];
 }
+
+/**
+ * The half extent a stale culling box is opened to.
+ *
+ * Huge rather than infinite: the box distance is then exactly zero, so the
+ * skip test `distance >= threshold + margin` is false and the operand is
+ * always evaluated, without an `inf - inf` anywhere to turn into a NaN.
+ */
+export const OPEN_BOX_HALF = 1e30;
 
 /** The uniform contract for a compiled scene, mirroring `ShaderProgram`. */
 export interface ShaderProgramPayload {
@@ -120,7 +134,15 @@ export function packParameters(
   const packed = new Float32Array(Math.max(program.buffer_bytes, PARAMETER_SLOT_BYTES) / 4);
   for (const slot of program.parameters) {
     const override = overrides?.[slot.name];
-    const value = override && override.length === slot.components ? override : slot.value;
+    let value: readonly (number | null)[] =
+      override && override.length === slot.components ? override : slot.value;
+    // A culling box the server computed from a value this drag has since
+    // moved may no longer contain its operand. Opened, it skips nothing,
+    // while every box the drag cannot reach goes on culling; the compile
+    // that ends the drag brings boxes that fit again.
+    if (overrides && slot.depends?.some((name) => name in overrides) && slot.name.endsWith(".half")) {
+      value = value.map(() => OPEN_BOX_HALF);
+    }
     for (let i = 0; i < slot.components; i += 1) {
       const component = value[i];
       // `null` is a value the scene never set; the literal form spells the
