@@ -22,7 +22,7 @@ import {
   type BcDraft,
   type BuilderSelectionKind,
 } from "../../studies";
-import { AXIS_LABELS, NumberField, VectorField } from "../ui";
+import { AXIS_LABELS, NumberField, Select, VectorField } from "../ui";
 import type { SimulateController } from "./controller";
 import type { StudyPayload } from "../../types";
 
@@ -62,38 +62,24 @@ export function BcBuilder(props: BcBuilderProps) {
       <div class="sim-builder-row">
         <label>
           <span>Type</span>
-          <select
+          <Select
             value={draft().bcType}
-            onChange={(event) =>
-              sim().setDraft({
-                ...draft(),
-                bcType: event.currentTarget.value as BcDraft["bcType"],
-              })
-            }
-            data-testid="simulate-builder-type"
-          >
-            <For each={bcTypesFor(props.study.kind)}>
-              {(type) => <option value={type}>{BC_LABELS[type]}</option>}
-            </For>
-          </select>
+            options={bcTypesFor(props.study.kind).map((type) => ({ value: type, label: BC_LABELS[type] }))}
+            onChange={(value) => sim().setDraft({ ...draft(), bcType: value as BcDraft["bcType"] })}
+            testId="simulate-builder-type"
+          />
         </label>
         <Show when={bcPlacesRegion(draft().bcType)}>
         <label>
           <span>Select</span>
-          <select
+          <Select
             value={draft().selectionKind}
-            onChange={(event) =>
-              sim().setDraft({
-                ...draft(),
-                selectionKind: event.currentTarget.value as BuilderSelectionKind,
-              })
+            options={SELECTION_KINDS.map((kind) => ({ value: kind.value, label: kind.label }))}
+            onChange={(value) =>
+              sim().setDraft({ ...draft(), selectionKind: value as BuilderSelectionKind })
             }
-            data-testid="simulate-builder-selection"
-          >
-            <For each={SELECTION_KINDS}>
-              {(kind) => <option value={kind.value}>{kind.label}</option>}
-            </For>
-          </select>
+            testId="simulate-builder-selection"
+          />
         </label>
         </Show>
         <Show when={!bcPlacesRegion(draft().bcType)}>

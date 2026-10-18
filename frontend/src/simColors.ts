@@ -21,35 +21,24 @@
  *   ranges (where nearly all pixels of a well-formed mesh sit); over the
  *   darkest field regions edge legibility falls back to facet shading.
  *
- * The two ramp polynomials are duplicated as WGSL constants in
- * viewer/simulation.wgsl — keep the tables in sync.
+ * The WGSL shaders get the ramp polynomials from `wgslTokens()` (tokens.ts).
  */
 
-import type { StudyBcType } from "./types";
+import { MAGMA_COEFFICIENTS, VIRIDIS_COEFFICIENTS, type Rgb } from "./tokens";
 
-export type Rgb = readonly [number, number, number];
-
-/** Degree-6 per-channel polynomial fit of matplotlib's viridis. */
-export const VIRIDIS_COEFFICIENTS: readonly Rgb[] = [
-  [0.2744554245, 0.0057679624, 0.3326638811],
-  [0.1077083262, 1.3964696839, 1.3867705979],
-  [-0.3272410968, 0.2148135645, 0.0919768808],
-  [-4.5999315182, -5.7582381893, -19.2918089503],
-  [6.2037359013, 14.1539649474, 56.6562995652],
-  [4.7517868889, -13.7494394044, -65.3209678276],
-  [-5.432077171, 4.641571316, 26.2721076045],
-] as const;
-
-/** Degree-6 per-channel polynomial fit of matplotlib's magma (err ≤ 0.024). */
-export const MAGMA_COEFFICIENTS: readonly Rgb[] = [
-  [-0.0020666453, -0.0006875655, -0.0095482507],
-  [0.2504864448, 0.6944550333, 2.4952869139],
-  [8.3459009063, -3.5960313696, 0.3290570684],
-  [-27.6669694889, 14.2538530831, -13.6465831585],
-  [52.1706837385, -27.9445843529, 12.8810906346],
-  [-50.7585722964, 29.0538803789, 4.2699357345],
-  [18.6642528253, -11.4900266123, -5.5707689618],
-] as const;
+// The values live in tokens.ts, the one source; this module evaluates them.
+export {
+  BC_TYPE_COLORS,
+  ELEMENT_EDGE_COLOR,
+  ELEMENT_EDGE_COLOR_LIGHT,
+  MAGMA_COEFFICIENTS,
+  PROPOSAL_COLOR,
+  VIEWPORT_BACKGROUND,
+  VIRIDIS_COEFFICIENTS,
+  contrastRatio,
+  relativeLuminance,
+  type Rgb,
+} from "./tokens";
 
 /** Evaluate a ramp polynomial at t ∈ [0, 1] (clamped, channels clamped). */
 function evaluateRamp(coefficients: readonly Rgb[], t: number): [number, number, number] {
@@ -89,90 +78,6 @@ function rampGradient(ramp: (t: number) => [number, number, number], stops = 12)
 export const fieldRampCss = (stops = 12): string => rampGradient(fieldRamp, stops);
 export const qualityRampCss = (stops = 12): string => rampGradient(qualityRamp, stops);
 
-/**
- * The viewport's paper ground, for contrast assertions — `#e6e6e9`.
- *
- * The raymarched environment is a shallow dome around this value; the dome
- * only ever goes *darker* than it (see `environment_radiance` in
- * `cadjoint/viewer/_webgpu.py`), so this is its brightest representative
- * sample and a ratio passing here passes everywhere in the viewport.
- *
- * Measured: OKLab L 0.926, and 19.2 ΔOKLab from its nearest viridis sample
- * (viridis(1.00) `#fae720`) — the field separates from the ground as a
- * colour even where it does not separate as a luminance.
- */
-export const VIEWPORT_BACKGROUND: Rgb = [0.902, 0.902, 0.914];
-
-/**
- * BC-type overlay hues (area tint + the panel's row swatches and legend).
- *
- * azure / ochre / violet / red: mutually distinguishable, ≥3:1 against the
- * paper viewport, and none sits on either ramp's reserved high end. Each is
- * the darkest-but-one step of its own hue that still holds full chroma —
- * on paper the hue survives the darkening, and the ramps stay the most
- * saturated thing on screen because they still own both ends of L.
- */
-export const BC_TYPE_COLORS: Record<StudyBcType, Rgb> = {
-  dirichlet: [0.122, 0.482, 0.961],
-  heat_flux: [0.753, 0.408, 0.114],
-  fixed: [0.667, 0.322, 0.965],
-  traction: [0.953, 0.161, 0.286],
-  // A flow study's five, held to the same numbers as the four above by
-  // `test/simColors.test.ts` and `test/tokens.test.ts`: 3:1 against paper,
-  // clear of both ramps' reserved high ends, of the builder's proposal
-  // teal, of every chrome accent, and of each other. Ordered by what the
-  // condition does — olive in, navy out, blue for the no-slip wall, violet
-  // for heat put in, purple for a held value.
-  inlet: [0.342, 0.51, 0.09],
-  outlet: [0.09, 0.216, 0.51],
-  walls: [0.008, 0.118, 0.832],
-  heat_source: [0.347, 0.218, 0.862],
-  held_temperature: [0.359, 0.006, 0.594],
-};
-
-/**
- * The builder's live proposal preview: deep teal. Not on either ramp's
- * high end, far from the selection lime and the Simulate amber accent, and
- * 4.1:1 against paper — the pale cyan this replaces measured 1.3:1 there.
- */
-export const PROPOSAL_COLOR: Rgb = [0.106, 0.475, 0.529];
-
-/**
- * Element-edge lines, dark tone: drawn where the ramp value under the
- * hairline is bright. Mirrored as a constant in simulation.wgsl.
- */
-export const ELEMENT_EDGE_COLOR: Rgb = [0.05, 0.05, 0.06];
-
-/**
- * Element-edge lines, light tone: drawn where the ramp value under the
- * hairline is dark (viridis' purple end swallows a charcoal line). The
- * shader picks between the two by the ramp colour's relative luminance, so
- * the wireframe stays legible across the whole field. Mirrored in
- * simulation.wgsl.
- */
-export const ELEMENT_EDGE_COLOR_LIGHT: Rgb = [0.86, 0.9, 0.94];
-
 /** Quality accent for panel chrome tied to the quality ramp (histogram). */
 export const QUALITY_ACCENT: Rgb = qualityRamp(0.75);
 
-// ── contrast math (WCAG relative luminance), used by the color tests ──────
-
-function linearChannel(value: number): number {
-  return value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
-}
-
-/** WCAG relative luminance of a normalized rgb triple. */
-export function relativeLuminance(rgb: Rgb): number {
-  return (
-    0.2126 * linearChannel(rgb[0]) +
-    0.7152 * linearChannel(rgb[1]) +
-    0.0722 * linearChannel(rgb[2])
-  );
-}
-
-/** WCAG contrast ratio between two colors (≥ 1, order-independent). */
-export function contrastRatio(a: Rgb, b: Rgb): number {
-  const lighter = Math.max(relativeLuminance(a), relativeLuminance(b));
-  const darker = Math.min(relativeLuminance(a), relativeLuminance(b));
-  return (lighter + 0.05) / (darker + 0.05);
-}

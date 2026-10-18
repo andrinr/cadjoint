@@ -5,6 +5,7 @@ import {
   elementTitle,
   formatArgument,
   kindLabel,
+  materialTargetLine,
   resolveSections,
   runtimePlaneRows,
 } from "../src/properties";
@@ -203,5 +204,49 @@ describe("the object tree with elements", () => {
     const rows = buildSceneTree(NODES);
     expect(rows.find((row) => row.kind === "operator")!.elementId).toBeNull();
     expect(rows.some((row) => row.kind === "boolean")).toBe(false);
+  });
+});
+
+describe("materialTargetLine", () => {
+  const box = node({
+    id: "box_0",
+    stableId: "assign:block",
+    kind: "box",
+    name: "block",
+    line: 7,
+    operators: [],
+  });
+  const boxElement = element({
+    id: "assign:block",
+    stableId: "assign:block",
+    kind: "primitive",
+    call: "box",
+    line: 7,
+  });
+
+  it("offers the drop's patch line for the selected node's own section", () => {
+    expect(materialTargetLine([boxElement], box, boxElement)).toBe(7);
+  });
+
+  it("offers nothing when the call already names a material", () => {
+    const named = element({
+      ...boxElement,
+      arguments: [
+        argument({
+          name: "material",
+          kind: "reference",
+          value: "steel",
+          patch: { op: "assign_material", name: "box", argument: "material", line: 7, id: "assign:block" },
+        }),
+      ],
+    });
+    expect(materialTargetLine([named], box, named)).toBeNull();
+  });
+
+  it("offers nothing for another section or a dynamic node", () => {
+    const other = element({ id: "assign:other", stableId: "assign:other", kind: "plane" });
+    expect(materialTargetLine([boxElement, other], box, other)).toBeNull();
+    expect(materialTargetLine([boxElement], { ...box, editable: false }, boxElement)).toBeNull();
+    expect(materialTargetLine([boxElement], undefined, boxElement)).toBeNull();
   });
 });

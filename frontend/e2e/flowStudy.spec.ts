@@ -19,11 +19,11 @@ async function waitForCompile(page: Page) {
 async function openStudies(page: Page) {
   // The Window menu item toggles, and dock arrangements survive a reload, so
   // clicking it blindly closes the panel a previous test left open.
-  if (await page.getByTestId("simulate-add-flow").isVisible().catch(() => false)) return;
+  if (await page.getByTestId("simulate-add-study").isVisible().catch(() => false)) return;
   await page.getByTestId("menu-window").click();
   await page.getByTestId("menu-window-studies").click();
   await page.keyboard.press("Escape");
-  await expect(page.getByTestId("simulate-add-flow")).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByTestId("simulate-add-study")).toBeVisible({ timeout: 30_000 });
 }
 
 async function start(page: Page): Promise<string[]> {
@@ -53,7 +53,7 @@ test("the duct scene's conditions read in the Studies window", async ({ page }) 
   expect(rows).toContain("lattice inlet face");
   expect(rows).toContain("lattice outlet face");
   expect(rows).toContain("duct walls");
-  expect(rows).toContain("box [-0.14, -0.18, -0.4]");
+  expect(rows).toContain("box [-0.14, -0.18, -0.42] → [0.14, 0.18, -0.18]");
   expect(errors, errors.join("\n")).toEqual([]);
 });
 
@@ -66,6 +66,8 @@ test("adding a flow study writes a runnable declaration", async ({ page }) => {
   await page.getByTestId("scene-open-starter.py").click();
   await openStudies(page);
   await expect(page.getByText("sink-conduction").first()).toBeVisible({ timeout: 120_000 });
+  // One "+ Study" opens the kinds, as Simulate › New study does.
+  await page.getByTestId("simulate-add-study").click();
   await page.getByTestId("simulate-add-flow").click();
   await expect(page.getByText("study1").first()).toBeVisible({ timeout: 120_000 });
 

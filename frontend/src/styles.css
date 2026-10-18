@@ -16,233 +16,22 @@
  *     so a hairline is what separates two things and a shared left edge is
  *     what groups them. There are no shadows and no radii in this file.
  *
- * The one exception is the "preview artwork" block near the material and
- * render-preset cards: those gradients are pictures of materials, not UI,
- * and are fenced off with @artwork markers.
+ * The one exception is the distance-field legend: its ramps are pictures of
+ * an encoding, not UI, and are fenced off with @artwork markers. Material
+ * swatches are rendered images (components/materialPreview.ts).
  */
 
-:root {
-  /* ── colour: the ground ────────────────────────────────────────────── */
-  /* One sheet. Chrome and the viewport carry the same paper, so the seam
-     between them measures 1.00:1 — there is no luminance step to read, and
-     the edge has to be *drawn*. That is the idea the whole file is built on:
-     structure comes from rules, not from boxes. Everything below is either a
-     lighter sheet laid on this one or ink printed on it. */
-  --surface-viewport: #e6e6e9;
-  --surface-viewport-94: rgba(230, 230, 233, 0.94);
-  --surface-viewport-70: rgba(230, 230, 233, 0.7);
-  --surface-base: #e6e6e9;
-  --surface-bar: #e6e6e9;
-  --surface-bar-alt: #edecee;
-  --surface-float: #f8f7f8;
-  --surface-panel: #f8f7f8;
-  --surface-raised: #f8f7f8;
-  /* Hover is a step *down*: on paper, pressure darkens. A light UI that
-     brightens on hover has nowhere to go once the sheet is already white. */
-  --surface-raised-hover: #edecee;
+/* The token block lives in tokens.css, generated from src/tokens.ts and
+   imported ahead of this file (main.tsx). Nothing here declares a value. */
 
-  /* Chrome floating over the viewport. Opaque at rest — a panel that let the
-     field show through would put a colormap behind type (§12.6). */
-  --surface-float-80: rgba(248, 247, 248, 0.96);
-  --surface-float-90: rgba(248, 247, 248, 0.98);
-  --surface-float-96: rgba(248, 247, 248, 1);
-  --surface-float-00: rgba(248, 247, 248, 0);
-  /* Shade is a fade of ink, not of black: on paper, black scrims grey the
-     sheet instead of deepening it. */
-  --shade-none: rgba(24, 22, 26, 0);
-  --shade-soft: rgba(24, 22, 26, 0.1);
-  --shade-strong: rgba(24, 22, 26, 0.16);
-  --shade-scroll: rgba(24, 22, 26, 0.22);
-  --scrim: rgba(24, 22, 26, 0.42);
-  /* Wells recessed into a sheet — a tint of ink, not a new colour. */
-  --surface-inset: rgba(24, 22, 26, 0.035);
-  --surface-inset-hover: rgba(24, 22, 26, 0.07);
-
-  /* ── colour: ink ───────────────────────────────────────────────────── */
-  /* Three levels and no fourth. Text is never dimmed with `opacity`: an
-     opacity fade has no contrast ratio anyone can assert. 14.4 / 7.5 / 5.1
-     on the darkest sheet, so even --ink-3 clears AA everywhere. */
-  --ink: #18161a;
-  --ink-2: #48464d;
-  --ink-3: #605e65;
-  /* The one ink printed on the accent rather than on paper: 7.02:1. */
-  --ink-on-accent: #0a0a0c;
-
-  /* ── colour: rules ─────────────────────────────────────────────────── */
-  /* One weight — 1px, always — and three contrasts. On a sheet the hierarchy
-     is how dark a line is, never how thick:
-       --rule         2.15:1 on paper, separation inside a panel
-       --rule-strong  3.81:1, between sections and at the viewport seam
-       --rule-heavy   9.85:1, the viewport frame and its corner marks
-     --rule sits under 3:1 on purpose: a resting hairline is structure, not
-     state. --rule-strong is the one that has to be found, because it is what
-     says "the viewport starts here" when no luminance step says it. */
-  --rule: #9f9da5;
-  --rule-strong: #747278;
-  --rule-heavy: #36343b;
-  /* Weaker than --rule: separation between rows of one list. */
-  --divider: rgba(24, 22, 26, 0.09);
-
-  /* ── colour: the accent ────────────────────────────────────────────── */
-  /* One hue, one job: a fill behind near-black type. 7.02:1 as a ground under
-     --ink-on-accent; 2.26:1 as ink on paper. Those are not two options, they
-     are a pass and a fail, so the accent is never text and never a hairline.
-     --accent-press is the pressed fill, and the only accent-coloured *mark*
-     the system allows (3.36:1 on paper). */
-  --accent: #f87318;
-  --accent-press: #c85d00;
-
-  /* ── colour: status ────────────────────────────────────────────────── */
-  /* Re-authored for paper: on a light ground a tone is darkened, not
-     brightened, to be read. 5.3 / 4.8 / 4.7 on the darkest sheet. */
-  --danger: #a8341c;
-  --danger-ink: #8a1f10;
-  /* The editor's warning severity: the accent family darkened past the point
-     where it can be a mark and shifted to amber so it is not danger's red.
-     4.76:1 on paper — a mark and a label at the same time. */
-  --warn: #8a5a00;
-  --info: #0065b4;
-  --info-ink: #004a85;
-  --ok: #00734c;
-
-  /* ── colour: viewport ink ──────────────────────────────────────────── */
-  /* Ink drawn inside the viewport rectangle. Now the same values chrome uses,
-     because chrome and viewport share a ground — but a separate list, because
-     it owes a separate rule: inside the rectangle nothing is coloured. The
-     field ramp is the only hue in there, which is what makes an annotation
-     unmistakably an annotation rather than a value. */
-  --viewport-ink: #18161a;
-  --viewport-ink-2: #605e65;
-  --viewport-mark: #48464d;
-  --viewport-mode: #605e65;
-  --viewport-mark-rgb: 72, 70, 77;
-  --viewport-mode-rgb: 96, 94, 101;
-
-  /* ── colour: graticule ─────────────────────────────────────────────── */
-  /* The instrument faceplate the scene is drawn over: the ruled grid and the
-     two centre axes. Structure, never text, so both sit below the 3:1 a
-     meaningful mark owes — 1.8 and 2.2 : 1 on paper, weaker first. The shader
-     reads them through tokens.ts; they are declared here so the token layer
-     stays one list. */
-  --graticule-line: #adadb3;
-  --graticule-axis: #9c9ca2;
-
-  /* Accent alpha ladder. The accent appears at exactly six strengths and each
-     step means something: a wash is a sheet barely touched, a tint is an
-     active row's fill, a veil is a decorative hairline, an edge is an active
-     control's border, a mark is something that has to be found. Solid is the
-     sixth and the important one — the filled block behind black type. */
-  --alpha-wash: 0.06;
-  --alpha-tint: 0.12;
-  --alpha-tint-strong: 0.18;
-  --alpha-veil: 0.28;
-  --alpha-edge: 0.55;
-  --alpha-mark: 0.85;
-
-  /* rgb triples, so a rule can tint with an alpha. */
-  --accent-rgb: 248, 115, 24;
-  --ink-rgb: 24, 22, 26;
-  --danger-rgb: 168, 52, 28;
-  --info-rgb: 0, 101, 180;
-  --ok-rgb: 0, 115, 76;
-
-  /* ── type ──────────────────────────────────────────────────────────── */
-  /* Mono is the house face. Every label, tab, menu item, readout and unit in
-     the chrome is monospaced, because the panel is a view of a program and
-     the furniture should say so; sans is kept for prose — hints, warnings,
-     descriptions — which is the only text here that is sentences. */
-  --font-sans: system-ui, -apple-system, "Segoe UI", sans-serif;
-  --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
-
-  --text-3xs: 9px;
-  --text-2xs: 10px;
-  --text-xs: 11px;
-  --text-sm: 12px;
-  --text-md: 13px;
-  --text-lg: 15px;
-
-  --weight-regular: 400;
-  --weight-medium: 500;
-  --weight-semibold: 600;
-  --weight-bold: 700;
-
-  --leading-flat: 1;
-  --leading-tight: 1.25;
-  --leading-snug: 1.4;
-  --leading-normal: 1.55;
-
-  /* Tracking is a function of size, not a house style: 9px needs 0.16em to
-     keep its counters open and 15px would fall apart at the same value. One
-     global tracking token is the tell of a system that never measured its own
-     labels. */
-  --tracking-3xs: 0.16em;
-  --tracking-2xs: 0.13em;
-  --tracking-xs: 0.1em;
-  --tracking-sm: 0.08em;
-  --tracking-md: 0.06em;
-  --tracking-lg: 0.04em;
-
-  /* Composites for the combinations that repeat everywhere. */
-  --type-kicker: var(--weight-semibold) var(--text-3xs) / var(--leading-flat)
-    var(--font-mono);
-  --type-mono: var(--weight-medium) var(--text-2xs) / var(--leading-tight)
-    var(--font-mono);
-  --type-mono-strong: var(--weight-semibold) var(--text-2xs) /
-    var(--leading-tight) var(--font-mono);
-
-  /* ── space ─────────────────────────────────────────────────────────── */
-  --space-1: 2px;
-  --space-2: 4px;
-  --space-3: 6px;
-  --space-4: 8px;
-  --space-5: 12px;
-  --space-6: 16px;
-  --space-7: 24px;
-
-  /* ── shape ─────────────────────────────────────────────────────────── */
-  /* One radius, and it is zero. Named rather than deleted so the decision has
-     a place to live: everything here is a cell on a ruled sheet, and cells
-     are square. The one exception is the status dot, which is a circle
-     because roundness carries "this is a point, not a region". */
-  --radius: 0px;
-
-  /* Every interactive box picks one of four heights; that is what keeps a
-     label, its input and its icon on one baseline. */
-  --control-xs: 22px;
-  --control-sm: 26px;
-  --control-md: 30px;
-  --control-lg: 34px;
-  --control-xl: 36px;
-
-  /* ── depth ─────────────────────────────────────────────────────────── */
-  /* There is none, and that is a decision rather than an omission. Elevation
-     on this sheet is luminance plus a rule; a drop shadow on paper is a
-     picture of a card lying on a desk, which is a metaphor this instrument
-     does not want. Nothing in the file casts. */
-
-  /* ── motion ────────────────────────────────────────────────────────── */
-  --dur-fast: 90ms;
-  --dur-base: 160ms;
-  --dur-slow: 260ms;
-  --ease: cubic-bezier(0.2, 0, 0, 1);
-  --ease-inout: cubic-bezier(0.4, 0, 0.2, 1);
-
-  color-scheme: light;
-}
-
-/* Per-mode accent. All three modes name the same fill, because the mode is
-   read from *where* the filled cell sits in the switcher and from the word in
-   the hint bar, not from a hue (design-language.md §6). The three selectors
-   stay because MODE_ACCENTS in src/tokens.ts is still mode-shaped and
-   test/tokens.test.ts asserts each binding; --viewport-accent is its
-   achromatic twin for the mode cue drawn inside the viewport rectangle,
-   where no chrome hue is allowed to go. */
+/* Per-mode accent. All three modes name the same fill: the mode is read from
+   which switcher cell is filled and the word in the hint bar, not from a hue
+   (design-language.md §6). --viewport-accent-rgb is the achromatic twin for
+   marks inside the viewport, where no chrome hue goes. */
 .app[data-mode="model"],
 .app[data-mode="sketch"],
 .app[data-mode="simulate"] {
-  --mode-accent: var(--accent);
   --mode-accent-rgb: var(--accent-rgb);
-  --viewport-accent: var(--viewport-mode);
   --viewport-accent-rgb: var(--viewport-mode-rgb);
 }
 
@@ -257,85 +46,53 @@ body,
   margin: 0;
 }
 
-/* `bolder` is relative, so a <b> inside a semibold button resolved to 900 —
-   a weight that is not on the scale and appears nowhere else. */
+/* Weight belongs to the text role, never to the element: a <b> or <strong>
+   inside a role is set in that role, and stands out by its ink level. */
 b,
 strong {
-  font-weight: var(--weight-semibold);
+  font-weight: inherit;
 }
 
-/* Mono is the default, not the exception. Every label, tab, menu item,
-   readout and unit in the chrome is monospaced, because the panel is a view
-   of a program and its furniture should look like one; --font-sans is opted
-   back in for prose — hints, warnings, descriptions, the shortcut sheet —
-   which is the only text in this app that is sentences. */
+/* `small` would shrink its text by a browser-chosen step (10.83px in the
+   perf readout); it is a role carrier like any other element. */
+small {
+  font-size: inherit;
+}
+
+/* ── text ─────────────────────────────────────────────────────────────── */
+
+/* Text is set in four roles (src/tokens.ts TEXT_ROLES: caps, body, title,
+   prose), each applied whole — font, tracking, case and figures together —
+   and nowhere else does a rule touch size, weight, tracking or case.
+
+   Body is the default. A program string keeps the case the program wrote
+   (§4), which is why tree names, study names and menu items are body and
+   never tracked capitals. Hierarchy inside a component comes from the role
+   and the ink level (ink, ink-2, ink-3). */
 body {
-  background: var(--surface-base);
+  background: var(--plane-ground);
   color: var(--ink);
-  font: var(--weight-regular) var(--text-sm) / var(--leading-normal)
-    var(--font-mono);
+  font: var(--text-body);
+  letter-spacing: var(--track-body);
+  text-transform: var(--case-body);
+  font-variant-numeric: var(--numeric-body);
   overflow: hidden;
 }
 
-/* Prose, and the only place sans is set.
-   `.material-empty` used to be on this list and is not any more. It is the
-   line the material panel shows instead of `.material-help` when the library
-   is empty — the same one-line instruction, in the same slot under the same
-   header — and the two were set in two different families, which read as a
-   font bug the moment the library emptied. A one-line readout of a state is
-   not prose; the sentences below are. */
-.viewer-hint,
-.menu-dropdown small,
-.opt-player-hint,
-.shortcut-groups li,
-.dialog p,
-.render-preset-card small,
-.render-preset-heading small {
-  font-family: var(--font-sans);
-  text-transform: none;
-  letter-spacing: normal;
-}
-
-/* Chrome furniture is tracked uppercase mono, and this is the one list that
-   says which strings are furniture: the labels a control wears, the tabs and
-   menu items you navigate by, the names of sections. It is deliberately not
-   `every button` — a button whose text is a *value* from the program (a mesh
-   name, a study name) stays as the program wrote it, because §4's rule is
-   that anything appearing in scene.py is quoted, not restyled. */
-button,
-select,
-.pane-hint,
-.status,
-.sim-row label,
-.sim-args label,
-.sim-builder-row label,
-.solver-controls label,
-.material-inspector > label,
-.material-inspector-head label,
-.save-as-form label,
-.switch span,
-.sim-stats span {
-  text-transform: uppercase;
-  letter-spacing: var(--tracking-xs);
-}
-
-/* …and the exceptions, which are the strings that exist in the source
-   program. A study called `sink-conduction` is not a label. */
-.sim-study-head strong,
-.tree-label,
-.pane-title,
-select option {
-  text-transform: none;
-  letter-spacing: var(--tracking-lg);
+.dialog p {
+  font: var(--text-prose);
+  letter-spacing: var(--track-prose);
+  text-transform: var(--case-prose);
+  font-variant-numeric: var(--numeric-prose);
 }
 
 /* ── shared chrome behaviour ──────────────────────────────────────────── */
 
-/* One focus ring for the whole app, drawn in the active mode's accent so
-   keyboard focus is legible without adding a fifth accent colour. */
+/* One focus ring for the whole app: the 2px ink edge, the weight that means
+   "this is the active one". The accent is a fill and never draws a line. */
 :focus-visible {
-  outline: 2px solid var(--mode-accent, var(--accent));
-  outline-offset: 1px;
+  outline: var(--line-active);
+  outline-offset: var(--hairline);
 }
 
 /* Scrollbars are chrome, so they get chrome's restraint: a hairline-width
@@ -346,8 +103,8 @@ select option {
 }
 
 ::-webkit-scrollbar {
-  width: 9px;
-  height: 9px;
+  width: var(--unit);
+  height: var(--unit);
 }
 
 ::-webkit-scrollbar-track {
@@ -355,14 +112,12 @@ select option {
 }
 
 ::-webkit-scrollbar-thumb {
-  border: 3px solid transparent;
+  border: 0;
   background: var(--rule-strong);
-  background-clip: content-box;
 }
 
 ::-webkit-scrollbar-thumb:hover {
   background: var(--ink-3);
-  background-clip: content-box;
 }
 
 ::-webkit-scrollbar-corner {
@@ -393,7 +148,8 @@ select option {
 
 .app {
   display: grid;
-  grid-template-rows: 30px 52px 1fr;
+  /* The desk's rows (L5): the menu bar a bar, the toolbar a toolbar height. */
+  grid-template-rows: var(--control-lg) var(--control-xl) 1fr;
   height: 100%;
 }
 
@@ -409,11 +165,12 @@ select option {
   position: relative;
   z-index: 1000;
   display: flex;
+  height: var(--control-lg);
   align-items: stretch;
-  gap: var(--space-1);
-  padding: 0 var(--space-4);
-  border-bottom: 1px solid var(--rule);
-  background: var(--surface-bar);
+  gap: var(--gap);
+  padding: 0 var(--inset);
+  border-bottom: var(--line);
+  background: var(--plane-ground);
 }
 
 .menu {
@@ -421,59 +178,72 @@ select option {
   display: flex;
 }
 
+/* The titles fill the bar's height, so the open title's block is the bar's
+   cell (no 2px nudge that put every title off the grid). */
 .menu-title {
-  height: var(--control-sm);
-  margin: var(--space-1) 0;
-  padding: 0 var(--space-4);
+  height: 100%;
+  margin: 0;
+  padding: 0 var(--inset);
   border: 0;
   background: transparent;
   color: var(--ink-2);
-  font: var(--weight-semibold) var(--text-2xs) / var(--leading-flat)
-    var(--font-mono);
-  letter-spacing: var(--tracking-2xs);
-  text-transform: uppercase;
+  font: var(--text-caps);
+  letter-spacing: var(--track-caps);
+  text-transform: var(--case-caps);
+  font-variant-numeric: var(--numeric-caps);
   transition:
     background-color var(--dur-fast) var(--ease),
     color var(--dur-fast) var(--ease);
 }
 
-.menu-title:hover,
-.menu-title.active {
-  background: var(--accent);
-  color: var(--ink-on-accent);
+/* Hover is a step, not a state: only the open menu is current, and only the
+   current thing takes the accent. */
+.menu-title:hover {
+  background: var(--plane-step);
+  color: var(--ink);
+}
+
+.menu-title.active,
+.menu-title.active:hover {
+  background: var(--block-current);
+  color: var(--block-current-ink);
 }
 
 .menu-dropdown {
   position: absolute;
-  top: calc(100% + var(--space-1));
+  top: calc(100% + var(--gap));
   left: 0;
   z-index: 60;
   display: flex;
   flex-direction: column;
-  gap: 1px;
-  min-width: 208px;
-  padding: var(--space-2);
-  border: 1px solid var(--rule);
-  background: var(--surface-panel);
+  min-width: calc(var(--unit) * 52);
+  padding: var(--gap) 0;
+  border: var(--line);
+  background: var(--plane-sheet);
   animation: pop-in var(--dur-base) var(--ease);
   transform-origin: top left;
 }
 
+/* One column, everywhere: a fixed leading cell for the check or the dot
+   (empty on plain items), the label, then the shortcut hung right. The mode
+   items used to centre because they alone had a mark and no column for it. */
 .menu-dropdown button,
 .menu-dropdown a {
-  display: flex;
+  display: grid;
+  grid-template-columns: calc(var(--unit) * 6) minmax(0, 1fr) auto;
   align-items: center;
-  justify-content: space-between;
-  gap: var(--space-6);
+  gap: 0 var(--inset);
   width: 100%;
   height: var(--control-sm);
-  padding: 0 var(--space-4);
+  padding: 0 var(--inset) 0 0;
+
   border: 0;
   background: transparent;
   color: var(--ink);
-  font: inherit;
-  font-size: var(--text-sm);
-  font-weight: var(--weight-medium);
+  font: var(--text-body);
+  letter-spacing: var(--track-body);
+  text-transform: var(--case-body);
+  font-variant-numeric: var(--numeric-body);
   text-align: left;
   text-decoration: none;
   cursor: pointer;
@@ -484,7 +254,7 @@ select option {
 .menu-dropdown a:hover,
 .menu-dropdown button:focus-visible,
 .menu-dropdown a:focus-visible {
-  background: var(--surface-raised-hover);
+  background: var(--plane-step);
   outline: none;
 }
 
@@ -494,26 +264,34 @@ select option {
 
 .menu-dropdown small {
   color: var(--ink-3);
-  font-size: var(--text-2xs);
+  font: var(--text-body);
+  letter-spacing: var(--track-body);
+  text-transform: var(--case-body);
+  font-variant-numeric: var(--numeric-body);
 }
 
 .menu-dropdown hr {
-  height: 1px;
-  margin: var(--space-2) var(--space-1);
+  height: var(--hairline);
+  margin: var(--gap) 0;
   border: 0;
-  background: var(--divider);
+  background: var(--rule);
 }
 
-.menu-dropdown [role="menuitemcheckbox"] {
-  justify-content: flex-start;
-  gap: var(--space-3);
+.menu-dropdown button > span,
+.menu-dropdown a > span {
+  grid-column: 2;
+}
+
+.menu-dropdown button > small,
+.menu-dropdown a > small {
+  grid-column: 3;
 }
 
 .menu-check {
-  width: 13px;
+  grid-column: 1;
   color: var(--ink);
-  font-size: var(--text-2xs);
   font-style: normal;
+  text-align: center;
 }
 
 .menu-scene {
@@ -522,9 +300,10 @@ select option {
   overflow: hidden;
   max-width: 32ch;
   color: var(--ink-3);
-  font: var(--type-kicker);
-  letter-spacing: var(--tracking-3xs);
-  text-transform: uppercase;
+  font: var(--text-caps);
+  letter-spacing: var(--track-caps);
+  text-transform: var(--case-caps);
+  font-variant-numeric: var(--numeric-caps);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -535,10 +314,10 @@ select option {
   position: relative;
   display: flex;
   align-items: center;
-  gap: var(--space-5);
-  padding: 0 var(--space-5);
-  border-bottom: 1px solid var(--rule);
-  background: var(--surface-bar-alt);
+  gap: var(--section);
+  padding: 0 var(--inset);
+  border-bottom: var(--line);
+  background: var(--plane-step);
 }
 
 /* The busy seam ------------------------------------------------------- */
@@ -546,18 +325,19 @@ select option {
 /* A compile of a real scene is twenty-five seconds during which the viewport
    is showing the *previous* program, and a chip is a small mark in a bar the
    eye skips. So the bar's own bottom rule — the line between the chrome and
-   the work — doubles to 2px and fills with the accent while that is true. It
-   is 1900px long and it costs no space: the rule is there either way, and 2px
-   is the language's reserved weight for an active state (§5). The accent is a
-   ground here and carries no type, which is the only shape it is allowed. */
+   the work — doubles to the active stroke and fills with ink while that is
+   true. It is the width of the window and it costs no space: the rule is
+   there either way, and 2px is the language's reserved weight for an active
+   state. Ink, not the accent: the accent is only a fill behind type, and a
+   compile in flight is not the *current* thing, it is work. */
 .toolbar-busy {
   position: absolute;
   right: 0;
-  bottom: -1px;
+  bottom: calc(var(--hairline) * -1);
   left: 0;
-  height: 2px;
+  height: var(--stroke-active);
   overflow: hidden;
-  background: var(--accent);
+  background: var(--ink);
 }
 
 /* The travelling segment, in the one darker tone of the same hue. The solid
@@ -572,7 +352,8 @@ select option {
   top: 0;
   bottom: 0;
   width: 22%;
-  background: var(--accent-press);
+  background: var(--ink-3);
+
   animation: toolbar-busy-sweep 1.4s var(--ease-inout) infinite;
 }
 
@@ -596,23 +377,20 @@ select option {
 .brand {
   display: flex;
   align-items: center;
-  gap: var(--space-4);
-  font: var(--weight-bold) var(--text-sm) / var(--leading-flat)
-    var(--font-mono);
-  letter-spacing: var(--tracking-sm);
-  text-transform: uppercase;
+  gap: var(--inset);
+  font: var(--text-caps);
+  letter-spacing: var(--track-caps);
+  text-transform: var(--case-caps);
+  font-variant-numeric: var(--numeric-caps);
 }
 
 .brand .mark {
   display: grid;
   place-items: center;
-  width: 26px;
-  height: 26px;
-  background: var(--accent);
-  color: var(--ink-on-accent);
-  font-size: var(--text-sm);
-  font-weight: var(--weight-bold);
-  line-height: var(--leading-flat);
+  width: calc(var(--unit) * 6);
+  height: calc(var(--unit) * 6);
+  background: var(--block-current);
+  color: var(--block-current-ink);
 }
 
 .spacer {
@@ -625,24 +403,24 @@ select option {
    the cells share rules with each other, the way cells on a sheet do. */
 .mode-switcher {
   display: flex;
-  margin-left: var(--space-4);
-  border: 1px solid var(--rule-strong);
+  margin-left: var(--inset);
+  border: var(--line);
 }
 
 .mode-switcher button {
   display: inline-flex;
   align-items: center;
-  gap: var(--space-3);
+  gap: var(--gap);
   height: var(--control-xl);
-  padding: 0 var(--space-6);
+  padding: 0 var(--inset);
   border: 0;
-  border-left: 1px solid var(--rule);
+  border-left: var(--line);
   background: transparent;
   color: var(--ink-2);
-  font: var(--weight-semibold) var(--text-xs) / var(--leading-flat)
-    var(--font-mono);
-  letter-spacing: var(--tracking-xs);
-  text-transform: uppercase;
+  font: var(--text-caps);
+  letter-spacing: var(--track-caps);
+  text-transform: var(--case-caps);
+  font-variant-numeric: var(--numeric-caps);
   transition:
     background-color var(--dur-base) var(--ease),
     border-color var(--dur-base) var(--ease),
@@ -650,12 +428,12 @@ select option {
 }
 
 .mode-switcher button svg {
-  width: 15px;
-  height: 15px;
+  width: calc(var(--unit) * 4);
+  height: calc(var(--unit) * 4);
 }
 
 .mode-switcher button:hover:not(.active) {
-  background: var(--surface-raised-hover);
+  background: var(--plane-step);
   color: var(--ink);
 }
 
@@ -664,24 +442,23 @@ select option {
 }
 
 .mode-switcher button.active {
-  background: var(--accent);
-  color: var(--ink-on-accent);
+  background: var(--block-current);
+  color: var(--block-current-ink);
 }
 
-/* A control's edge is something you have to find, so it clears the 3:1 a
-   meaningful non-text mark owes (--rule-strong, 3.8:1 on paper). --rule is
-   one step weaker and belongs to *structure* — the hairlines that divide a
-   panel into cells, which nobody has to find because they are the grid. */
-button,
-select {
-  height: var(--control-md);
-  padding: 0 var(--space-5);
-  border: 1px solid var(--rule-strong);
-  background: var(--surface-raised);
+/* A control's edge is something you have to find, so it uses --rule-strong
+   (≥3:1 on paper). --rule is weaker and belongs to structure: the hairlines
+   that divide a panel into cells. */
+button {
+  height: var(--control-sm);
+  padding: 0 var(--inset);
+  border: var(--line);
+  background: var(--plane-sheet);
   color: var(--ink);
-  font: inherit;
-  font-size: var(--text-sm);
-  font-weight: var(--weight-semibold);
+  font: var(--text-caps);
+  letter-spacing: var(--track-caps);
+  text-transform: var(--case-caps);
+  font-variant-numeric: var(--numeric-caps);
   cursor: pointer;
   transition:
     background-color var(--dur-fast) var(--ease),
@@ -690,8 +467,7 @@ select {
     opacity var(--dur-fast) var(--ease);
 }
 
-button:hover:not(:disabled),
-select:hover {
+button:hover:not(:disabled) {
   border-color: var(--rule-strong);
 }
 
@@ -701,41 +477,32 @@ button:disabled {
 }
 
 /* One "this control is on" treatment for the whole app: the accent as a solid
-   fill with near-black type on it, and that is the only shape the accent is
-   allowed to take anywhere. As a fill it measures 7.02:1 under
-   --ink-on-accent; as a label on paper it measures 2.26:1 and fails, which is
-   what the previous tint-plus-accent-text version was doing in thirty places.
-   A filled cell is also how a mode is read off the switcher — the *position*
-   of the block is the signal, not its hue. */
+   fill with near-black type on it, the only shape the accent takes. As ink on
+   paper it fails contrast, so it is never text or a line. */
 button.active,
-button.primary {
-  border-color: var(--accent-press);
-  background: var(--accent);
-  color: var(--ink-on-accent);
-}
-
-button.active:hover:not(:disabled),
-button.primary:hover:not(:disabled) {
-  border-color: var(--accent-press);
-  background: var(--accent-press);
+button.primary,
+.sim-run,
+.opt-player button.opt-replay {
+  border-color: var(--accent);
+  background: var(--block-current);
+  color: var(--block-current-ink);
 }
 
 /* ── form controls ────────────────────────────────────────────────────── */
 
-/* Inputs used to fall back to the browser's own box — roughly 23px tall next
-   to 30px buttons, with grey native spin arrows leaking through. Giving them
-   a scale height is what puts a label, its box and its button on one
-   baseline inside a row. */
+/* A scale height puts a label, its box and its button on one baseline. */
 input[type="number"],
 input[type="text"] {
-  height: var(--control-md);
+  height: var(--control-sm);
   min-width: 0;
-  padding: 0 var(--space-3);
-  border: 1px solid var(--rule-strong);
-  background: var(--surface-raised);
+  padding: 0 var(--inset);
+  border: var(--line);
+  background: var(--plane-sheet);
   color: var(--ink);
-  font: var(--type-mono);
-  font-size: var(--text-xs);
+  font: var(--text-body);
+  letter-spacing: var(--track-body);
+  text-transform: var(--case-body);
+  font-variant-numeric: var(--numeric-body);
   transition: border-color var(--dur-fast) var(--ease);
 }
 
@@ -764,7 +531,7 @@ input[type="number"]::-webkit-outer-spin-button {
 }
 
 input[type="range"] {
-  height: var(--control-md);
+  height: var(--control-sm);
   /* Chrome's UA sheet gives this a 0 2px margin, which pushed it past the
      right edge of every fixed-width column it sat in. */
   margin: 0;
@@ -772,44 +539,136 @@ input[type="range"] {
 }
 
 input[type="checkbox"] {
-  width: 13px;
-  height: 13px;
+  width: calc(var(--unit) * 3);
+  height: calc(var(--unit) * 3);
   accent-color: var(--ink);
 }
 
-/* Dense panel rows run one step shorter than the toolbar's controls. */
+/* Panel-row inputs (checkboxes included) take the row's control height. */
 .sim-row input,
-.sim-row select,
 .sim-args input,
 .sim-builder-vector input[type="number"],
-.sim-builder-vector select,
 .sim-bcs li input[type="number"],
-.solver-controls input,
-.solver-controls select {
+.solver-controls input {
   height: var(--control-sm);
 }
 
-.sim-row input[type="range"],
-.sim-slice input[type="range"],
-.sim-deform input[type="range"],
-.opt-player input[type="range"] {
-  height: var(--control-sm);
+/* ── chips ──────────────────────────────────────────────────────────── */
+
+/* Kind chips are taxonomy, not status and not *current*: every kind is the
+   same inverse-ink tag, and the word says which kind it is. The modifier
+   classes (thermal, elastic, mesh, opt) stay as hooks and add no hue. */
+.sim-kind,
+.object-tree-panel > header small,
+.properties-panel > header small,
+.sketch-panel header small,
+.material-panel-title small,
+.sim-panel header small,
+.render-panel header small,
+.properties-section h3 small {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  height: var(--control-tag);
+  padding: 0 var(--gap);
+  background: var(--block-kind);
+  color: var(--block-kind-ink);
+  font: var(--text-caps);
+  letter-spacing: var(--track-caps);
+  text-transform: var(--case-caps);
+  font-variant-numeric: var(--numeric-caps);
+  white-space: nowrap;
+}
+
+/* The value chip: a string or a count from the program, on a sheet with a
+   hairline edge. Same box as the kind chip; only the fill and role differ. */
+.history-chips > span,
+.tree-badge,
+.tree-material,
+.selection-chip,
+.plane-label,
+.shortcut-groups kbd,
+.scene-materials .sim-kind {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  height: var(--control-tag);
+  padding: 0 var(--gap);
+  border: var(--line);
+  background: var(--plane-sheet);
+  color: var(--ink-2);
+  font: var(--text-body);
+  letter-spacing: var(--track-body);
+  text-transform: var(--case-body);
+  font-variant-numeric: var(--numeric-body);
+  white-space: nowrap;
 }
 
 /* Viewport overlays ---------------------------------------------------- */
 
+/* The tool rail: a narrow floating card in the viewport's top-left corner,
+   one 32px cell per tool; the word is in each tooltip and the armed tool is
+   named in the hint bar. */
 .tool-rail {
   position: absolute;
-  top: var(--space-5);
-  left: var(--space-5);
+  top: var(--section);
+  left: var(--section);
   z-index: 10;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: var(--space-2);
-  padding: var(--space-3);
-  border: 1px solid var(--rule);
-  background: var(--surface-float-80);
+  gap: var(--gap);
+  padding: var(--gap);
+  border: var(--line);
+  background: var(--plane-sheet);
+}
+
+.tool-rail .rail-word {
+  display: none;
+}
+
+/* How the picture is drawn: projection and render settings, a pair over the
+   view cube in the top-right corner. */
+.view-controls {
+  position: absolute;
+  top: var(--section);
+  right: var(--section);
+  z-index: 11;
+  display: flex;
+  justify-content: center;
+  gap: var(--gap);
+  /* The cube stage's own width, so the pair is centred over the cube and
+     the buttons, the cube and the triad read as one column. */
+  width: calc(var(--unit) * 31);
+}
+
+.viewport-bar-button {
+  display: grid;
+  place-items: center;
+  width: var(--control-lg);
+  height: var(--control-lg);
+  padding: 0;
+  border: var(--line);
+  background: var(--plane-sheet);
+  color: var(--ink-2);
+}
+
+.viewport-bar-button .rail-word {
+  display: none;
+}
+
+.viewport-bar-button:hover:not(:disabled) {
+  background: var(--plane-step);
+  color: var(--ink);
+}
+
+/* Projection and the open popover are states, not the current tool: an ink
+   edge, not the accent. */
+.viewport-bar-button.active,
+.viewport-bar-button.active:hover:not(:disabled) {
+  border-color: var(--ink);
+  background: var(--plane-sheet);
+  color: var(--ink);
 }
 
 .tool-rail button {
@@ -820,19 +679,21 @@ input[type="checkbox"] {
   padding: 0;
   border-color: transparent;
   background: transparent;
-  color: var(--ink-3);
+  color: var(--ink-2);
 }
 
 .tool-rail button:hover:not(:disabled) {
   border-color: var(--rule);
   color: var(--ink);
-  background: var(--surface-raised-hover);
+  background: var(--plane-step);
 }
 
+/* The rail sits inside the viewport rectangle, where no chrome hue goes
+   (C7): its current cell is the ink block, not the accent. */
 .tool-rail button.active {
-  border-color: var(--accent-press);
-  background: var(--accent);
-  color: var(--ink-on-accent);
+  border-color: var(--block-kind);
+  background: var(--block-kind);
+  color: var(--block-kind-ink);
 }
 
 .tool-rail button:disabled {
@@ -846,27 +707,25 @@ input[type="checkbox"] {
 }
 
 .tool-rail hr {
-  width: 22px;
-  height: 1px;
-  margin: var(--space-1) 0;
+  width: calc(var(--unit) * 6);
+  height: var(--hairline);
+  /* gap + 1.5 + line + 1.5 + gap = 12: a separator is one stack step, so
+     the cells after it stay on the grid. */
+  margin: calc((var(--unit) - var(--hairline)) / 2) 0;
   border: 0;
-  background: var(--divider);
+  background: var(--rule);
 }
 
 .rail-hint {
   color: var(--ink-2);
-  font: var(--type-kicker);
-  letter-spacing: var(--tracking-3xs);
-  text-transform: uppercase;
+  font: var(--text-caps);
+  letter-spacing: var(--track-caps);
+  text-transform: var(--case-caps);
+  font-variant-numeric: var(--numeric-caps);
 }
 
 /* Grouped tool clusters: the parent shows the last-used child and expands
-   into a horizontal flyout of children beside the rail.
- *
- * A group is exactly as wide as the button inside it — it used to inherit a
- * toolbar rule (padding-left + border-left) that nothing in the toolbar
- * actually used, which pushed grouped tools 2.5px off the rail's other
- * buttons and drew a stray hairline down the column. */
+   into a horizontal flyout of children beside the rail. */
 .tool-group {
   position: relative;
   display: flex;
@@ -878,30 +737,54 @@ input[type="checkbox"] {
 
 .tool-group-caret {
   position: absolute;
-  right: 3px;
-  bottom: 3px;
-  width: 0;
-  height: 0;
-  border-left: var(--space-2) solid transparent;
-  border-bottom: var(--space-2) solid var(--ink-3);
+  right: var(--gap);
+  bottom: var(--gap);
+  width: var(--unit);
+  height: var(--unit);
+  background: var(--ink-3);
+  clip-path: polygon(100% 0, 100% 100%, 0 100%);
 }
 
-/* The caret is a 4px mark on a filled cell, so it is drawn in the ink that
-   cell carries. The accent itself is 2.26:1 on paper and can never be a mark. */
+/* On a filled cell the caret takes that cell's ink. */
 .tool-group-parent.active .tool-group-caret {
-  border-bottom-color: var(--ink-on-accent);
+  background: var(--block-kind-ink);
 }
 
+/* The flyout (K8): a separate sheet a section out from the rail's edge, its
+   cells on the parent's row, with a notch pointing back at the parent. */
 .tool-flyout {
   display: none;
   position: absolute;
-  top: -1px;
-  left: calc(100% + var(--space-5));
+  top: calc((var(--gap) + var(--hairline)) * -1);
+  left: calc(100% + var(--gap) + var(--hairline) + var(--section));
   z-index: 11;
-  gap: var(--space-2);
-  padding: var(--space-2);
-  border: 1px solid var(--rule);
-  background: var(--surface-float-96);
+  gap: var(--gap);
+  padding: var(--gap);
+  border: var(--line);
+  background: var(--plane-sheet);
+}
+
+.tool-flyout::before {
+  content: "";
+  position: absolute;
+  top: calc(50% - var(--gap));
+  left: calc(var(--gap) * -1 - var(--hairline));
+  width: var(--inset);
+  height: var(--inset);
+  border-left: var(--line);
+  border-bottom: var(--line);
+  background: var(--plane-sheet);
+  transform: rotate(45deg);
+}
+
+.tool-flyout button {
+  border: 0;
+}
+
+.tool-group.open > .tool-group-parent:not(.active) {
+  border-color: transparent;
+  background: var(--plane-step);
+  color: var(--ink);
 }
 
 .tool-group.open .tool-flyout {
@@ -916,7 +799,7 @@ input[type="checkbox"] {
   position: absolute;
   top: 0;
   left: 100%;
-  width: var(--space-5);
+  width: calc(var(--gap) + var(--hairline) + var(--section));
   height: 100%;
 }
 
@@ -925,29 +808,28 @@ input[type="checkbox"] {
   display: flex;
   flex-direction: column;
   align-items: stretch;
-  gap: var(--space-1);
-  padding-top: var(--space-1);
+  gap: var(--gap);
+  padding-top: var(--gap);
 }
 
 .plane-picks-label {
   color: var(--ink-3);
-  font: var(--type-kicker);
-  letter-spacing: var(--tracking-3xs);
-  text-transform: uppercase;
+  font: var(--text-caps);
+  letter-spacing: var(--track-caps);
+  text-transform: var(--case-caps);
+  font-variant-numeric: var(--numeric-caps);
   text-align: center;
 }
 
 .tool-rail .plane-picks button {
   width: var(--control-lg);
-  height: var(--control-xs);
-  font: var(--type-kicker);
-  letter-spacing: 0.05em;
+  height: var(--control-sm);
 }
 
 /* Sketch history (a dock section; the shell comes from the dock rules). */
 
 .sketch-panel {
-  padding: var(--space-5);
+  padding: var(--inset);
   overflow: auto;
 }
 
@@ -955,65 +837,55 @@ input[type="checkbox"] {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: var(--space-4);
-  margin-bottom: var(--space-4);
+  gap: var(--inset);
+  margin-bottom: var(--inset);
 }
 
 /* The point count rides the kicker line, so it inherits the kicker's type
    and only needs separating from the label. */
 .sketch-panel header small {
   display: flex;
-  gap: var(--space-3);
+  gap: var(--gap);
 }
 
 .sketch-panel header small b {
-  color: var(--ink-on-accent);
+  color: inherit;
   font: inherit;
 }
 
 .history-chips {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--space-2);
-  margin-bottom: var(--space-4);
+  gap: var(--gap);
+  margin-bottom: var(--inset);
 }
 
-.history-chips span {
-  padding: var(--space-1) var(--space-3);
-  border: 1px solid var(--rule);
+.history-chips > span {
   color: var(--ink-2);
-  background: rgba(
-    var(--ink-rgb),
-    var(--alpha-wash)
-  );
-  font: var(--type-kicker);
-  line-height: var(--leading-tight);
 }
 
 .history-chips .constraint-chip {
   display: inline-flex;
   align-items: center;
-  gap: var(--space-2);
+  gap: var(--gap);
 }
 
 .history-chips .chip-label {
   padding: 0;
-  border: none;
-  background: none;
 }
 
 .history-chips .chip-label.editable {
   cursor: pointer;
-  text-decoration: underline dotted var(--accent-press);
-  text-underline-offset: 2px;
+  text-decoration: underline dotted var(--ink-3);
+  text-underline-offset: var(--gap);
 }
 
 .history-chips .chip-value {
-  width: 46px;
+  width: calc(var(--unit) * 12);
   height: auto;
-  padding: 0 var(--space-1);
-  border: 1px solid var(--rule-strong);
-  background: var(--surface-raised);
+  padding: 0 var(--gap);
+  border: var(--line);
+  background: var(--plane-sheet);
   color: inherit;
   font: inherit;
 }
@@ -1024,9 +896,6 @@ input[type="checkbox"] {
   border: none;
   background: none;
   color: var(--ink-3);
-  font: inherit;
-  font-size: var(--text-xs);
-  line-height: var(--leading-flat);
   cursor: pointer;
 }
 
@@ -1040,77 +909,81 @@ input[type="checkbox"] {
 }
 
 .empty-history {
-  margin: 0 0 var(--space-4);
+  margin: 0 0 var(--inset);
   color: var(--ink-3);
-  font-size: var(--text-xs);
+  font: var(--text-prose);
+  letter-spacing: var(--track-prose);
+  text-transform: var(--case-prose);
+  font-variant-numeric: var(--numeric-prose);
 }
 
 .sketch-actions {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: var(--space-2);
+  gap: var(--gap);
 }
 
 .sketch-actions button {
   height: var(--control-sm);
   min-width: 0;
-  padding: 0 var(--space-3);
-  font-size: var(--text-2xs);
+  padding: 0 var(--inset);
 }
 
 .solver-panel {
   display: grid;
-  gap: var(--space-4);
-  margin-top: var(--space-5);
-  padding-top: var(--space-5);
-  border-top: 1px solid var(--divider);
+  gap: var(--inset);
+  margin-top: var(--section);
+  padding-top: var(--section);
+  border-top: var(--line);
 }
 
 .solver-controls {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 72px 48px;
+  grid-template-columns: minmax(0, 1fr) calc(var(--unit) * 18) calc(var(--unit) * 12);
   align-items: end;
-  gap: var(--space-3);
+  gap: var(--gap);
 }
 
 .solver-controls label {
   display: grid;
-  gap: var(--space-2);
+  gap: var(--gap);
   min-width: 0;
 }
 
 .solver-controls label > span {
   color: var(--ink-3);
-  font: var(--type-kicker);
-  letter-spacing: var(--tracking-3xs);
-  text-transform: uppercase;
+  font: var(--text-caps);
+  letter-spacing: var(--track-caps);
+  text-transform: var(--case-caps);
+  font-variant-numeric: var(--numeric-caps);
 }
 
-.solver-controls select,
 .solver-controls input,
 .solver-controls button {
   width: 100%;
   height: var(--control-sm);
   min-width: 0;
-  padding: 0 var(--space-3);
-  font-size: var(--text-2xs);
+  padding: 0 var(--inset);
 }
 
 .solver-empty {
   margin: 0;
-  padding: var(--space-4);
-  background: var(--surface-inset);
+  padding: var(--inset);
+  border: var(--line-pending);
   color: var(--ink-3);
-  font-size: var(--text-2xs);
+  font: var(--text-prose);
+  letter-spacing: var(--track-prose);
+  text-transform: var(--case-prose);
+  font-variant-numeric: var(--numeric-prose);
   text-align: center;
 }
 
-/* The constraint solver's residual chart: the one place the info tone is
-   allowed to carry a line, because the line *is* the datum. */
+/* The constraint solver's residual chart. The residual is not a free
+   parameter, so its line is ink: hue is meaning, and this one has none. */
 .solver-chart {
-  padding: var(--space-4) var(--space-4) var(--space-3);
-  border: 1px solid rgba(var(--info-rgb), var(--alpha-tint-strong));
-  background: var(--shade-soft);
+  padding: var(--inset);
+  border: var(--line);
+  background: var(--plane-step);
 }
 
 .solver-chart > div,
@@ -1118,41 +991,45 @@ input[type="checkbox"] {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: var(--space-4);
+  gap: var(--inset);
 }
 
 .solver-chart > div span,
 .solver-chart footer {
   color: var(--ink-3);
-  font: var(--type-kicker);
-  letter-spacing: var(--tracking-3xs);
-  text-transform: uppercase;
+  font: var(--text-caps);
+  letter-spacing: var(--track-caps);
+  text-transform: var(--case-caps);
+  font-variant-numeric: var(--numeric-caps);
 }
 
 .solver-chart > div b {
-  color: var(--info-ink);
-  font: var(--type-kicker);
+  color: var(--ink);
+  font: var(--text-body);
+  letter-spacing: var(--track-body);
+  text-transform: var(--case-body);
+  font-variant-numeric: var(--numeric-body);
 }
 
 .solver-chart svg {
   display: block;
   width: 100%;
-  height: 66px;
-  margin: var(--space-2) 0 var(--space-1);
+  height: calc(var(--unit) * 16);
+  margin: var(--gap) 0 var(--gap);
   overflow: visible;
 }
 
 .solver-chart line {
-  stroke: var(--divider);
+  stroke: var(--rule);
   stroke-width: 1;
 }
 
 .solver-chart polyline {
   fill: none;
-  stroke: var(--info);
-  stroke-width: 2;
-  stroke-linecap: round;
-  stroke-linejoin: round;
+  stroke: var(--ink);
+  stroke-width: 1.5;
+  stroke-linecap: square;
+  stroke-linejoin: miter;
   vector-effect: non-scaling-stroke;
 }
 
@@ -1164,15 +1041,15 @@ input[type="checkbox"] {
    the hint bar below, and never runs off-screen. */
 .dock {
   position: absolute;
-  top: 150px;
-  right: var(--space-5);
-  bottom: 40px;
+  top: calc(var(--unit) * 38);
+  right: var(--section);
+  bottom: calc(var(--unit) * 10);
   z-index: 9;
   display: flex;
   flex-direction: column;
   align-items: stretch;
-  gap: var(--space-3);
-  width: 292px;
+  gap: var(--section);
+  width: calc(var(--unit) * 73);
   pointer-events: none;
 }
 
@@ -1190,19 +1067,19 @@ input[type="checkbox"] {
    small minimum (header plus a couple of rows) and scrolls internally. The
    minimums sum well below the dock height at 800px-tall viewports. */
 .dock .object-tree-panel {
-  min-height: 132px;
+  min-height: calc(var(--unit) * 33);
 }
 
 .dock .sketch-panel {
-  min-height: 118px;
+  min-height: calc(var(--unit) * 30);
 }
 
 .dock .material-panel {
-  min-height: 118px;
+  min-height: calc(var(--unit) * 30);
 }
 
 .dock .sim-panel {
-  min-height: 150px;
+  min-height: calc(var(--unit) * 38);
 }
 
 /* Render settings popover: anchored to the toolbar's eye icon, openable
@@ -1214,49 +1091,31 @@ input[type="checkbox"] {
 
 .render-popover {
   position: absolute;
-  top: calc(100% + var(--space-5));
+  top: calc(100% + var(--gap));
   right: 0;
   z-index: 40;
-  width: 300px;
+  width: calc(var(--unit) * 75);
   animation: pop-in var(--dur-base) var(--ease);
   transform-origin: top right;
 }
 
 .render-popover .render-panel {
-  max-height: min(72vh, 640px);
+  max-height: min(72vh, calc(var(--unit) * 160));
   border-top-color: var(--rule);
 }
 
-/* Panel and section headers used to open with a filled accent cell carrying a
-   number — 01, 02, 03 — from a CSS counter, on the reasoning that a panel is a
-   zone of a drawing and a drawing numbers its zones.
- *
- * They are gone. A drawing numbers its zones so that a *written* reference can
- * point at one ("see zone 03"), and nothing in this app ever does: no label,
- * no message and no document refers to a panel or a section by number. What
- * was left was a counter counting itself — three of the loudest blocks on the
- * screen, in the one colour the design reserves for state, carrying no state
- * and naming nothing. The kicker chips beside them (LIBRARY, SERVER, FEM) do
- * name something and stay.
- *
- * The counters themselves stay reset and incremented nowhere: with the two
- * `::before` rules removed there is nothing left to increment. */
-
-/* Expanded sections: one shared panel shell with the mode-accent header
-   strip along the top edge. */
+/* Expanded sections: one shared panel shell. */
 .object-tree-panel,
 .material-panel,
 .sim-panel,
 .sketch-panel,
 .render-panel {
   width: 100%;
-  border: 1px solid var(--rule-strong);
-  background: var(--surface-float-90);
+  border: var(--line);
+  background: var(--plane-sheet);
   animation: panel-in var(--dur-slow) var(--ease);
 }
 
-/* The panel's own header carries the zone number in the same cell the
-   launcher does, so opening a section does not renumber the dock. */
 .object-tree-panel > header,
 .material-panel > header,
 .sim-panel > header,
@@ -1265,62 +1124,9 @@ input[type="checkbox"] {
   padding-left: 0;
 }
 
-/* The title stack takes the slack, so the head reads left to right —
-   number, kicker, name — instead of drifting to the right edge. */
-.object-tree-panel > header > span,
-.properties-panel > header > span,
-.sim-panel header span,
-.sketch-panel header > span,
-.render-panel > header > span,
-.material-panel-title > span:not(.material-panel-icon) {
-  margin-right: auto;
-}
-
-/* ── numbered sections ─────────────────────────────────────────────────── */
-
-/* A section is announced by its name in tracked uppercase mono and closed by
-   a rule, with whatever it counts hung right. See the note above the panel
-   headers for why the numbers that used to lead it are gone. */
-
-.section-head {
-  display: flex;
-  align-items: center;
-  gap: 0;
-  margin: 0;
-  padding-bottom: var(--space-2);
-  border-bottom: 1px solid var(--rule-strong);
-}
-
-.section-head b,
-.render-settings h4,
-.shortcut-groups h4 {
-  margin-right: auto;
-  font: var(--weight-semibold) var(--text-2xs) / var(--leading-flat)
-    var(--font-mono);
-  letter-spacing: var(--tracking-2xs);
-  text-transform: uppercase;
-}
-
-/* The right-hung figure that closes a section rule: how many things the
-   section holds, or the unit its readouts are in. */
-.section-count {
-  flex: 0 0 auto;
-  color: var(--ink-3);
-  font: var(--type-mono);
-  font-variant-numeric: tabular-nums;
-}
-
-.section {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-}
-
-/* One panel header, everywhere: the kicker, then the section's name. The
-   kicker used to be accent-coloured *text*, which measures 2.26:1 on paper;
-   it is now the same filled cell the section numbers use. The components
-   emit <small> first so the kicker is always the top line — see
-   ObjectTree/RenderPanel/MaterialPanel. */
+/* One panel header, everywhere: the kicker (a kind chip, emitted first as
+   <small>), then the section's name. The title stack takes the slack, so the
+   head reads left to right instead of drifting to the right edge. */
 .object-tree-panel > header > span,
 .properties-panel > header > span,
 .sim-panel header span,
@@ -1330,32 +1136,60 @@ input[type="checkbox"] {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: var(--space-2);
+  gap: var(--gap);
   min-width: 0;
-  font: var(--weight-semibold) var(--text-md) / var(--leading-tight)
-    var(--font-mono);
-  letter-spacing: var(--tracking-md);
-  text-transform: uppercase;
+  margin-right: auto;
+  font: var(--text-title);
+  letter-spacing: var(--track-title);
+  text-transform: var(--case-title);
+  font-variant-numeric: var(--numeric-title);
 }
 
-.object-tree-panel > header small,
-.object-tree-panel > header small *,
-.properties-panel > header small,
-.properties-panel > header small *,
-.sketch-panel header small,
-.sketch-panel header small *,
-.material-panel-title small,
-.material-panel-title small *,
-.sim-panel header small,
-.sim-panel header small *,
-.render-panel header small,
-.render-panel header small * {
-  padding: 0 var(--space-2);
-  background: var(--accent);
-  color: var(--ink-on-accent);
-  font: var(--type-kicker);
-  letter-spacing: var(--tracking-3xs);
-  text-transform: uppercase;
+/* ── sections ──────────────────────────────────────────────────────────── */
+
+/* A section is announced by its name and closed by a rule, with whatever it
+   counts hung right. */
+.section-head {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  margin: 0;
+  padding-bottom: var(--gap);
+  border-bottom: var(--line);
+}
+
+/* Every section is named the same way, wherever it is: caps in ink-2. */
+.section-head b,
+.render-settings h4,
+.shortcut-groups h4,
+.sim-section-head b,
+.material-section-head {
+  color: var(--ink-2);
+  font: var(--text-caps);
+  letter-spacing: var(--track-caps);
+  text-transform: var(--case-caps);
+  font-variant-numeric: var(--numeric-caps);
+}
+
+.section-head b {
+  margin-right: auto;
+}
+
+/* The right-hung figure that closes a section rule: how many things the
+   section holds, or the unit its readouts are in. */
+.section-count {
+  flex: 0 0 auto;
+  color: var(--ink-3);
+  font: var(--text-body);
+  letter-spacing: var(--track-body);
+  text-transform: var(--case-body);
+  font-variant-numeric: var(--numeric-body);
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap);
 }
 
 /* Object tree ----------------------------------------------------------- */
@@ -1366,16 +1200,10 @@ input[type="checkbox"] {
   overflow: hidden;
 }
 
-/* Panel headers stick while their list scrolls under them, so the section
-   you are reading always says what it is. */
-/* A panel header is a title block: the kicker is its first line, and the
-   controls beside it belong to that line. A control only as tall as its own
-   glyph cannot both share the block's centre and sit on its first line —
-   centred, the audit measured the park control 12.9px below the line it
-   reads with; baseline-aligned, its box left the block's centre by 12.1px.
-   So a header control takes the block's full height, which settles the
-   centres, and draws its glyph in the block's own first line box, which
-   settles the baselines. The shared rule is below, next to .material-help. */
+/* Panel headers stick while their list scrolls under them. A header control
+   takes the title block's full height and draws its glyph in the kicker's
+   line box, so it shares both the block's centre and its first baseline (the
+   shared rule is next to .material-add). */
 .object-tree-panel > header {
   position: sticky;
   top: 0;
@@ -1383,40 +1211,42 @@ input[type="checkbox"] {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: var(--space-4);
+  gap: var(--inset);
   flex: 0 0 auto;
-  padding: var(--space-4) var(--space-3) var(--space-3) var(--space-5);
-  background: var(--surface-float-96);
+  padding: var(--inset);
+  background: var(--plane-sheet);
 }
-
 
 .object-tree-rows {
   display: flex;
   flex-direction: column;
-  gap: 1px;
+  gap: 0;
   min-height: 0;
-  padding: 0 var(--space-3) var(--space-4);
+  padding: 0 0 var(--inset);
   overflow: auto;
 }
 
-/* Every child of a row sits on one 15px line box whatever size it is set in,
-   which is what puts a 9px count and an 11px name on the same baseline
-   instead of two baselines a pixel and a half apart. */
+/* Every child of a row sits on one 16px line box whatever role it is set in,
+   which is what puts a label and a name on the same baseline instead of two
+   baselines a pixel and a half apart. */
 .object-tree-row > *,
 .material-inspector-head > *,
 .render-preset-heading > *,
 .render-customize > * {
-  line-height: var(--text-lg);
+  line-height: calc(var(--unit) * 4);
 }
 
 .object-tree-row {
   display: flex;
   align-items: center;
-  gap: var(--space-3);
+  gap: var(--gap);
   min-height: var(--control-sm);
-  padding: var(--space-1) var(--space-3);
+  padding: 0 var(--inset);
   color: var(--ink);
-  font-size: var(--text-xs);
+  font: var(--text-body);
+  letter-spacing: var(--track-body);
+  text-transform: var(--case-body);
+  font-variant-numeric: var(--numeric-body);
   cursor: pointer;
   user-select: none;
   transition: background-color var(--dur-fast) var(--ease);
@@ -1424,47 +1254,47 @@ input[type="checkbox"] {
 
 .object-tree-row:hover,
 .object-tree-row.hovered {
-  background: var(--surface-inset-hover);
+  background: var(--plane-step);
 }
 
 .object-tree-row.active {
-  background: var(--accent);
-  color: var(--ink-on-accent);
+  background: var(--block-current);
+  color: var(--block-current-ink);
 }
 
 /* Everything on a selected row is ink on the accent fill, the caret and the
-   kind mark included: left at --ink-3 the caret measured 2.27:1 on the
-   orange, the one place in the tree where a mark was unreadable. */
+   kind mark included: --ink-3 is unreadable on the accent. */
 .object-tree-row.active .tree-detail,
 .object-tree-row.active .tree-material,
 .object-tree-row.active .tree-caret,
 .object-tree-row.active .tree-icon {
-  color: var(--ink-on-accent);
+  color: var(--block-current-ink);
 }
 
 .object-tree-row.operator {
   color: var(--ink);
-  font: var(--type-kicker);
-  line-height: var(--leading-tight);
+  font: var(--text-caps);
+  letter-spacing: var(--track-caps);
+  text-transform: var(--case-caps);
+  font-variant-numeric: var(--numeric-caps);
 }
 
 .tree-caret {
   display: grid;
   place-items: center;
   flex: 0 0 auto;
-  width: 14px;
-  height: 14px;
+  width: calc(var(--unit) * 4);
+  height: calc(var(--unit) * 4);
   padding: 0;
   border: 0;
   background: none;
   color: var(--ink-3);
-  font-size: var(--text-3xs);
   cursor: pointer;
 }
 
 .tree-caret-space {
   flex: 0 0 auto;
-  width: 14px;
+  width: calc(var(--unit) * 4);
 }
 
 .tree-icon {
@@ -1475,8 +1305,8 @@ input[type="checkbox"] {
 }
 
 .tree-icon svg {
-  width: 13px;
-  height: 13px;
+  width: calc(var(--unit) * 3);
+  height: calc(var(--unit) * 3);
 }
 
 /* The name is the only elastic cell in the row; min-width:0 is what lets it
@@ -1485,7 +1315,6 @@ input[type="checkbox"] {
   flex: 0 1 auto;
   min-width: 0;
   overflow: hidden;
-  font-weight: var(--weight-semibold);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -1493,19 +1322,17 @@ input[type="checkbox"] {
 .tree-detail {
   flex: 0 0 auto;
   color: var(--ink-3);
-  font-size: var(--text-3xs);
+  font: var(--text-body);
+  letter-spacing: var(--track-body);
+  text-transform: var(--case-body);
+  font-variant-numeric: var(--numeric-body);
   white-space: nowrap;
 }
 
+/* A count, not a kind and not a parameter: ink on the alternate bar. */
 .tree-badge {
-  flex: 0 0 auto;
-  min-width: 16px;
   margin-left: auto;
-  padding: var(--space-1) var(--space-2);
-  background: var(--info);
-  color: var(--surface-float);
-  font: var(--type-kicker);
-  text-align: center;
+  color: var(--ink);
 }
 
 .tree-badge + .tree-material {
@@ -1513,17 +1340,13 @@ input[type="checkbox"] {
 }
 
 .tree-material {
+  display: block;
   flex: 0 1 auto;
-  max-width: 74px;
+  max-width: calc(var(--unit) * 18);
   margin-left: auto;
-  padding: var(--space-1) var(--space-2);
-  border: 1px solid var(--rule);
-  background: rgba(var(--ink-rgb), var(--alpha-wash));
-  color: var(--ink-2);
-  font: var(--type-kicker);
+  line-height: calc(var(--control-tag) - var(--hairline) * 2);
   overflow: hidden;
   text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 /* Material browser ----------------------------------------------------- */
@@ -1539,18 +1362,18 @@ input[type="checkbox"] {
   z-index: 2;
   display: flex;
   align-items: center;
-  gap: var(--space-2);
-  padding: var(--space-3);
-  background: var(--surface-float-96);
+  gap: var(--gap);
+  padding: var(--inset);
+  background: var(--plane-sheet);
 }
 
 .material-panel-title {
   display: flex;
   flex: 1;
   align-items: center;
-  gap: var(--space-4);
+  gap: var(--inset);
   min-width: 0;
-  padding: 0 var(--space-4);
+  padding: 0;
   border-color: transparent;
   background: transparent;
   text-align: left;
@@ -1559,27 +1382,27 @@ input[type="checkbox"] {
 .material-panel-title b {
   flex: 0 0 auto;
   color: var(--ink-3);
-  font: var(--type-mono-strong);
+  font: var(--text-body);
+  letter-spacing: var(--track-body);
+  text-transform: var(--case-body);
+  font-variant-numeric: var(--numeric-body);
 }
 
+/* A mark, not a panel button: a drawn edge around a glyph on the title's
+   first line reads as an empty cell, so the step appears only under the
+   pointer. */
 .material-add {
   flex: 0 0 auto;
   width: var(--control-sm);
   padding: 0;
+  border-color: transparent;
+  background: transparent;
   color: var(--ink);
 }
 
 /* The control-on-the-title-line pattern (see the panel header note above):
-   the block's full height so the centres agree, the glyph in the kicker's own
-   9px line box so the baselines do, and the kicker's own size so the glyph
-   does not add a variant to the type census.
-
-   There is exactly one control here now. The two panels used to carry their
-   own em-dash beside it, wired to park the window — which is the job of the
-   frame's own minimise button two centimetres to the right, so every panel
-   showed the reader two identical controls doing one thing. The frame's is
-   the one that stays: it is on every window, docked or floating, and it is
-   where a window's own chrome belongs. */
+   the block's full height so the centres agree, the glyph in the kicker's
+   line box so the baselines do. */
 .material-add,
 .material-panel-title > b {
   align-self: stretch;
@@ -1587,42 +1410,36 @@ input[type="checkbox"] {
   align-content: start;
   justify-items: center;
   height: auto;
-  font-size: var(--text-3xs);
-  line-height: var(--text-3xs);
-}
-
-/* And they are marks, not panel buttons: a drawn edge around a glyph sitting
-   on the title's first line reads as an empty cell. The edge appears under
-   the pointer, the way the editor's and the study rows' own marks do. */
-.material-add {
-  border-color: transparent;
-  background: transparent;
 }
 
 .material-add:hover:not(:disabled) {
   color: var(--ink);
-  background: var(--surface-raised-hover);
+  background: var(--plane-step);
 }
 
 .material-help {
   margin: 0;
-  padding: 0 var(--space-5) var(--space-3);
+  padding: 0 var(--inset) var(--inset);
   color: var(--ink-3);
-  font-size: var(--text-2xs);
+  font: var(--text-prose);
+  letter-spacing: var(--track-prose);
+  text-transform: var(--case-prose);
+  font-variant-numeric: var(--numeric-prose);
 }
 
 .material-browser {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: var(--space-2);
-  padding: 0 var(--space-4) var(--space-3);
+  gap: var(--gap);
+  padding: 0 var(--inset) var(--inset);
 }
 
 .material-card {
   min-width: 0;
-  padding: var(--space-3) var(--space-2);
-  border: 1px solid transparent;
-  background: var(--surface-inset);
+  height: calc(var(--unit) * 27);
+  padding: var(--inset) var(--gap);
+  border: var(--line);
+  background: var(--plane-sheet);
   cursor: grab;
   outline: none;
   text-align: center;
@@ -1634,80 +1451,53 @@ input[type="checkbox"] {
 .material-card:hover,
 .material-card:focus-visible {
   border-color: var(--rule-strong);
-  background: var(--surface-inset-hover);
+  background: var(--plane-step);
 }
 
-.material-card.active {
-  border-color: var(--accent-press);
-  background: rgba(
-    var(--accent-rgb),
-    var(--alpha-wash)
-  );
+/* The current material: an accent block behind its name, never an accent
+   edge around the card. The card stays a sheet under the pointer too. */
+.material-card.active,
+.material-card.active:hover {
+  border-color: var(--rule-strong);
+  background: var(--plane-sheet);
+}
+
+.material-card.active .material-name {
+  background: var(--block-current);
+  color: var(--block-current-ink);
 }
 
 .material-card:active {
   cursor: grabbing;
 }
 
-/* @artwork — the swatches below are pictures of materials and render modes,
-   not chrome. Their gradients are illustration, so they keep literal colours
-   instead of semantic tokens. Nothing outside this fence may. */
-
 .material-panel-icon {
   flex: 0 0 auto;
-  width: 18px;
-  height: 18px;
-  border: 1px solid rgba(255, 255, 255, 0.28);
-  border-radius: 50%;
-  background:
-    radial-gradient(circle at 32% 25%, white 0 4%, transparent 15%),
-    radial-gradient(circle at 38% 32%, #9fc2bc, #273632 45%, #0b0d0c 72%);
-  box-shadow: inset -3px -4px 6px rgba(0, 0, 0, 0.5);
+  width: calc(var(--unit) * 4);
+  height: calc(var(--unit) * 4);
 }
 
+.material-panel-icon img {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* A rendered part on the viewport's ground (materialPreview.ts): the
+   image carries the material, the tile only frames it. */
 .material-preview {
-  position: relative;
-  width: 48px;
-  height: 48px;
-  margin: 0 auto var(--space-2);
-  overflow: hidden;
-  background:
-    linear-gradient(145deg, rgba(255, 255, 255, 0.045), rgba(0, 0, 0, 0.28)),
-    #101311;
+  width: calc(var(--unit) * 12);
+  height: calc(var(--unit) * 12);
+  margin: 0 auto var(--gap);
+  border: var(--line);
+  background: var(--plane-ground);
 }
 
-.material-preview span {
-  position: absolute;
-  inset: 7px;
-  border-radius: 50%;
-  opacity: var(--material-opacity);
-  background:
-    radial-gradient(
-      circle at 31% 24%,
-      rgba(255, 255, 255, calc(0.86 - var(--material-roughness) * 0.46)) 0 5%,
-      rgba(255, 255, 255, calc(0.32 - var(--material-roughness) * 0.18)) 10%,
-      rgba(var(--material-rgb), 0.98) 28%,
-      rgba(var(--material-rgb), 0.45) 72%,
-      rgba(0, 0, 0, 0.92) 100%
-    );
-  box-shadow:
-    inset -5px -7px 9px rgba(0, 0, 0, calc(0.32 + var(--material-roughness) * 0.25)),
-    0 5px 10px rgba(0, 0, 0, 0.48);
+.material-preview img {
+  display: block;
+  width: 100%;
+  height: 100%;
 }
-
-.material-preview span::after {
-  position: absolute;
-  right: 4px;
-  bottom: 5px;
-  width: calc(4px + var(--material-metallic) * 10px);
-  height: 3px;
-  border-radius: 50%;
-  background: rgba(255, 232, 180, calc(var(--material-metallic) * 0.72));
-  content: "";
-  filter: blur(1px);
-}
-
-/* @end-artwork */
 
 .material-name,
 .material-card small {
@@ -1718,22 +1508,29 @@ input[type="checkbox"] {
 }
 
 .material-name {
+  margin: 0 calc(var(--gap) * -1);
+  padding: var(--gap) var(--gap);
   color: var(--ink);
-  font-size: var(--text-2xs);
-  font-weight: var(--weight-semibold);
+  font: var(--text-body);
+  letter-spacing: var(--track-body);
+  text-transform: var(--case-body);
+  font-variant-numeric: var(--numeric-body);
 }
 
 .material-card small {
   color: var(--ink-3);
-  font-size: var(--text-3xs);
+  font: var(--text-body);
+  letter-spacing: var(--track-body);
+  text-transform: var(--case-body);
+  font-variant-numeric: var(--numeric-body);
 }
 
 .material-inspector {
   display: grid;
-  gap: var(--space-2);
-  padding: var(--space-4) var(--space-5) var(--space-4);
-  border-top: 1px solid var(--divider);
-  background: var(--shade-soft);
+  gap: var(--gap);
+  padding: var(--inset);
+  border-top: var(--line);
+  background: var(--plane-step);
 }
 
 /* The inspector is two sections, because a Material answers to two readers:
@@ -1743,14 +1540,10 @@ input[type="checkbox"] {
 .material-section-head {
   display: flex;
   align-items: center;
-  gap: var(--space-3);
-  margin-top: var(--space-3);
-  padding-top: var(--space-3);
-  border-top: 1px solid var(--divider);
-  color: var(--ink-2);
-  font: var(--type-kicker);
-  letter-spacing: var(--tracking-3xs);
-  text-transform: uppercase;
+  gap: var(--gap);
+  margin-top: var(--gap);
+  padding-top: var(--inset);
+  border-top: var(--line);
 }
 
 /* Physical properties: label · value · unit, one row per property whether the
@@ -1759,23 +1552,26 @@ input[type="checkbox"] {
    digits line up whatever the row is doing. */
 .material-physical {
   display: grid;
-  gap: var(--space-1);
+  gap: var(--gap);
   margin: 0;
 }
 
 .material-physical-row {
   display: grid;
-  grid-template-columns: 1fr auto;
+  grid-template-columns: var(--col-label) minmax(0, 1fr);
   align-items: center;
-  gap: var(--space-1) var(--space-4);
+  gap: var(--gap) var(--inset);
   min-width: 0;
 }
 
+/* Two-word labels ("Thermal expansion") wrap rather than being cut. */
 .material-physical-row dt {
   color: var(--ink-2);
-  font: var(--type-mono);
-  letter-spacing: var(--tracking-2xs);
-  text-transform: uppercase;
+  font: var(--text-caps);
+  letter-spacing: var(--track-caps);
+  text-transform: var(--case-caps);
+  font-variant-numeric: var(--numeric-caps);
+  white-space: normal;
 }
 
 /* The value column is sized for the widest thing that can honestly appear in
@@ -1784,30 +1580,25 @@ input[type="checkbox"] {
    recoverable from a truncated `W/(m…` in a way an elided magnitude is not. */
 .material-physical-row dd {
   display: grid;
-  grid-template-columns: 96px var(--control-sm) minmax(0, 52px);
+  grid-template-columns: minmax(0, 1fr) var(--control-sm) var(--col-unit);
   align-items: center;
-  gap: var(--space-2);
+  gap: var(--gap);
   margin: 0;
   white-space: nowrap;
 }
 
-/* Two-word properties wrap rather than being cut: "Thermal expansion" and
-   "Young's modulus" are the labels, and half a label is not one. */
-.material-physical-row dt {
-  white-space: normal;
-}
-
 .material-physical-row input[type="number"] {
   height: var(--control-sm);
-  padding: 0 var(--space-2);
-  font-size: var(--text-2xs);
-  font-variant-numeric: tabular-nums;
+  padding: 0 var(--gap);
   text-align: right;
 }
 
 .material-physical-row dd small {
   color: var(--ink-3);
-  font: var(--type-mono);
+  font: var(--text-body);
+  letter-spacing: var(--track-body);
+  text-transform: var(--case-body);
+  font-variant-numeric: var(--numeric-body);
   overflow: hidden;
   text-overflow: ellipsis;
 }
@@ -1815,9 +1606,15 @@ input[type="checkbox"] {
 /* An expression, not a literal: the value is in the program and this row will
    not pretend to own it. Sits in the box's own column, without the box. */
 .material-physical-row dd em {
-  color: var(--ink-3);
-  font: var(--type-mono);
+  padding: 0 var(--gap);
+  border: var(--line-pending);
+  color: var(--ink-2);
+  font: var(--text-body);
+  letter-spacing: var(--track-body);
+  text-transform: var(--case-body);
+  font-variant-numeric: var(--numeric-body);
   font-style: normal;
+  line-height: calc(var(--control-sm) - var(--hairline) * 2);
   text-align: right;
 }
 
@@ -1844,7 +1641,7 @@ input[type="checkbox"] {
 .material-physical-state:hover:not(:disabled),
 .material-physical-clear:hover:not(:disabled) {
   border-color: var(--rule-strong);
-  background: var(--surface-raised-hover);
+  background: var(--plane-step);
   color: var(--ink);
 }
 
@@ -1861,22 +1658,21 @@ input[type="checkbox"] {
 .material-physical-error {
   grid-column: 1 / -1;
   margin: 0;
-  padding: var(--space-1) 0 var(--space-2);
-  border-top: 1px solid var(--rule);
+  padding: var(--gap) 0 var(--gap);
+  border-top: var(--line);
   color: var(--ink-2);
-  font-family: var(--font-sans);
-  font-size: var(--text-2xs);
-  text-transform: none;
-  letter-spacing: normal;
+  font: var(--text-prose);
+  letter-spacing: var(--track-prose);
+  text-transform: var(--case-prose);
+  font-variant-numeric: var(--numeric-prose);
   white-space: normal;
 }
 
 .material-physical-error button {
   height: var(--control-sm);
-  margin-top: var(--space-2);
-  padding: 0 var(--space-3);
+  margin-top: var(--gap);
+  padding: 0 var(--inset);
 }
-
 
 .material-inspector-head,
 .material-inspector label,
@@ -1884,15 +1680,17 @@ input[type="checkbox"] {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: var(--space-4);
+  gap: var(--inset);
   min-width: 0;
 }
 
 .material-inspector-head strong {
   min-width: 0;
   overflow: hidden;
-  font: var(--weight-semibold) var(--text-xs) / var(--leading-flat)
-    var(--font-mono);
+  font: var(--text-body);
+  letter-spacing: var(--track-body);
+  text-transform: var(--case-body);
+  font-variant-numeric: var(--numeric-body);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -1900,28 +1698,36 @@ input[type="checkbox"] {
 .material-inspector-head label {
   flex: 0 0 auto;
   color: var(--ink-3);
-  font-size: var(--text-3xs);
+  font: var(--text-caps);
+  letter-spacing: var(--track-caps);
+  text-transform: var(--case-caps);
+  font-variant-numeric: var(--numeric-caps);
 }
 
 .material-inspector input[type="color"] {
-  width: 28px;
-  height: var(--control-xs);
-  padding: var(--space-1);
-  border: 1px solid var(--rule);
-  background: var(--surface-raised);
+  width: var(--control-sm);
+  height: var(--control-sm);
+  padding: var(--gap);
+  border: var(--line);
+  background: var(--plane-sheet);
 }
 
 .material-inspector > label {
   display: grid;
-  grid-template-columns: 92px minmax(0, 1fr);
+  grid-template-columns: var(--col-label) minmax(0, 1fr);
   color: var(--ink-3);
-  font-size: var(--text-3xs);
+  font: var(--text-caps);
+  letter-spacing: var(--track-caps);
+  text-transform: var(--case-caps);
+  font-variant-numeric: var(--numeric-caps);
 }
 
 .material-inspector label b {
   color: var(--ink);
-  font: var(--type-mono);
-  font-size: var(--text-3xs);
+  font: var(--text-body);
+  letter-spacing: var(--track-body);
+  text-transform: var(--case-body);
+  font-variant-numeric: var(--numeric-body);
 }
 
 .material-inspector > label > * {
@@ -1940,28 +1746,28 @@ input[type="checkbox"] {
 
 .material-empty {
   margin: 0;
-  padding: var(--space-5);
-  border-top: 1px solid var(--divider);
+  padding: var(--inset);
+  border-top: var(--line);
   color: var(--ink-3);
-  font-size: var(--text-2xs);
+  font: var(--text-prose);
+  letter-spacing: var(--track-prose);
+  text-transform: var(--case-prose);
+  font-variant-numeric: var(--numeric-prose);
 }
 
 /* The navigation cube ---------------------------------------------------- */
 
 .view-cube {
   position: absolute;
-  top: var(--space-5);
-  right: var(--space-5);
+  top: calc(var(--section) + var(--control-lg) + var(--gap));
+  right: var(--section);
   z-index: 10;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: var(--space-3);
-  /* The cluster is taller than the cube since the axis triad moved below it,
-     and an empty absolutely-positioned div is still a hit target: without
-     this, the band the triad is drawn in would be a hole in the viewport
-     where a drag neither orbits the camera nor reaches the canvas. The two
-     halves of this that *are* controls take their events back below. */
+  gap: var(--gap);
+  /* An absolutely-positioned box is a hit target even where it draws
+     nothing; the cube stage takes its events back below. */
   pointer-events: none;
 }
 
@@ -1969,14 +1775,24 @@ input[type="checkbox"] {
    else. It is projected in TypeScript (viewer/navCube.ts) rather than by CSS
    3D, so what is described here is only paint. */
 .cube-stage {
-  /* Smaller than it was: the cube is a control, not an ornament, and at 168
-     it took a corner of the viewport away from the model it describes. */
-  width: 124px;
-  height: 124px;
+  width: calc(var(--unit) * 31);
+  height: calc(var(--unit) * 31);
   cursor: grab;
   touch-action: none;
   overflow: visible;
   pointer-events: auto;
+}
+
+/* The cube's face names and the triad's axis letters are the label role,
+   set on the two squares and inherited: a face name keeps the size its own
+   attribute gives it in the cube's units, and takes the role's weight,
+   family, tracking and case. */
+.cube-stage,
+.cube-triad {
+  font: var(--text-caps);
+  letter-spacing: var(--track-caps);
+  text-transform: var(--case-caps);
+  font-variant-numeric: var(--numeric-caps);
 }
 
 .cube-stage:active {
@@ -1988,7 +1804,7 @@ input[type="checkbox"] {
    it. What separates them is the hairline between them, which is also what
    makes the chamfer legible as a chamfer. */
 .cube-facet {
-  fill: var(--surface-float);
+  fill: var(--plane-sheet);
   stroke: var(--rule-strong);
   stroke-width: 1;
   stroke-linejoin: round;
@@ -2000,35 +1816,30 @@ input[type="checkbox"] {
    every other control on this ground makes, and the only feedback a facet
    needs, because its shape already says which view it is. */
 .cube-facet:hover {
-  fill: var(--surface-raised-hover);
+  fill: var(--plane-step);
 }
 
-/* The camera is standing on this view.
-   Drawn as a heavier outline rather than a fill. A filled facet is fine on a
-   face, which has a label to reverse out of it, and wrong on a corner or a
-   bevel, which have none: a solid black triangle in the middle of the cube
-   reads as a hole punched through it rather than as "you are here". Viewport
-   ink, not the accent — no chrome hue crosses into the viewport (§3.7). */
+/* The camera is standing on this view: a heavier outline rather than a fill,
+   since a filled corner or bevel reads as a hole in the cube. Viewport ink,
+   not the accent — no chrome hue crosses into the viewport (§3.7). */
 .cube-facet.active,
 .cube-facet.active:hover {
-  fill: var(--surface-raised-hover);
+  fill: var(--plane-step);
   stroke: var(--viewport-ink);
   stroke-width: 2;
 }
 
+/* Tracking is set again on the label itself: an em length computes where it
+   is declared and is inherited as an absolute length, so the stage's 0.88px
+   would arrive here as 0.88 cube units and pull the face name apart. */
 .cube-label {
+  letter-spacing: var(--track-caps);
   fill: var(--ink-3);
-  font-family: var(--font-mono);
-  font-weight: var(--weight-semibold);
-  letter-spacing: var(--tracking-md);
   pointer-events: none;
   user-select: none;
 }
 
-/* The facet the camera is standing on carries its name in full ink, matching
-   the heavier outline around it. It was reversed out in paper while the active
-   state was a solid black fill; against the light fill that replaced it, a
-   near-white label is an invisible one. */
+/* The active facet's name in full ink, matching its heavier outline. */
 .cube-label.active {
   fill: var(--viewport-ink);
 }
@@ -2038,98 +1849,64 @@ input[type="checkbox"] {
    the screen. It is a legend and not a control: no pointer events, so the
    canvas underneath still orbits where the triad is drawn over it. */
 .cube-triad {
-  width: 64px;
-  height: 64px;
+  position: absolute;
+  left: var(--section);
+  bottom: var(--section);
+  z-index: 10;
+  width: calc(var(--unit) * 16);
+  height: calc(var(--unit) * 16);
   overflow: visible;
   pointer-events: none;
-  /* Pulled up into the stage's own bottom margin. The cube's silhouette stops
-     about 23px short of the bottom of its square, so the 6px flex gap above
-     would leave a 31px hole and the legend would read as something else
-     floating in the viewport. −20 (net −14 after the gap) closes it to 14px
-     at the tightest standpoint of 360 swept — the one that aims the cube's
-     furthest point and an axis label at each other — and to more elsewhere. */
-  margin-top: -20px;
 }
 
-/* @artwork — the axis triad is a reading of orientation, not chrome.
-   X-red, Y-green, Z-blue is the convention every CAD and DCC application
-   shares, and it is the reason this is the one saturated hue allowed inside
-   the viewport rectangle: three achromatic hairlines would be three identical
-   lines, which is not a triad, it is a scribble. */
+/* The axis triad is a reading of orientation, and X-red, Y-green, Z-blue is
+   the convention every CAD application shares: the one saturated hue allowed
+   inside the viewport rectangle. It draws the same axis-x/y/z the transform
+   gizmo does, dark enough that the letters clear 4.5:1. */
 .cube-axis {
-  stroke-width: 1.6;
-  stroke-linecap: round;
+  stroke-width: 1.5;
+  stroke-linecap: square;
 }
 
-.cube-axis.axis-x { stroke: #d21f2b; }
-.cube-axis.axis-y { stroke: #1f8a2e; }
-.cube-axis.axis-z { stroke: #1f5fd2; }
+.cube-axis.axis-x { stroke: var(--axis-x); }
+.cube-axis.axis-y { stroke: var(--axis-y); }
+.cube-axis.axis-z { stroke: var(--axis-z); }
 
 .cube-axis-label {
-  font-family: var(--font-mono);
-  font-size: 9px;
-  font-weight: var(--weight-semibold);
   pointer-events: none;
   user-select: none;
 }
 
-.cube-axis-label.axis-x { fill: #d21f2b; }
-.cube-axis-label.axis-y { fill: #1f8a2e; }
-.cube-axis-label.axis-z { fill: #1f5fd2; }
-/* @end-artwork */
-
-/* The projection toggle takes the cube stage's top-right corner. However the
-   cube is turned its silhouette reaches less than half the way from the
-   centre to a corner of its own square, so the corners are free: the widget
-   stays one square instead of a square with a button under it. */
-.cube-projection {
-  position: absolute;
-  right: 0;
-  top: 0;
-  display: grid;
-  place-items: center;
-  width: 28px;
-  height: var(--control-sm);
-  padding: 0;
-  background: var(--surface-float);
-  pointer-events: auto;
-}
-
-/* This sits straight on the paper, so its active edge is drawn at viewport
-   weight; the shared control accent measures 1.04:1 there. */
-.cube-projection.active {
-  border-color: rgba(var(--viewport-accent-rgb, var(--viewport-mode-rgb)), var(--alpha-mark));
-  background: var(--surface-float);
-  color: var(--ink);
-}
+.cube-axis-label.axis-x { fill: var(--axis-x); }
+.cube-axis-label.axis-y { fill: var(--axis-y); }
+.cube-axis-label.axis-z { fill: var(--axis-z); }
 
 /* Render settings (the eye-icon popover in the toolbar) ----------------- */
 
 button.icon {
   display: grid;
   place-items: center;
-  width: var(--control-md);
+  width: var(--control-sm);
   padding: 0;
 }
 
-/* The eye is active exactly while its popover is open; it glows in the
-   current mode's accent rather than the default lime. */
+/* The eye is active exactly while its popover is open: the accent fill, the
+   same "this is current" block every other control uses. */
 .toolbar button.icon.active {
-  border-color: var(--accent-press);
-  background: var(--accent);
-  color: var(--ink-on-accent);
+  border-color: var(--accent);
+  background: var(--block-current);
+  color: var(--block-current-ink);
 }
 
 /* Icon + label buttons lay their two children out rather than stacking the
-   icon into the text's line box, which used to push the label 2.5px below
-   the rest of the toolbar. */
+   icon into the text's line box. */
 button.primary,
 button.icon {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: var(--space-3);
-  line-height: var(--leading-flat);
+  gap: var(--gap);
+  line-height: 1;
 }
 
 .render-panel {
@@ -2143,64 +1920,58 @@ button.icon {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: var(--space-4);
-  padding: var(--space-4) var(--space-5) var(--space-4);
+  gap: var(--inset);
+  padding: var(--inset);
 }
 
 .render-settings {
   display: flex;
   flex-direction: column;
-  gap: var(--space-6);
+  gap: var(--section);
   min-height: 0;
-  padding: 0 var(--space-5) var(--space-5);
+  padding: 0 var(--inset) var(--inset);
   overflow: auto;
 }
 
 .render-settings section {
   display: flex;
   flex-direction: column;
-  gap: var(--space-3);
+  gap: var(--gap);
 }
 
 .render-settings h4 {
   margin: 0;
-  color: var(--ink-3);
-  font: var(--weight-semibold) var(--text-3xs) / var(--leading-flat)
-    var(--font-mono);
-  letter-spacing: var(--tracking-3xs);
-  text-transform: uppercase;
 }
 
 .render-preset-heading {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: var(--space-4);
+  gap: var(--inset);
 }
 
 .render-preset-heading small {
   flex: 0 0 auto;
   color: var(--ink-3);
-  font-size: var(--text-3xs);
+  font: var(--text-prose);
+  letter-spacing: var(--track-prose);
+  text-transform: var(--case-prose);
+  font-variant-numeric: var(--numeric-prose);
 }
 
 .render-preset-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: var(--space-3);
+  gap: var(--gap);
 }
 
-/* The distance-field views.
-   Above the preset editor rather than inside it: a preset says how the solid
-   is *drawn*, and these say whether the solid is what is drawn at all. The
-   slice controls borrow the Results tab's own row (.sim-slice) and legend
-   (.sim-legend) verbatim — the two are the same instrument reading two
-   different scalars over a plane, and giving them separate furniture would be
-   the app claiming a difference it does not have. */
+/* The distance-field views, above the preset editor: a preset says how the
+   solid is drawn, these say whether the solid is drawn at all. The slice
+   controls reuse the Results tab's row (.sim-slice) and legend (.sim-legend). */
 .render-sdf {
-  gap: var(--space-3);
-  padding-top: var(--space-4);
-  border-top: 1px solid var(--divider);
+  gap: var(--gap);
+  padding-top: var(--inset);
+  border-top: var(--line);
 }
 
 .render-sdf .sim-legend-values {
@@ -2225,10 +1996,12 @@ button.icon {
 /* "Return to the real surface" — a text button rather than a switch, because
    it has one state worth naming and it is the value it returns to. */
 .render-sdf-zero {
-  height: var(--control-xs);
-  padding: 0 var(--space-3);
-  font: var(--type-mono);
-  letter-spacing: var(--tracking-sm);
+  height: var(--control-sm);
+  padding: 0 var(--inset);
+  font: var(--text-body);
+  letter-spacing: var(--track-body);
+  text-transform: var(--case-body);
+  font-variant-numeric: var(--numeric-body);
 }
 
 .render-preset-card {
@@ -2238,152 +2011,112 @@ button.icon {
   align-items: stretch;
   height: auto;
   min-width: 0;
-  padding: var(--space-2);
-  border-color: transparent;
-  background: var(--surface-inset);
+  padding: var(--gap);
+  border-color: var(--rule);
+  background: var(--plane-sheet);
   text-align: left;
 }
 
 .render-preset-card:hover {
-  background: var(--surface-inset-hover);
+  background: var(--plane-step);
 }
 
 .render-preset-card.selected {
   border-color: var(--rule-strong);
 }
 
-.render-preset-card.active {
-  border-color: var(--accent-press);
-  background: rgba(var(--accent-rgb), var(--alpha-wash));
+/* The preset in use: the accent block behind its name, as on the material
+   cards. The card itself stays a sheet, overriding the generic button.active
+   fill. */
+.render-preset-card.active,
+.render-preset-card.active:hover {
+  border-color: var(--rule-strong);
+  background: var(--plane-sheet);
+  color: var(--ink);
 }
 
-.render-preset-card.active::after {
-  position: absolute;
-  top: var(--space-4);
-  right: var(--space-4);
-  width: var(--space-3);
-  height: var(--space-3);
-  border-radius: 50%;
-  background: var(--accent-press);
-  content: "";
-}
-
-/* @artwork — the three preset thumbnails are pictures of render modes. */
-
-.render-preset-preview {
-  position: relative;
-  height: 43px;
-  margin-bottom: 6px;
-  overflow: hidden;
-  border: 1px solid rgba(255, 255, 255, 0.055);
-  background:
-    linear-gradient(160deg, rgba(255, 255, 255, 0.055), transparent 52%),
-    #0b0e0c;
-}
-
-.render-preset-preview i:first-child {
-  position: absolute;
-  top: 7px;
-  left: 50%;
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  transform: translateX(-50%);
-  background:
-    radial-gradient(circle at 34% 27%, rgba(255, 255, 255, 0.88), transparent 10%),
-    radial-gradient(circle at 42% 36%, #89ad9f, #283832 57%, #080a09 80%);
-  box-shadow: 0 6px 10px rgba(0, 0, 0, 0.65);
-}
-
-.render-preset-preview i:last-child {
-  position: absolute;
-  right: 8px;
-  bottom: 5px;
-  left: 8px;
-  height: 8px;
-  border-top: 1px solid rgba(255, 255, 255, 0.12);
-  transform: skewX(-28deg);
-}
-
-.render-preset-card[data-preset="xray"] .render-preset-preview i:first-child {
-  border: 1px solid rgba(217, 255, 87, 0.8);
-  background:
-    linear-gradient(90deg, transparent 47%, rgba(217, 255, 87, 0.55) 50%, transparent 53%),
-    linear-gradient(transparent 47%, rgba(217, 255, 87, 0.55) 50%, transparent 53%),
-    rgba(111, 145, 93, 0.24);
-  box-shadow: 0 0 12px rgba(217, 255, 87, 0.12);
-}
-
-.render-preset-card[data-preset="studio"] .render-preset-preview i:first-child {
-  background:
-    radial-gradient(circle at 32% 25%, #fff6df 0 4%, transparent 13%),
-    radial-gradient(circle at 38% 34%, #d2b474, #6b4f28 52%, #15100a 78%);
-}
-
-.render-preset-card[data-preset="wire"] .render-preset-preview i:first-child {
-  border: 1px solid #78c6e7;
-  background:
-    linear-gradient(45deg, transparent 48%, rgba(120, 198, 231, 0.7) 50%, transparent 52%),
-    linear-gradient(-45deg, transparent 48%, rgba(120, 198, 231, 0.7) 50%, transparent 52%);
-  box-shadow: none;
-  transform: translateX(-50%) rotate(8deg);
-}
-
-/* @end-artwork */
-
+/* Every name sits in the same box, so turning one on fills it and moves
+   nothing. */
 .render-preset-card strong {
+  margin: 0 calc(var(--gap) * -1);
+  padding: var(--gap) var(--gap);
   overflow: hidden;
+  color: var(--ink);
+  font: var(--text-body);
+  letter-spacing: var(--track-body);
+  text-transform: var(--case-body);
+  font-variant-numeric: var(--numeric-body);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.render-preset-card small {
-  overflow-wrap: anywhere;
+.render-preset-card.active strong {
+  background: var(--block-current);
+  color: var(--block-current-ink);
 }
 
-.render-preset-card strong {
+/* The preset's glyph, on a strip of viewport ground: an icon from the
+   rail's own set (I1) rather than a painted thumbnail, so the three cards
+   read as three tools of one kit. The ground is the viewport's, because the
+   glyph says what the viewport will look like. */
+.render-preset-preview {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: var(--control-xl);
+  margin-bottom: var(--gap);
+  border: var(--line);
+  background: var(--plane-ground);
+  color: var(--ink-2);
+}
+
+.render-preset-card.active .render-preset-preview {
   color: var(--ink);
-  font-size: var(--text-2xs);
-  font-weight: var(--weight-semibold);
 }
 
 .render-preset-card small {
-  margin-top: var(--space-1);
+  margin-top: var(--gap);
+  overflow-wrap: anywhere;
   color: var(--ink-3);
-  font-size: var(--text-3xs);
+  font: var(--text-prose);
+  letter-spacing: var(--track-prose);
+  text-transform: var(--case-prose);
+  font-variant-numeric: var(--numeric-prose);
 }
 
 .render-customize {
   display: flex;
   align-items: center;
-  line-height: var(--text-lg);
+  line-height: calc(var(--unit) * 4);
   justify-content: space-between;
-  gap: var(--space-4);
+  gap: var(--inset);
   height: var(--control-lg);
-  padding: 0 var(--space-4);
-  border-color: transparent;
-  background: var(--surface-inset);
+  padding: 0 var(--inset);
+  border-color: var(--rule-strong);
+  background: var(--plane-sheet);
   text-align: left;
 }
 
 .render-customize > span {
   display: flex;
   align-items: baseline;
-  gap: var(--space-3);
+  gap: var(--gap);
   min-width: 0;
   overflow: hidden;
 }
 
 .render-customize b {
   flex: 0 0 auto;
-  font-size: var(--text-2xs);
 }
 
 .render-customize small {
   min-width: 0;
   overflow: hidden;
   color: var(--ink-3);
-  font-size: var(--text-3xs);
+  font: var(--text-body);
+  letter-spacing: var(--track-body);
+  text-transform: var(--case-body);
+  font-variant-numeric: var(--numeric-body);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -2391,59 +2124,57 @@ button.icon {
 .render-customize > i {
   flex: 0 0 auto;
   color: var(--ink);
-  /* The row's own line box, and a glyph one size off its label — at --text-lg
-     the mark sat 2.5px below the words it belongs to. */
-  font: var(--weight-regular) var(--text-md) / var(--text-lg)
-    var(--font-mono);
 }
 
 .render-preset-editor {
   display: flex;
   flex-direction: column;
-  gap: var(--space-5);
-  padding-top: var(--space-5);
-  border-top: 1px solid var(--divider);
+  gap: var(--section);
+  padding-top: var(--section);
+  border-top: var(--line);
 }
 
 .render-preset-actions {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto auto;
   align-items: center;
-  gap: var(--space-2);
+  gap: var(--gap);
 }
 
 .render-preset-actions span {
   min-width: 0;
   overflow: hidden;
   color: var(--ink-3);
-  font-size: var(--text-3xs);
+  font: var(--text-body);
+  letter-spacing: var(--track-body);
+  text-transform: var(--case-body);
+  font-variant-numeric: var(--numeric-body);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .render-preset-actions button {
-  height: var(--control-xs);
-  padding: 0 var(--space-3);
-  font-size: var(--text-3xs);
+  height: var(--control-sm);
+  padding: 0 var(--inset);
 }
 
+/* One segmented strip, wherever a choice of one is made. */
 .segmented {
   display: flex;
-  padding: var(--space-1);
-  border: 1px solid var(--rule);
-  background: var(--surface-float);
+  padding: var(--gap);
+  border: var(--line);
+  background: var(--plane-sheet);
 }
 
 .segmented button {
+  white-space: nowrap;
   flex: 1;
   min-width: 0;
   height: var(--control-sm);
-  padding: 0 var(--space-3);
+  padding: 0 var(--gap);
   border: 0;
   background: transparent;
-  color: var(--ink-3);
-  font-size: var(--text-sm);
-  font-weight: var(--weight-semibold);
+  color: var(--ink-2);
   transition:
     background-color var(--dur-base) var(--ease),
     color var(--dur-base) var(--ease);
@@ -2454,49 +2185,55 @@ button.icon {
 }
 
 .segmented button.active {
-  background: var(--accent);
-  color: var(--ink-on-accent);
+  background: var(--block-current);
+  color: var(--block-current-ink);
 }
 
 .switch {
   display: flex;
   align-items: flex-start;
-  gap: var(--space-4);
-  padding: var(--space-2);
+  gap: var(--inset);
+  padding: var(--gap);
   cursor: pointer;
   transition: background-color var(--dur-fast) var(--ease);
 }
 
 .switch:hover {
-  background: var(--surface-inset-hover);
+  background: var(--plane-step);
 }
 
 .switch input {
   flex: 0 0 auto;
-  margin-top: var(--space-1);
+  margin-top: var(--gap);
   accent-color: var(--ink);
 }
 
 .switch span {
   display: flex;
   flex-direction: column;
-  gap: var(--space-1);
+  gap: var(--gap);
   min-width: 0;
-  font-size: var(--text-sm);
+  font: var(--text-caps);
+  letter-spacing: var(--track-caps);
+  text-transform: var(--case-caps);
+  font-variant-numeric: var(--numeric-caps);
 }
 
 .switch small {
   color: var(--ink-3);
-  font-size: var(--text-xs);
+  font: var(--text-prose);
+  letter-spacing: var(--track-prose);
+  text-transform: var(--case-prose);
+  font-variant-numeric: var(--numeric-prose);
 }
 
 .annotation-options {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  gap: 1px;
-  margin-left: var(--space-7);
-  padding-left: var(--space-3);
-  border-left: 1px solid var(--divider);
+  gap: 0;
+  margin-left: var(--section);
+  padding-left: var(--inset);
+  border-left: var(--line);
 }
 
 .annotation-options.disabled {
@@ -2505,45 +2242,43 @@ button.icon {
 
 .switch.compact {
   min-height: var(--control-sm);
-  padding-block: var(--space-1);
-}
-
-.switch.compact span {
-  font-size: var(--text-xs);
+  padding-block: var(--gap);
 }
 
 .selection-chip {
-  padding: var(--space-1) var(--space-4);
-  border: 1px solid var(--rule-strong);
   color: var(--ink);
-  font: var(--weight-semibold) var(--text-xs) / var(--leading-snug)
-    var(--font-mono);
 }
 
+/* A block, not a flex row: text-overflow only ellipsises an inline run, so
+   as a flex container the readout would be cut mid-word. */
 .status {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-3);
+  display: block;
+  flex: 0 1 auto;
+  min-width: 0;
   max-width: 46ch;
   overflow: hidden;
   color: var(--ink-2);
-  font: var(--type-mono);
-  letter-spacing: var(--tracking-lg);
+  font: var(--text-caps);
+  letter-spacing: var(--track-caps);
+  text-transform: var(--case-caps);
+  font-variant-numeric: var(--numeric-caps);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .status .dot {
-  flex: 0 0 auto;
-  width: var(--space-4);
-  height: var(--space-4);
+  display: inline-block;
+  margin-right: var(--gap);
+  vertical-align: middle;
+  width: calc(var(--unit) * 2);
+  height: calc(var(--unit) * 2);
   border-radius: 50%;
   background: var(--ink-3);
   transition: background-color var(--dur-base) var(--ease);
 }
 
-/* Ready is a status, not the brand, so it takes the status tone — and the
-   accent could not carry an 8px dot anyway: it is 2.26:1 on paper. */
+/* Ready is a status, not the brand, so it takes the status tone; the accent
+   cannot carry a mark. */
 .status.ready .dot {
   background: var(--ok);
 }
@@ -2552,32 +2287,23 @@ button.icon {
   background: var(--danger);
 }
 
-/* Stopped while working — a compile somebody cancelled, so the view is older
-   than the code. It takes the one tone the accent family is allowed to draw a
-   *mark* in (--accent-press, 3.36:1 on paper, where --accent itself measures
-   2.26:1 and may only ever be a ground), because it belongs to the compile
-   pipeline; and it is still rather than pulsing, because nothing is running.
-   There is no `busy` status: while work is in flight the status line is
-   silent and the toolbar's chip is the one indicator. */
+/* Stopped while working (a cancelled compile, so the view is older than the
+   code): a still warn dot. There is no `busy` status; while work is in flight
+   the toolbar's chip is the one indicator. */
 .status.stale .dot {
-  background: var(--accent-press);
+  background: var(--warn);
 }
 
 /* The running-work chip, beside the mode switcher ---------------------- */
 
-/* One control's height so the toolbar's baseline row survives it, and no
-   width at all when nothing is running: this is drawn only while there is
-   something to say, so it never teaches the eye to skip its own spot. The
-   whole thing is ink on paper apart from the dot — a chip that changed colour
-   would compete with the status line for the same job. */
-/* The border is the chip's, so the buttons inside it come out two pixels
-   short of a control unless the box is two pixels taller — and a button that
-   is 24px next to the panels' 26px reads as sloppy rather than deliberate. */
+/* Drawn only while something runs, ink on paper apart from the dot. The box
+   is two hairlines taller than a control so the buttons inside its border
+   come out a full control high. */
 .job-chip {
   display: flex;
   align-items: stretch;
-  height: calc(var(--control-sm) + 2px);
-  border: 1px solid var(--rule);
+  height: calc(var(--control-sm) + var(--hairline) * 2);
+  border: var(--line);
   animation: pop-in var(--dur-base) var(--ease);
 }
 
@@ -2589,17 +2315,14 @@ button.icon {
   color: var(--ink-2);
 }
 
-/* Capped short enough that the status line to its right still fits its own
-   sentence on a 1280-wide window: the chip is transient and the adapter
-   readout is permanent, and neither may push the other into an ellipsis. The
-   name is what gives when the cap bites, which is the right thing to lose —
-   the kind and the clock are the sentence. */
+/* Capped so the status line beside it still fits on a 1280-wide window; the
+   job name is what gives when the cap bites. */
 .job-chip-open {
   display: flex;
   align-items: center;
-  gap: var(--space-3);
+  gap: var(--gap);
   max-width: 28ch;
-  padding: 0 var(--space-3);
+  padding: 0 var(--inset);
   overflow: hidden;
   white-space: nowrap;
 }
@@ -2607,13 +2330,12 @@ button.icon {
 .job-chip-cancel {
   width: var(--control-sm);
   padding: 0;
-  border-left: 1px solid var(--rule);
-  font-size: var(--text-sm);
+  border-left: var(--line);
 }
 
 .job-chip-open:hover,
 .job-chip-cancel:hover {
-  background: var(--surface-raised-hover);
+  background: var(--plane-step);
   color: var(--ink);
 }
 
@@ -2622,26 +2344,24 @@ button.icon {
    it (§4). The clock is tabular so the digits do not shuffle as it counts. */
 .job-chip-open b {
   color: var(--ink);
-  font: var(--type-mono-strong);
-  letter-spacing: var(--tracking-xs);
-  text-transform: uppercase;
+  font: var(--text-caps);
+  letter-spacing: var(--track-caps);
+  text-transform: var(--case-caps);
+  font-variant-numeric: var(--numeric-caps);
 }
 
 .job-chip-open span {
   min-width: 0;
   overflow: hidden;
   color: var(--ink-2);
-  font: var(--type-mono);
+  font: var(--text-body);
+  letter-spacing: var(--track-body);
+  text-transform: var(--case-body);
+  font-variant-numeric: var(--numeric-body);
   text-overflow: ellipsis;
-  text-transform: none;
-  letter-spacing: normal;
 }
 
-/* The overflow count is the one field that may never be shortened: it is the
-   whole answer to "is that everything that is running", and an ellipsis over
-   it would turn an accounting into a guess. So it keeps its width while the
-   job *name* beside it gives way — the name is recoverable from the Processes
-   window, the count is not recoverable from anywhere. */
+/* The overflow count never shortens; the job name beside it gives way. */
 [data-testid="job-chip-others"] {
   flex: 0 0 auto;
   overflow: visible;
@@ -2653,14 +2373,16 @@ button.icon {
    children are the dot and the leading word, which nothing precedes. */
 .job-chip-open > *:nth-child(n + 3)::before {
   content: "·";
-  margin-right: var(--space-2);
+  margin-right: var(--gap);
   color: var(--ink-3);
 }
 
 .job-chip-open time {
   color: var(--ink);
-  font: var(--type-mono);
-  font-variant-numeric: tabular-nums;
+  font: var(--text-body);
+  letter-spacing: var(--track-body);
+  text-transform: var(--case-body);
+  font-variant-numeric: var(--numeric-body);
 }
 
 /* The one coloured mark in the chip. It pulses while work is alive, which is
@@ -2668,8 +2390,8 @@ button.icon {
    says "it is still going". */
 .job-chip .dot {
   flex: 0 0 auto;
-  width: var(--space-4);
-  height: var(--space-4);
+  width: calc(var(--unit) * 2);
+  height: calc(var(--unit) * 2);
   border-radius: 50%;
   background: var(--ok);
   animation: job-pulse 1.4s var(--ease-inout) infinite;
@@ -2686,10 +2408,8 @@ button.icon {
   }
 }
 
-/* A pulse reports progress rather than decorating, so under a reduced-motion
-   preference it stops where it is defined rather than being swept away by the
-   global transition rule — the dot stays, fully opaque, and still says which
-   state the work is in. */
+/* A pulse reports progress, so reduced motion stops it here and the dot
+   stays, fully opaque. */
 @media (prefers-reduced-motion: reduce) {
   .job-chip .dot {
     animation: none;
@@ -2701,18 +2421,17 @@ button.icon {
 .editor-collapse {
   display: grid;
   place-items: center;
-  width: var(--control-xs);
-  height: var(--control-xs);
+  width: var(--control-sm);
+  height: var(--control-sm);
   padding: 0;
   border-color: transparent;
   background: transparent;
   color: var(--ink-3);
-  font-size: var(--text-md);
 }
 
 .editor-collapse:hover {
   color: var(--ink);
-  background: var(--surface-raised-hover);
+  background: var(--plane-step);
 }
 
 .pane {
@@ -2727,26 +2446,28 @@ button.icon {
   /* The source is authoritative. Keep it above any viewer/tool popover that
      grows across the pane boundary on a narrow window. */
   z-index: 30;
-  border-right: 1px solid var(--rule);
-  background: var(--surface-panel);
+  border-right: var(--line);
+  background: var(--plane-sheet);
 }
 
 .pane-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: var(--space-4);
-  height: 38px;
-  padding: 0 var(--space-5);
-  border-bottom: 1px solid var(--rule);
+  gap: var(--inset);
+  height: calc(var(--unit) * 10);
+  padding: 0 var(--inset);
+  border-bottom: var(--line);
 }
 
 .pane-title {
   min-width: 0;
   overflow: hidden;
   color: var(--ink);
-  font: var(--weight-semibold) var(--text-sm) / var(--leading-flat)
-    var(--font-mono);
+  font: var(--text-body);
+  letter-spacing: var(--track-body);
+  text-transform: var(--case-body);
+  font-variant-numeric: var(--numeric-body);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -2754,13 +2475,15 @@ button.icon {
 .editor-head-actions {
   display: flex;
   align-items: center;
-  gap: var(--space-4);
+  gap: var(--inset);
 }
 
 .pane-hint {
   color: var(--ink-3);
-  font: var(--type-kicker);
-  letter-spacing: var(--tracking-3xs);
+  font: var(--text-caps);
+  letter-spacing: var(--track-caps);
+  text-transform: var(--case-caps);
+  font-variant-numeric: var(--numeric-caps);
   white-space: nowrap;
 }
 
@@ -2773,13 +2496,15 @@ button.icon {
 .console {
   max-height: 32%;
   margin: 0;
-  padding: var(--space-4) var(--space-5);
+  padding: var(--inset);
   overflow: auto;
-  border-top: 1px solid var(--rule);
-  background: var(--surface-bar);
+  border-top: var(--line);
+  background: var(--plane-ground);
   color: var(--danger-ink);
-  font: var(--weight-regular) var(--text-sm) / var(--leading-normal)
-    var(--font-mono);
+  font: var(--text-body);
+  letter-spacing: var(--track-body);
+  text-transform: var(--case-body);
+  font-variant-numeric: var(--numeric-body);
   white-space: pre-wrap;
 }
 
@@ -2787,18 +2512,15 @@ button.icon {
   background: var(--surface-viewport);
 }
 
-/* The drawing frame. Chrome and viewport share one paper, so the rectangle
-   has no luminance step to announce it and the frame is what says where the
-   field begins — which is why it takes --rule-heavy (9.85:1) rather than the
-   hairline a panel uses. Achromatic, because nothing coloured crosses this
-   edge; the mode is named in words in the hint bar instead of tinted here.
-   Non-interactive; above the canvas, under every overlay. */
+/* The drawing frame. Chrome and viewport share one paper, so the frame is
+   what says where the field begins. Achromatic, because nothing coloured
+   crosses this edge. Non-interactive; above the canvas, under every overlay. */
 .viewer-pane::after {
   content: "";
   position: absolute;
   inset: 0;
   z-index: 6;
-  border: 1px solid var(--rule-heavy);
+  border: var(--line);
   pointer-events: none;
 }
 
@@ -2811,9 +2533,11 @@ button.icon {
   touch-action: none;
 }
 
+/* A drop target is "not yet": dashed, at the active weight while armed. */
 .viewer-canvas.material-drop-active {
-  outline: 2px solid var(--viewport-ink);
-  outline-offset: -7px;
+  outline: var(--line-pending);
+  outline-color: var(--viewport-ink);
+  outline-offset: calc(var(--unit) * -2);
 }
 
 /* The gain readout: what one graticule division is worth, and where the
@@ -2822,112 +2546,105 @@ button.icon {
    it. No plate: it sits where the tool rail already holds the field back. */
 .graticule-gain {
   position: absolute;
-  top: var(--space-5);
-  left: 62px;
+  top: var(--section);
+  left: calc(var(--unit) * 16);
   z-index: 5;
   display: flex;
   /* Every cell is given the same line box, so centring them also lands their
      baselines within a pixel of each other — the two things a mixed-size row
      usually has to choose between. */
   align-items: center;
-  gap: var(--space-2);
+  gap: var(--gap);
   pointer-events: none;
 }
 
 .graticule-gain > span {
   color: var(--viewport-ink-2);
-  font: var(--type-kicker);
-  line-height: var(--text-sm);
-  letter-spacing: var(--tracking-3xs);
+  font: var(--text-caps);
+  letter-spacing: var(--track-caps);
+  text-transform: var(--case-caps);
+  font-variant-numeric: var(--numeric-caps);
 }
 
 .graticule-gain > span:not(:first-child) {
-  margin-left: var(--space-5);
+  margin-left: var(--section);
 }
 
 .graticule-gain b {
   color: var(--viewport-ink);
-  font: var(--weight-medium) var(--text-sm) / var(--leading-flat) var(--font-mono);
-  font-variant-numeric: tabular-nums;
+  font: var(--text-body);
+  letter-spacing: var(--track-body);
+  text-transform: var(--case-body);
+  font-variant-numeric: var(--numeric-body);
 }
 
 .graticule-gain i {
   color: var(--viewport-ink-2);
-  font: var(--type-mono);
+  font: var(--text-body);
+  letter-spacing: var(--track-body);
+  text-transform: var(--case-body);
+  font-variant-numeric: var(--numeric-body);
   font-style: normal;
-  line-height: var(--text-sm);
 }
 
-/* The contour readout, on the row under the gain: same instrument, second
-   scale. It appears with the slice rather than with the floor grid, because
-   what it states is a property of the slice — but the interval it states is
-   the floor grid's, which is the point. */
+/* The contour readout, on the row under the gain; shown with the slice. */
 .graticule-contour {
-  top: 32px;
+  top: calc(var(--unit) * 8);
 }
 
-/* A paper plate under a readout that is standing on data.
-   The gain and view fields are chrome, and chrome on this ground is dark ink
-   on paper — over a saturated slice or a black depth pass there is no paper
-   left and the type disappears into whatever the shader happened to draw. The
-   title block already solves this the same way, for the same reason. */
+/* A paper plate under a readout standing on data: over a saturated slice or
+   a black depth pass there is no paper left for dark ink to read on. */
 .graticule-gain.plated {
-  padding: var(--space-1) var(--space-3);
+  padding: var(--gap) var(--inset);
   background: var(--surface-viewport);
-  outline: 1px solid var(--rule);
+  outline: var(--line);
 }
 
+/* The slice's key: the ramp itself, with the value at each end. Over the
+   viewport because both numbers on it are functions of the camera. */
 .sdf-key {
-  padding: var(--space-2) var(--space-3);
+  padding: var(--gap) var(--inset);
   background: var(--surface-viewport);
-  outline: 1px solid var(--rule);
-}
-
-/* The slice's key: the ramp itself, with the value at each end.
-   It answers "what am I looking at" without a trip to the panel, and it is
-   over the viewport rather than in one because both numbers on it are
-   functions of the camera. */
-.sdf-key {
+  outline: var(--line);
   position: absolute;
-  top: 58px;
-  left: 62px;
+  top: calc(var(--unit) * 14);
+  left: calc(var(--unit) * 16);
   z-index: 5;
-  width: 200px;
+  width: calc(var(--unit) * 50);
   pointer-events: none;
 }
 
 /* The fill is set inline from `sdfRamp.ts`, which is the ramp the shader
    draws with; only the box is described here. */
 .sdf-key-ramp {
-  height: var(--text-2xs);
-  border: 1px solid var(--rule);
+  height: calc(var(--unit) * 2.5);
+  border: var(--line);
 }
 
 .sdf-key-values {
   display: flex;
   justify-content: space-between;
-  gap: var(--space-3);
-  margin-top: var(--space-1);
+  gap: var(--gap);
+  margin-top: var(--gap);
   color: var(--viewport-ink-2);
-  font: var(--type-kicker);
-  letter-spacing: var(--tracking-3xs);
+  font: var(--text-body);
+  letter-spacing: var(--track-body);
+  text-transform: var(--case-body);
+  font-variant-numeric: var(--numeric-body);
 }
 
-/* The title block, ASME Y14.100's lower-right corner: five rows of what is on
-   screen, an em dash wherever the app cannot fill a field. Opaque paper, so a
-   part passing behind it never shows through the type; below the dock in
-   stacking order, because a panel someone opened outranks a caption. */
+/* The perf readout (PerfReadout.tsx), a title block in the lower-right
+   corner: label/value rows on opaque paper, so a part passing behind never
+   shows through; below the dock in stacking order. */
 .title-block {
   position: absolute;
-  /* Inside the drawing frame, not on it: the corner brackets reach 36px in
-     from each edge, and a title block belongs within the border it labels. */
-  right: 40px;
-  bottom: 40px;
+  right: calc(var(--unit) * 10);
+  bottom: calc(var(--unit) * 10);
   z-index: 5;
   display: grid;
-  grid-template-columns: 62px 136px;
+  grid-template-columns: calc(var(--unit) * 16) calc(var(--unit) * 34);
   margin: 0;
-  border: 1px solid var(--rule-heavy);
+  border: var(--line);
   background: var(--surface-viewport);
   pointer-events: none;
 }
@@ -2935,7 +2652,7 @@ button.icon {
 .title-block dt,
 .title-block dd {
   margin: 0;
-  padding: var(--space-1) var(--space-3);
+  padding: var(--gap) var(--inset);
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
@@ -2944,41 +2661,26 @@ button.icon {
 /* Same two cells as the gain readout, on the same 12px line box: two labels
    of one instrument should not be two type variants. */
 .title-block dt {
-  border-right: 1px solid var(--rule);
+  border-right: var(--line);
   color: var(--viewport-ink-2);
-  font: var(--type-kicker);
-  line-height: var(--text-sm);
-  letter-spacing: var(--tracking-3xs);
+  font: var(--text-caps);
+  letter-spacing: var(--track-caps);
+  text-transform: var(--case-caps);
+  font-variant-numeric: var(--numeric-caps);
 }
 
 .title-block dd {
   color: var(--viewport-ink);
-  font: var(--type-mono);
-  font-variant-numeric: tabular-nums;
-  line-height: var(--text-sm);
-  text-transform: uppercase;
+  font: var(--text-body);
+  letter-spacing: var(--track-body);
+  text-transform: var(--case-body);
+  font-variant-numeric: var(--numeric-body);
 }
 
 .title-block dt:nth-of-type(n + 2),
 .title-block dd:nth-of-type(n + 2) {
-  border-top: 1px solid var(--rule);
+  border-top: var(--line);
 }
-
-/* The hint bar is left alone: the title block sits 40px up from the bottom
-   edge, so the two never share a line, and narrowing the hint to "clear" it
-   only truncated a sentence that already fits. */
-
-/* The dock keeps its full height. Shortening it to clear the title block was
-   tried and measured: the panels are already over-full at the height they
-   have (`scroll-content-hidden` fires on three of them today), so taking
-   100px away buried more controls and squeezed two panels into overlapping
-   hit boxes. A caption occasionally hidden behind a panel the user opened is
-   the cheaper failure, which is why the block sits below the dock in the
-   stacking order rather than pushing it around. */
-
-/* The viewport carried a "COMPILING" chip of its own here. It is gone: the
-   top bar's running-work chip says the same thing, names the work, counts its
-   seconds and can stop it, and one machine state deserves one indicator. */
 
 .constraint-overlay {
   position: absolute;
@@ -3006,110 +2708,113 @@ button.icon {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: var(--space-4);
+  gap: var(--inset);
   flex: 0 0 auto;
-  padding: var(--space-4) var(--space-3) var(--space-3) var(--space-5);
-  background: var(--surface-float-96);
+  padding: var(--inset);
+  background: var(--plane-sheet);
 }
 
 .properties-follow {
-  padding: var(--space-1) var(--space-2);
-  border: 1px solid var(--rule);
-  background: transparent;
+  height: var(--control-tag);
+  padding: 0 var(--inset);
   color: var(--ink-2);
-  font: var(--type-kicker);
-  cursor: pointer;
 }
 
 .properties-empty,
 .properties-note {
   margin: 0;
-  padding: 0 var(--space-5) var(--space-4);
+  padding: 0 var(--inset) var(--inset);
   color: var(--ink-2);
-  font: var(--type-body-small, inherit);
-  line-height: var(--leading-normal, 1.4);
+  font: var(--text-prose);
+  letter-spacing: var(--track-prose);
+  text-transform: var(--case-prose);
+  font-variant-numeric: var(--numeric-prose);
 }
 
 .properties-section {
-  padding: 0 var(--space-5) var(--space-4);
+  padding: 0 var(--inset) var(--inset);
 }
 
 .properties-section + .properties-section {
-  border-top: 1px solid var(--rule);
-  padding-top: var(--space-4);
+  border-top: var(--line);
+  padding-top: var(--inset);
 }
 
 .properties-section h3 {
   display: flex;
   align-items: baseline;
-  gap: var(--space-3);
-  margin: 0 0 var(--space-3);
+  gap: var(--gap);
+  margin: 0 0 var(--gap);
   font: inherit;
 }
 
-.properties-section h3 small {
-  font: var(--type-kicker);
-  color: var(--ink-2);
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-}
-
-.properties-section h3 b {
-  font-weight: 600;
-}
+/* The element's kind is a kind chip (.sim-kind). */
 
 .properties-section h3 i {
   margin-left: auto;
-  font: var(--type-kicker);
+  font: var(--text-caps);
+  letter-spacing: var(--track-caps);
+  text-transform: var(--case-caps);
+  font-variant-numeric: var(--numeric-caps);
   font-style: normal;
-  color: var(--ink-3, var(--ink-2));
+  color: var(--ink-3);
 }
 
 .properties-row {
   display: grid;
-  grid-template-columns: 72px 1fr;
+  grid-template-columns: var(--col-label) minmax(0, 1fr);
   align-items: center;
-  gap: var(--space-2);
-  margin-bottom: var(--space-2);
+  gap: var(--gap);
+  margin-bottom: var(--gap);
 }
 
 .properties-row > span {
-  font: var(--type-kicker);
+  font: var(--text-caps);
+  letter-spacing: var(--track-caps);
+  text-transform: var(--case-caps);
+  font-variant-numeric: var(--numeric-caps);
   color: var(--ink-2);
 }
 
-.properties-row input,
-.properties-row select {
+.properties-row input {
   min-width: 0;
   width: 100%;
-  font: inherit;
 }
 
 .properties-vector {
-  grid-template-columns: 72px 1fr 1fr 1fr;
+  grid-template-columns: var(--col-label) 1fr 1fr 1fr;
 }
 
 .properties-parameter {
   grid-column: 2 / -1;
-  font: var(--type-kicker);
+  font: var(--text-body);
+  letter-spacing: var(--track-body);
+  text-transform: var(--case-body);
+  font-variant-numeric: var(--numeric-body);
   color: var(--ink-2);
 }
 
+/* A read-only expression is "not yet" a value: a dashed edge, no fill. */
 .properties-readonly code {
   overflow: hidden;
+  padding: 0 var(--inset);
+  border: var(--line-pending);
   text-overflow: ellipsis;
   white-space: nowrap;
   color: var(--ink-2);
-  font: var(--type-mono);
+  font: var(--text-body);
+  letter-spacing: var(--track-body);
+  text-transform: var(--case-body);
+  font-variant-numeric: var(--numeric-body);
+  line-height: calc(var(--control-sm) - var(--hairline) * 2);
 }
 
 .object-tree-row.boolean .tree-label {
   color: var(--ink-2);
 }
 
-/* Sketch-plane name tags: DOM text at the frame's +u,+v corner, in the same
-   cool ink the GPU draws the frame with, so the tag reads as part of the
-   plane and not as a second annotation about it. */
+/* Sketch-plane name tags: DOM text at the frame's +u,+v corner, in viewport
+   ink. A plane is not a free parameter, so it carries no hue. */
 .plane-labels {
   position: absolute;
   inset: 0;
@@ -3120,39 +2825,31 @@ button.icon {
 
 .plane-label {
   position: absolute;
-  transform: translate(4px, -100%);
-  padding: 1px var(--space-2);
-  border: 1px solid rgba(51, 96, 143, 0.55);
-  border-radius: 2px;
-  background: rgba(230, 230, 233, 0.82);
-  color: var(--info-ink);
-  font: var(--type-kicker);
-  line-height: var(--leading-tight);
-  letter-spacing: 0.04em;
-  white-space: nowrap;
+  transform: translate(var(--unit), -100%);
+  border-color: var(--rule-strong);
+  background: var(--surface-viewport-94);
+  color: var(--viewport-ink);
   cursor: pointer;
   pointer-events: auto;
 }
 
 .plane-label:hover {
-  background: rgba(51, 96, 143, 0.12);
+  background: var(--plane-sheet);
 }
 
 .plane-label.derived {
   border-style: dashed;
-  color: var(--ink-3);
-  border-color: rgba(90, 90, 96, 0.5);
+  color: var(--viewport-ink-2);
+  border-color: var(--rule);
 }
 
 .plane-label.preview {
   border-style: dashed;
-  font-style: italic;
   pointer-events: none;
 }
 
-/* Dimensions on paper: the mark blue, and — the part that inverts with the
-   ground — a dark label inside a paper halo. Light-on-dark was the right way
-   round over a black viewport and is unreadable over this one. */
+/* Dimensions on paper: the viewport mark, and a dark label inside a paper
+   halo. */
 .constraint-distance {
   fill: var(--viewport-mark);
   stroke: rgba(var(--viewport-mark-rgb), var(--alpha-edge));
@@ -3175,9 +2872,10 @@ button.icon {
   stroke: var(--surface-viewport-94);
   stroke-width: 5px;
   paint-order: stroke fill;
-  font: var(--type-mono-strong);
-  line-height: var(--leading-flat);
-  letter-spacing: 0.03em;
+  font: var(--text-body);
+  letter-spacing: var(--track-body);
+  text-transform: var(--case-body);
+  font-variant-numeric: var(--numeric-body);
   text-anchor: middle;
 }
 
@@ -3201,45 +2899,31 @@ button.icon {
 
 .viewer-hint {
   position: absolute;
-  right: var(--space-5);
-  bottom: var(--space-5);
-  left: 62px;
+  right: var(--section);
+  bottom: var(--section);
+  left: calc(var(--unit) * 16);
   z-index: 5;
   margin: 0;
   overflow: hidden;
   text-align: right;
   color: var(--viewport-ink-2);
-  font-size: var(--text-xs);
+  font: var(--text-prose);
+  letter-spacing: var(--track-prose);
+  text-transform: var(--case-prose);
+  font-variant-numeric: var(--numeric-prose);
   text-overflow: ellipsis;
   white-space: nowrap;
   pointer-events: none;
 }
 
-/* Same plate the readouts wear, for the same reason: while a distance-field
-   view is up the viewport is data end to end, and there is no paper left for
-   chrome to be dark ink on. The hint keeps its right alignment, so the plate
-   shrinks to the text rather than ruling a bar across the bottom of the
-   picture. */
+/* Same plate the readouts wear while a distance-field view is up. The hint
+   keeps its right alignment, so the plate shrinks to the text. */
 .viewer-pane.sdf-data .viewer-hint {
   left: auto;
-  max-width: calc(100% - 74px);
-  padding: var(--space-1) var(--space-3);
+  max-width: calc(100% - var(--unit) * 19);
+  padding: var(--gap) var(--inset);
   background: var(--surface-viewport);
-  outline: 1px solid var(--rule);
-}
-
-/* Active editing mode, leading the hint bar: a stamped block. The word is the
-   mode signal — it survives greyscale, colour-blindness and a screenshot — so
-   it is set in reversed ink rather than tinted, which also keeps the last
-   chrome hue out of the viewport rectangle. Opaque, so geometry passing
-   behind it never shows through the type. */
-.viewer-hint .hint-mode {
-  padding: var(--space-1) var(--space-3);
-  background: var(--viewport-ink);
-  color: var(--surface-viewport);
-  font: var(--type-kicker);
-  letter-spacing: var(--tracking-3xs);
-  text-transform: uppercase;
+  outline: var(--line);
 }
 
 /* The simulate-mode slot only positions its owner's panel. */
@@ -3249,20 +2933,24 @@ button.icon {
 
 .viewer-error {
   position: absolute;
-  bottom: 40px;
-  right: var(--space-5);
-  left: 62px;
+  bottom: calc(var(--unit) * 10);
+  right: var(--section);
+  left: calc(var(--unit) * 16);
   z-index: 12;
-  padding: var(--space-5);
-  border: 1px solid rgba(var(--danger-rgb), var(--alpha-edge));
-  background: var(--surface-float-96);
+  padding: var(--inset);
+  border: var(--line);
+  border-color: rgba(var(--danger-rgb), var(--alpha-edge));
+  background: var(--plane-sheet);
   color: var(--danger-ink);
-  font-size: var(--text-sm);
+  font: var(--text-prose);
+  letter-spacing: var(--track-prose);
+  text-transform: var(--case-prose);
+  font-variant-numeric: var(--numeric-prose);
   animation: rise-in var(--dur-slow) var(--ease);
 }
 
 .viewer-error p {
-  margin: 0 0 var(--space-4);
+  margin: 0 0 var(--inset);
 }
 
 /* WGSL dialog --------------------------------------------------------- */
@@ -3284,10 +2972,10 @@ button.icon {
   /* Without min-height the flex item takes its content's full height, and a
      shader thousands of lines long pushes the whole dialog off screen. */
   min-height: 0;
-  width: min(880px, calc(100% - 48px));
-  height: min(680px, calc(100% - 48px));
-  border: 1px solid var(--rule-strong);
-  background: var(--surface-panel);
+  width: min(calc(var(--unit) * 220), calc(100% - var(--unit) * 12));
+  height: min(calc(var(--unit) * 170), calc(100% - var(--unit) * 12));
+  border: var(--line);
+  background: var(--plane-sheet);
   animation: rise-in var(--dur-slow) var(--ease);
 }
 
@@ -3295,89 +2983,86 @@ button.icon {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: var(--space-4);
-  padding: var(--space-5) var(--space-5) var(--space-5) var(--space-6);
-  border-bottom: 1px solid var(--rule);
-  font-size: var(--text-md);
-  font-weight: var(--weight-semibold);
+  gap: var(--inset);
+  padding: var(--inset);
+  border-bottom: var(--line);
+  font: var(--text-title);
+  letter-spacing: var(--track-title);
+  text-transform: var(--case-title);
+  font-variant-numeric: var(--numeric-title);
 }
 
 .dialog pre {
   flex: 1;
   min-height: 0;
   margin: 0;
-  padding: var(--space-5) var(--space-6);
+  padding: var(--inset);
   overflow: auto;
-  font: var(--weight-regular) var(--text-sm) / var(--leading-normal)
-    var(--font-mono);
+  font: var(--text-body);
+  letter-spacing: var(--track-body);
+  text-transform: var(--case-body);
+  font-variant-numeric: var(--numeric-body);
 }
 
 /* Menu-bar dialogs (open, save-as, shortcuts) -------------------------- */
 
 .dialog-compact {
-  width: min(460px, calc(100% - 48px));
+  width: min(calc(var(--unit) * 115), calc(100% - var(--unit) * 12));
   height: auto;
-  max-height: min(580px, calc(100% - 48px));
+  max-height: min(calc(var(--unit) * 145), calc(100% - var(--unit) * 12));
 }
 
 .dialog-body {
   display: flex;
   flex-direction: column;
-  gap: var(--space-4);
+  gap: var(--inset);
   min-height: 0;
-  padding: var(--space-5) var(--space-6) var(--space-6);
+  padding: var(--inset);
   overflow: auto;
 }
 
 .dialog-note {
   margin: 0;
   color: var(--ink-3);
-  font-size: var(--text-xs);
+  font: var(--text-prose);
+  letter-spacing: var(--track-prose);
+  text-transform: var(--case-prose);
+  font-variant-numeric: var(--numeric-prose);
 }
 
 .dialog-note code {
   color: var(--ink);
-  font-size: var(--text-2xs);
+  font: var(--text-body);
+  letter-spacing: var(--track-body);
+  text-transform: var(--case-body);
+  font-variant-numeric: var(--numeric-body);
 }
 
 .dialog-error {
   margin: 0;
   color: var(--danger-ink);
-  font-size: var(--text-xs);
-}
-
-.scene-list {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.scene-list button {
-  width: 100%;
-  height: var(--control-md);
-  text-align: left;
-  font: var(--weight-semibold) var(--text-sm) / var(--leading-flat)
-    var(--font-mono);
+  font: var(--text-prose);
+  letter-spacing: var(--track-prose);
+  text-transform: var(--case-prose);
+  font-variant-numeric: var(--numeric-prose);
 }
 
 .save-as-form label {
   display: grid;
-  gap: var(--space-2);
+  gap: var(--gap);
   color: var(--ink-3);
-  font-size: var(--text-xs);
+  font: var(--text-caps);
+  letter-spacing: var(--track-caps);
+  text-transform: var(--case-caps);
+  font-variant-numeric: var(--numeric-caps);
 }
 
 .save-as-form input[type="text"] {
-  height: var(--control-md);
-  padding: 0 var(--space-4);
-  border: 1px solid var(--rule);
-  background: var(--surface-raised);
+  height: var(--control-sm);
+  padding: 0 var(--inset);
+  border: var(--line);
+  background: var(--plane-sheet);
   color: var(--ink);
-  font: var(--weight-semibold) var(--text-sm) / var(--leading-flat)
-    var(--font-mono);
 }
 
 .save-as-form button.primary {
@@ -3387,21 +3072,16 @@ button.icon {
 .shortcut-groups {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--space-6);
+  gap: var(--section);
 }
 
 .shortcut-groups h4 {
-  margin: 0 0 var(--space-3);
-  color: var(--ink-3);
-  font: var(--weight-semibold) var(--text-3xs) / var(--leading-flat)
-    var(--font-mono);
-  letter-spacing: var(--tracking-3xs);
-  text-transform: uppercase;
+  margin: 0 0 var(--gap);
 }
 
 .shortcut-groups ul {
   display: grid;
-  gap: var(--space-2);
+  gap: var(--gap);
   margin: 0;
   padding: 0;
   list-style: none;
@@ -3411,8 +3091,11 @@ button.icon {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: var(--space-4);
-  font-size: var(--text-xs);
+  gap: var(--inset);
+  font: var(--text-body);
+  letter-spacing: var(--track-body);
+  text-transform: var(--case-body);
+  font-variant-numeric: var(--numeric-body);
 }
 
 .shortcut-groups li span {
@@ -3424,14 +3107,7 @@ button.icon {
 }
 
 .shortcut-groups kbd {
-  flex: 0 0 auto;
-  padding: var(--space-1) var(--space-3);
-  border: 1px solid var(--rule);
-  border-bottom-width: 2px;
-  background: var(--surface-raised);
   color: var(--ink);
-  font: var(--type-mono-strong);
-  white-space: nowrap;
 }
 
 /* ── FEM simulate mode (a dock section) ────────────────────────────────── */
@@ -3444,12 +3120,12 @@ button.icon {
   overflow: auto;
   display: flex;
   flex-direction: column;
-  gap: var(--space-4);
-  padding: var(--space-5);
+  gap: var(--section);
+  padding: var(--inset);
 }
 
 /* When the dock shrinks the section, the panel scrolls — its rows must not
-   be flex-crushed to zero height (the face-group list used to vanish). */
+   be flex-crushed to zero height. */
 .sim-panel > * {
   flex: 0 0 auto;
 }
@@ -3457,31 +3133,37 @@ button.icon {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: var(--space-4);
+  gap: var(--inset);
 }
 .sim-row {
   display: flex;
   align-items: flex-end;
-  gap: var(--space-4);
+  gap: var(--inset);
 }
 .sim-row label {
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
+  gap: var(--gap);
   min-width: 0;
   color: var(--ink-3);
-  font: var(--type-kicker);
-  letter-spacing: var(--tracking-3xs);
+  font: var(--text-caps);
+  letter-spacing: var(--track-caps);
+  text-transform: var(--case-caps);
+  font-variant-numeric: var(--numeric-caps);
 }
-.sim-row input[type="number"],
-.sim-row select {
-  width: 76px;
+.sim-row input[type="number"] {
+  width: calc(var(--unit) * 19);
 }
 .sim-help {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap);
   margin: 0;
   color: var(--ink-2);
-  font-size: var(--text-xs);
-  line-height: var(--leading-snug);
+  font: var(--text-prose);
+  letter-spacing: var(--track-prose);
+  text-transform: var(--case-prose);
+  font-variant-numeric: var(--numeric-prose);
 }
 /* Declared studies: one card per ThermalStudy/ElasticStudy in the code. */
 .sim-studies {
@@ -3490,84 +3172,74 @@ button.icon {
   list-style: none;
   display: flex;
   flex-direction: column;
-  gap: var(--space-4);
+  gap: var(--inset);
 }
+/* The hairline is inside the inset, so the card's rows land on the panel's
+   tracks rather than a pixel below them. */
 .sim-study {
   display: flex;
   flex-direction: column;
-  gap: var(--space-3);
-  padding: var(--space-4);
-  border: 1px solid var(--rule);
-  background: var(--surface-inset);
+  gap: var(--gap);
+  padding: calc(var(--inset) - var(--hairline));
+  border: var(--line);
+  background: var(--plane-sheet);
 }
 .sim-study-head {
   display: flex;
   align-items: center;
-  gap: var(--space-3);
+  gap: var(--gap);
   min-width: 0;
 }
 .sim-study-head strong {
   flex: 1 1 auto;
   min-width: 0;
   overflow: hidden;
-  font-size: var(--text-sm);
-  font-weight: var(--weight-semibold);
+  font: var(--text-body);
+  letter-spacing: var(--track-body);
+  text-transform: var(--case-body);
+  font-variant-numeric: var(--numeric-body);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-/* Kind chips are taxonomy, not status: three tones drawn from the same
-   token set the rest of the chrome uses, never new hues. */
-.sim-kind {
-  flex: 0 0 auto;
-  padding: var(--space-1) var(--space-3);
-  font: var(--type-kicker);
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-}
-/* Kind chips are filled cells, like every other taxonomy mark here: the ink
-   on them is near-black, never the chip's own hue at reading weight. */
-.sim-kind-thermal {
-  background: var(--accent);
-  color: var(--ink-on-accent);
-}
-.sim-kind-elastic {
-  background: var(--info);
-  color: var(--surface-float);
-}
+
 .sim-delete {
   flex: 0 0 auto;
   display: grid;
   place-items: center;
-  width: var(--control-xs);
-  height: var(--control-xs);
+  width: var(--control-sm);
+  height: var(--control-sm);
   padding: 0;
   border-color: transparent;
   background: transparent;
   color: var(--ink-3);
-  /* One size off the row's name rather than two: a 13px glyph beside a 9px
-     kind chip put the study head's three cells 2.2px apart. */
-  font-size: var(--text-sm);
-  line-height: var(--leading-flat);
 }
 .sim-delete:hover:not(:disabled) {
-  border-color: rgba(var(--danger-rgb), var(--alpha-edge));
+  border-color: var(--danger);
   color: var(--danger-ink);
 }
+/* A study's arguments are rows on the panel tracks (L2): label | value |
+   unit, a cell high, a line between, so their fields share one column with
+   every other value in the app. */
 .sim-args {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-3);
+  display: grid;
 }
 .sim-args label {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
+  display: grid;
+  grid-template-columns: var(--col-label) minmax(0, 1fr) var(--col-unit);
+  align-items: center;
+  gap: var(--inset);
   min-width: 0;
+  min-height: calc(var(--control-sm) + var(--gap) * 2);
+  border-bottom: var(--line);
   color: var(--ink-2);
-  font-size: var(--text-2xs);
+  font: var(--text-caps);
+  letter-spacing: var(--track-caps);
+  text-transform: var(--case-caps);
+  font-variant-numeric: var(--numeric-caps);
 }
-.sim-args input[type="number"] {
-  width: 72px;
+.sim-args input[type="number"],
+.sim-args .ui-select {
+  width: 100%;
 }
 .sim-bcs {
   margin: 0;
@@ -3575,57 +3247,67 @@ button.icon {
   list-style: none;
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
+  gap: var(--gap);
 }
-/* One line per boundary condition. The row never wraps: the selection is
-   the only elastic cell (min-width:0 lets it ellipsis), and the value box
-   and the delete button hold their size beside it. Wrapping used to drop
-   the delete button onto a second line of its own. */
+/* One line per boundary condition, on the panel tracks: the description is
+   the only elastic cell, the value box and the delete hold their size beside
+   it. Aligned to the top so a row's height is its line boxes plus a gap each
+   side (L3). */
 .sim-bcs li {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto var(--control-sm);
+  align-items: start;
+  gap: var(--inset);
   min-width: 0;
-  padding: var(--space-2) var(--space-3);
-  background: var(--surface-inset);
+  /* The row's own edge is inside its rhythm: padding is a gap less a hairline,
+     so a bordered row is the same height as an unbordered one. */
+  padding: calc(var(--gap) - var(--hairline)) var(--inset);
+  border: var(--line);
+  background: var(--plane-sheet);
   transition: background-color var(--dur-fast) var(--ease);
 }
 .sim-bcs li:hover {
-  background: var(--surface-inset-hover);
+  background: var(--plane-step);
+}
+/* A condition the code states as an expression: read-only, so dashed. */
+.sim-bcs li.sim-bc-readonly {
+  border-style: dashed;
 }
 .sim-bc-main {
   display: flex;
   flex-direction: column;
-  gap: var(--space-1);
+  gap: var(--gap);
   flex: 1 1 auto;
   min-width: 0;
 }
 .sim-bc-type {
   display: flex;
   align-items: center;
-  font-size: var(--text-2xs);
-  font-weight: var(--weight-semibold);
+  font: var(--text-caps);
+  letter-spacing: var(--track-caps);
+  text-transform: var(--case-caps);
+  font-variant-numeric: var(--numeric-caps);
 }
 .sim-bc-main code {
   max-width: 100%;
   color: var(--ink-3);
-  font-family: var(--font-mono);
-  font-size: var(--text-2xs);
-  line-height: var(--leading-tight);
+  font: var(--text-body);
+  letter-spacing: var(--track-body);
+  text-transform: var(--case-body);
+  font-variant-numeric: var(--numeric-body);
   overflow: hidden;
   overflow-wrap: anywhere;
 }
 .sim-bcs li input[type="number"] {
   flex: 0 0 auto;
-  width: 56px;
+  width: calc(var(--unit) * 14);
 }
 .sim-bcs li .sim-vector input[type="number"] {
-  width: 40px;
+  width: calc(var(--unit) * 10);
 }
 /* A boundary condition's cell is a stack — type over selection — so the
    controls beside it follow the panel headers' rule: full height for the
-   centres, glyph on the stack's first line for the baselines. Centred, the
-   delete mark measured 21.4px below the line it deletes. */
+   centres, glyph on the stack's first line for the baselines. */
 .sim-bcs li > .sim-delete,
 .sim-bcs li > small {
   align-self: stretch;
@@ -3633,7 +3315,7 @@ button.icon {
   align-content: start;
   justify-items: center;
   height: auto;
-  line-height: var(--text-lg);
+  line-height: calc(var(--unit) * 4);
 }
 
 .sim-bcs li > small {
@@ -3646,160 +3328,146 @@ button.icon {
   height: var(--control-sm);
   border-style: dashed;
   color: var(--ink-2);
-  font-size: var(--text-xs);
 }
 .sim-add-study {
-  gap: var(--space-3);
+  gap: var(--gap);
 }
 .sim-add-study button {
   flex: 1;
   min-width: 0;
   height: var(--control-sm);
-  font-size: var(--text-2xs);
-  letter-spacing: var(--tracking-lg);
   white-space: nowrap;
 }
 /* The add-BC builder: type + selection pickers over per-kind numeric forms. */
 .sim-builder {
   display: flex;
   flex-direction: column;
-  gap: var(--space-3);
-  padding: var(--space-3);
-  border: 1px dashed var(--rule-strong);
+  gap: var(--gap);
+  padding: var(--inset);
+  border: var(--line-pending);
   animation: rise-in var(--dur-base) var(--ease);
 }
 .sim-builder-row {
   display: flex;
-  gap: var(--space-4);
+  gap: var(--inset);
 }
 .sim-builder-row label {
   display: flex;
   flex-direction: column;
-  gap: var(--space-1);
+  gap: var(--gap);
   min-width: 0;
   color: var(--ink-2);
-  font-size: var(--text-2xs);
+  font: var(--text-caps);
+  letter-spacing: var(--track-caps);
+  text-transform: var(--case-caps);
+  font-variant-numeric: var(--numeric-caps);
   flex: 1;
 }
 .sim-sides {
   display: grid;
   grid-template-columns: repeat(6, minmax(0, 1fr));
-  gap: var(--space-2);
+  gap: var(--gap);
 }
 .sim-sides button {
-  height: var(--control-xs);
+  height: var(--control-sm);
   min-width: 0;
   padding: 0;
-  font: var(--type-mono-strong);
 }
 /* A labelled numeric row: fixed label column, then the boxes. The shared
    label width is what lines every panel's inputs up on one left edge. */
 .sim-builder-vector {
   display: flex;
   align-items: center;
-  gap: var(--space-2);
+  gap: var(--gap);
   min-width: 0;
   color: var(--ink-2);
-  font-size: var(--text-2xs);
-  letter-spacing: var(--tracking-lg);
 }
-/* Mono is wider than the sans this column was measured for, so the label
-   cell grew to fit its longest string ("resolution") rather than truncating
-   it, and it drops the furniture tracking that a dense cell cannot afford. */
+/* The shared label column, ellipsised if a label outgrows it. */
 .sim-builder-vector > span {
   flex: 0 0 auto;
-  text-transform: none;
-  letter-spacing: normal;
-  width: 66px;
+  font: var(--text-caps);
+  letter-spacing: var(--track-caps);
+  text-transform: var(--case-caps);
+  font-variant-numeric: var(--numeric-caps);
+  width: var(--col-label);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.sim-builder-vector input[type="number"],
-.sim-builder-vector select {
+.sim-builder-vector input[type="number"] {
   flex: 1 1 0;
   min-width: 0;
 }
 .sim-builder-actions {
   display: flex;
-  gap: var(--space-3);
+  gap: var(--gap);
 }
 .sim-builder-actions button {
   flex: 1;
   min-width: 0;
   height: var(--control-sm);
-  font-size: var(--text-xs);
 }
 .sim-vector {
   display: flex;
-  gap: var(--space-2);
+  gap: var(--gap);
   min-width: 0;
-}
-.sim-run {
-  height: var(--control-md);
-  border-color: var(--accent-press);
-  background: var(--accent);
-  color: var(--ink-on-accent);
-  font-size: var(--text-sm);
-  font-weight: var(--weight-semibold);
-  letter-spacing: var(--tracking-sm);
-}
-
-.sim-run:hover:not(:disabled) {
-  border-color: var(--accent-press);
-  background: var(--accent-press);
 }
 .sim-legend {
   display: flex;
   flex-direction: column;
-  gap: var(--space-1);
-  font-size: var(--text-xs);
+  gap: var(--gap);
 }
 /* The field ramp itself — the one place saturated data colour belongs in a
    panel, so the chrome around it stays neutral. */
 .sim-ramp {
-  height: var(--text-2xs);
-  border: 1px solid var(--divider);
+  height: calc(var(--unit) * 2.5);
+  border: var(--line);
 }
 .sim-legend-values {
   display: flex;
   justify-content: space-between;
-  gap: var(--space-4);
+  gap: var(--inset);
   color: var(--ink-2);
-  font: var(--type-mono);
+  font: var(--text-body);
+  letter-spacing: var(--track-body);
+  text-transform: var(--case-body);
+  font-variant-numeric: var(--numeric-body);
 }
 /* Viewport master switch (Scene | Mesh) + the element-edge toggle. */
 .sim-view-control {
   align-items: center;
   justify-content: space-between;
 }
-.sim-view-control .switch {
+.sim-view-control .switch,
+.sim-slice .switch {
   flex-direction: row !important;
   align-items: center;
 }
-/* This row mixes a checkbox label, three axis buttons and a range slider —
-   three different intrinsic heights. Centring them is the only arrangement
-   in which they share an axis; flex-end left them 5.5px apart. */
+/* A switch, a segmented control and a range slider: three intrinsic
+   heights, centred on one axis. */
 .sim-slice,
 .sim-deform,
 .sim-view-control {
   align-items: center;
 }
 
+/* Single-letter axes: each cell at least square. */
+.sim-slice .segmented button {
+  min-width: var(--control-sm);
+}
+
 .sim-slice input[type="range"] {
   flex: 1;
-  min-width: 60px;
+  min-width: calc(var(--unit) * 15);
   accent-color: var(--ink);
-}
-.sim-slice-toggle {
-  flex-direction: row !important;
-  align-items: center;
 }
 .sim-note,
 .sim-error {
   margin: 0;
-  font-size: var(--text-xs);
-  line-height: var(--leading-snug);
+  font: var(--text-prose);
+  letter-spacing: var(--track-prose);
+  text-transform: var(--case-prose);
+  font-variant-numeric: var(--numeric-prose);
 }
 .sim-note {
   color: var(--ink-3);
@@ -3812,25 +3480,25 @@ button.icon {
 /* ── Optimize panel (a Model-mode dock section) ────────────────────────── */
 
 .dock .optimize-panel {
-  min-height: 118px;
-}
-
-.opt-kind {
-  background: var(--accent);
-  color: var(--ink-on-accent);
+  min-height: calc(var(--unit) * 30);
 }
 
 .opt-objective {
   margin: 0;
   color: var(--ink-2);
-  font-size: var(--text-2xs);
-  line-height: var(--leading-snug);
+  font: var(--text-prose);
+  letter-spacing: var(--track-prose);
+  text-transform: var(--case-prose);
+  font-variant-numeric: var(--numeric-prose);
   overflow-wrap: anywhere;
 }
 
 .opt-objective code {
   color: var(--ink);
-  font: var(--type-mono-strong);
+  font: var(--text-body);
+  letter-spacing: var(--track-body);
+  text-transform: var(--case-body);
+  font-variant-numeric: var(--numeric-body);
 }
 
 .opt-parameters {
@@ -3839,26 +3507,33 @@ button.icon {
   list-style: none;
   display: flex;
   flex-direction: column;
-  gap: var(--space-1);
+  gap: var(--gap);
 }
 
 .opt-parameters li {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: var(--space-4);
+  gap: var(--inset);
   min-width: 0;
-  padding: var(--space-1) var(--space-3);
-  background: var(--surface-inset);
-  font-size: var(--text-2xs);
+  padding: var(--gap) var(--inset);
+  background: var(--plane-step);
+  font: var(--text-body);
+  letter-spacing: var(--track-body);
+  text-transform: var(--case-body);
+  font-variant-numeric: var(--numeric-body);
 }
 
+/* These are the run's free parameters: the one thing the param hue means. */
 .opt-parameters code {
   flex: 0 1 auto;
   min-width: 0;
   overflow: hidden;
-  color: var(--ink-2);
-  font: var(--type-mono-strong);
+  color: var(--param-ink);
+  font: var(--text-body);
+  letter-spacing: var(--track-body);
+  text-transform: var(--case-body);
+  font-variant-numeric: var(--numeric-body);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -3867,9 +3542,12 @@ button.icon {
   flex: 0 0 auto;
   display: flex;
   align-items: center;
-  gap: var(--space-2);
+  gap: var(--gap);
   color: var(--ink);
-  font: var(--type-mono);
+  font: var(--text-body);
+  letter-spacing: var(--track-body);
+  text-transform: var(--case-body);
+  font-variant-numeric: var(--numeric-body);
 }
 
 .opt-parameter-values i {
@@ -3880,23 +3558,24 @@ button.icon {
 .opt-result {
   display: flex;
   flex-direction: column;
-  gap: var(--space-3);
+  gap: var(--gap);
 }
 
 .opt-spark svg {
   display: block;
   width: 100%;
-  height: 44px;
-  border: 1px solid var(--rule);
-  background: var(--surface-inset);
+  height: calc(var(--unit) * 11);
+  border: var(--line);
+  background: var(--plane-sheet);
 }
 
+/* The objective's trace is ink: the accent is a fill and never a line. */
 .opt-spark polyline {
   fill: none;
-  stroke: var(--mode-accent, var(--accent));
-  stroke-width: 1.6;
-  stroke-linecap: round;
-  stroke-linejoin: round;
+  stroke: var(--ink);
+  stroke-width: 1.5;
+  stroke-linecap: square;
+  stroke-linejoin: miter;
   vector-effect: non-scaling-stroke;
 }
 
@@ -3911,62 +3590,63 @@ button.icon {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
-  gap: var(--space-4);
+  gap: var(--inset);
   color: var(--ink-2);
-  font-size: var(--text-2xs);
+  font: var(--text-body);
+  letter-spacing: var(--track-body);
+  text-transform: var(--case-body);
+  font-variant-numeric: var(--numeric-body);
 }
 
 .opt-summary b {
-  font: var(--type-mono-strong);
   color: var(--ink);
 }
 
 .opt-player {
   display: flex;
   align-items: center;
-  gap: var(--space-3);
+  gap: var(--gap);
 }
 
 .opt-player button {
   flex: 0 0 auto;
   display: grid;
   place-items: center;
-  width: var(--control-xs);
-  height: var(--control-xs);
+  width: var(--control-sm);
+  height: var(--control-sm);
   padding: 0;
-  font-size: var(--text-2xs);
 }
 
 .opt-player input[type="range"] {
   flex: 1;
-  min-width: 50px;
+  min-width: calc(var(--unit) * 12);
   accent-color: var(--ink);
 }
 
 .opt-frame-label {
   flex: 0 0 auto;
   color: var(--ink-3);
-  font: var(--type-mono);
-  font-size: var(--text-3xs);
+  font: var(--text-body);
+  letter-spacing: var(--track-body);
+  text-transform: var(--case-body);
+  font-variant-numeric: var(--numeric-body);
   white-space: nowrap;
 }
 
 /* The replay is the payoff of a run — the button says so in words. */
 .opt-player button.opt-replay {
   width: auto;
-  padding: 0 var(--space-4);
+  padding: 0 var(--inset);
   white-space: nowrap;
-  font-size: var(--text-2xs);
-  font-weight: var(--weight-semibold);
-  color: var(--ink-on-accent);
-  background: var(--accent);
-  border-color: var(--accent);
 }
 
 .opt-player-hint {
   display: block;
   color: var(--ink-3);
-  font-size: var(--text-3xs);
+  font: var(--text-prose);
+  letter-spacing: var(--track-prose);
+  text-transform: var(--case-prose);
+  font-variant-numeric: var(--numeric-prose);
 }
 
 /* ── Live run progress (streaming /api/optimize) ───────────────────────── */
@@ -3974,20 +3654,20 @@ button.icon {
 .opt-live {
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
+  gap: var(--gap);
 }
 
 .opt-progress {
   position: relative;
-  height: var(--space-3);
+  height: calc(var(--unit) * 1.5);
   overflow: hidden;
-  background: var(--surface-inset-hover);
+  background: var(--plane-step);
 }
 
 .opt-progress i {
   display: block;
   height: 100%;
-  background: var(--mode-accent, var(--accent));
+  background: var(--ink);
   transition: width var(--dur-slow) var(--ease);
 }
 
@@ -4022,13 +3702,15 @@ button.icon {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
-  gap: var(--space-4);
+  gap: var(--inset);
   color: var(--ink-2);
-  font-size: var(--text-2xs);
+  font: var(--text-body);
+  letter-spacing: var(--track-body);
+  text-transform: var(--case-body);
+  font-variant-numeric: var(--numeric-body);
 }
 
 .opt-live-stats b {
-  font: var(--type-mono-strong);
   color: var(--ink);
 }
 
@@ -4038,7 +3720,7 @@ button.icon {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: var(--space-4);
+  gap: var(--inset);
   min-width: 0;
 }
 
@@ -4046,44 +3728,47 @@ button.icon {
   min-width: 0;
   margin-right: auto;
   overflow: hidden;
-  font: var(--weight-semibold) var(--text-2xs) / var(--leading-flat)
-    var(--font-mono);
-  letter-spacing: var(--tracking-2xs);
-  text-transform: uppercase;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .sim-add-inline {
   flex: 0 0 auto;
-  height: var(--control-xs);
-  padding: 0 var(--space-4);
+  height: var(--control-sm);
+  padding: 0 var(--inset);
   border-style: dashed;
   color: var(--ink-2);
-  font-size: var(--text-2xs);
-}
-
-.sim-kind-mesh {
-  background: rgba(var(--ok-rgb), var(--alpha-tint-strong));
-  color: var(--ok);
 }
 
 .sim-inspect {
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
+  gap: var(--gap);
 }
 
 .sim-stats {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--space-2) var(--space-4);
+  gap: var(--gap) var(--inset);
   color: var(--ink-2);
-  font-size: var(--text-2xs);
+  font: var(--text-body);
+  letter-spacing: var(--track-body);
+  text-transform: var(--case-body);
+  font-variant-numeric: var(--numeric-body);
+}
+
+.sim-stats span {
+  font: var(--text-caps);
+  letter-spacing: var(--track-caps);
+  text-transform: var(--case-caps);
+  font-variant-numeric: var(--numeric-caps);
 }
 
 .sim-stats b {
-  font: var(--type-mono-strong);
+  font: var(--text-body);
+  letter-spacing: var(--track-body);
+  text-transform: var(--case-body);
+  font-variant-numeric: var(--numeric-body);
   color: var(--ink);
 }
 
@@ -4092,9 +3777,9 @@ button.icon {
 .sim-histogram {
   display: block;
   width: 100%;
-  height: 42px;
-  border: 1px solid var(--rule);
-  background: var(--surface-inset);
+  height: calc(var(--unit) * 10);
+  border: var(--line);
+  background: var(--plane-sheet);
 }
 
 .sim-histogram rect {
@@ -4104,29 +3789,34 @@ button.icon {
 .sim-result-summary {
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
+  gap: var(--gap);
 }
 
 .sim-field-table {
   width: 100%;
   table-layout: fixed;
   border-collapse: collapse;
-  font-size: var(--text-2xs);
 }
 
 .sim-field-table th {
   text-align: left;
   color: var(--ink-3);
-  font-weight: var(--weight-semibold);
-  padding: var(--space-1) var(--space-2);
-  border-bottom: 1px solid var(--rule);
+  font: var(--text-caps);
+  letter-spacing: var(--track-caps);
+  text-transform: var(--case-caps);
+  font-variant-numeric: var(--numeric-caps);
+  padding: var(--gap) var(--gap);
+  border-bottom: var(--line);
 }
 
 .sim-field-table td {
-  padding: var(--space-1) var(--space-2);
+  padding: var(--gap) var(--gap);
   color: var(--ink-2);
-  font: var(--type-mono);
-  border-bottom: 1px solid var(--divider);
+  font: var(--text-body);
+  letter-spacing: var(--track-body);
+  text-transform: var(--case-body);
+  font-variant-numeric: var(--numeric-body);
+  border-bottom: var(--line);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -4138,7 +3828,7 @@ button.icon {
 
 .sim-deform input[type="range"] {
   flex: 1;
-  min-width: 50px;
+  min-width: calc(var(--unit) * 12);
   accent-color: var(--ink);
 }
 
@@ -4149,41 +3839,44 @@ button.icon {
 .sim-bc-swatch {
   flex: 0 0 auto;
   display: inline-block;
-  width: var(--space-3);
-  height: var(--space-3);
-  margin-right: var(--space-2);
+  width: calc(var(--unit) * 1.5);
+  height: calc(var(--unit) * 1.5);
+  margin-right: var(--gap);
 }
 
 .sim-bc-legend {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--space-2) var(--space-4);
+  gap: var(--gap) var(--inset);
   color: var(--ink-2);
-  font-size: var(--text-3xs);
+  font: var(--text-body);
+  letter-spacing: var(--track-body);
+  text-transform: var(--case-body);
+  font-variant-numeric: var(--numeric-body);
 }
 
 .sim-bc-legend span {
   display: inline-flex;
   align-items: center;
-  gap: var(--space-2);
+  gap: var(--gap);
 }
 
 .sim-bc-legend i {
   flex: 0 0 auto;
-  width: var(--space-4);
-  height: var(--space-4);
+  width: calc(var(--unit) * 2);
+  height: calc(var(--unit) * 2);
 }
 
 .sim-pick {
-  height: var(--control-xs);
-  font-size: var(--text-2xs);
+  height: var(--control-sm);
 }
 
 /* Rubber-band rectangle while shift-dragging a box BC pick. */
 .bc-pick-rect {
   position: absolute;
   z-index: 6;
-  border: 1px dashed rgba(var(--viewport-accent-rgb, var(--viewport-mode-rgb)), var(--alpha-mark));
+  border: var(--line-pending);
+  border-color: rgba(var(--viewport-accent-rgb, var(--viewport-mode-rgb)), var(--alpha-mark));
   background: rgba(var(--viewport-accent-rgb, var(--viewport-mode-rgb)), var(--alpha-tint));
   pointer-events: none;
 }
@@ -4192,22 +3885,23 @@ button.icon {
 .sim-probe {
   position: absolute;
   z-index: 7;
-  transform: translate(10px, -100%);
+  transform: translate(calc(var(--unit) * 2), -100%);
   display: flex;
   flex-direction: column;
-  gap: var(--space-1);
-  padding: var(--space-2) var(--space-4);
-  border: 1px solid var(--rule);
-  background: var(--surface-float-96);
+  gap: var(--gap);
+  padding: var(--gap) var(--inset);
+  border: var(--line);
+  background: var(--plane-sheet);
   pointer-events: none;
-  font-size: var(--text-2xs);
   animation: fade-in var(--dur-fast) var(--ease);
 }
 
 /* Inside the viewport: viewport ink, never a chrome hue. */
 .sim-probe b {
-  font: var(--type-mono-strong);
-  font-size: var(--text-xs);
+  font: var(--text-body);
+  letter-spacing: var(--track-body);
+  text-transform: var(--case-body);
+  font-variant-numeric: var(--numeric-body);
   color: var(--viewport-ink);
 }
 
@@ -4216,8 +3910,10 @@ button.icon {
 }
 
 .sim-probe small {
-  font: var(--type-mono);
-  font-size: var(--text-3xs);
+  font: var(--text-body);
+  letter-spacing: var(--track-body);
+  text-transform: var(--case-body);
+  font-variant-numeric: var(--numeric-body);
   color: var(--ink-3);
 }
 
@@ -4226,59 +3922,10 @@ button.icon {
 }
 
 .sim-method-hint {
-  font-size: var(--text-2xs);
-}
-
-/* ── Simulate panel tabs ───────────────────────────────────────────────── */
-
-.sim-tabs {
-  display: flex;
-  gap: var(--space-1);
-  padding: var(--space-1);
-  border: 1px solid var(--rule);
-  background: var(--surface-float);
-}
-
-.sim-tabs button {
-  position: relative;
-  flex: 1;
-  min-width: 0;
-  letter-spacing: var(--tracking-lg);
-  height: var(--control-sm);
-  padding: 0 var(--space-2);
-  border: none;
-  background: transparent;
-  color: var(--ink-2);
-  font: var(--weight-semibold) var(--text-2xs) / var(--leading-flat)
-    var(--font-mono);
-  letter-spacing: var(--tracking-2xs);
-  transition:
-    background-color var(--dur-base) var(--ease),
-    color var(--dur-base) var(--ease);
-}
-
-.sim-tabs button:hover {
-  color: var(--ink);
-}
-
-.sim-tabs button.active {
-  background: var(--accent);
-  color: var(--ink-on-accent);
-}
-
-.sim-tab-badge {
-  position: absolute;
-  top: var(--space-1);
-  right: var(--space-1);
-  width: var(--space-2);
-  height: var(--space-2);
-  background: var(--mode-accent, var(--accent));
-}
-
-.sim-help {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
+  font: var(--text-prose);
+  letter-spacing: var(--track-prose);
+  text-transform: var(--case-prose);
+  font-variant-numeric: var(--numeric-prose);
 }
 
 .sim-help p {
@@ -4286,19 +3933,21 @@ button.icon {
 }
 
 .sim-probe-row {
-  padding: var(--space-2) var(--space-3);
-  background: var(--surface-inset);
+  padding: var(--gap) var(--inset);
+  background: var(--plane-step);
 }
 
 .opt-parameters-toggle {
-  height: var(--control-xs);
+  height: var(--control-sm);
   border: none;
   background: transparent;
   color: var(--ink-3);
-  font-size: var(--text-3xs);
-  font-weight: var(--weight-medium);
+  font: var(--text-caps);
+  letter-spacing: var(--track-caps);
+  text-transform: var(--case-caps);
+  font-variant-numeric: var(--numeric-caps);
   text-align: left;
-  padding: 0 var(--space-1);
+  padding: 0 var(--gap);
 }
 
 .opt-parameters-toggle:hover {
@@ -4309,12 +3958,12 @@ button.icon {
 .opt-player-strip {
   display: flex;
   flex-direction: column;
-  gap: var(--space-3);
+  gap: var(--gap);
 }
 
 .opt-spark .opt-cursor-point {
-  fill: var(--mode-accent, var(--accent));
-  stroke: var(--shade-strong);
+  fill: var(--ink);
+  stroke: var(--surface-float);
   stroke-width: 1;
 }
 
@@ -4338,46 +3987,34 @@ button.icon {
 .dialog pre {
   background:
     linear-gradient(var(--surface-float), var(--surface-float-00)) local top /
-      100% 16px no-repeat,
+      100% calc(var(--unit) * 4) no-repeat,
     linear-gradient(var(--surface-float-00), var(--surface-float)) local bottom /
-      100% 16px no-repeat,
+      100% calc(var(--unit) * 4) no-repeat,
     linear-gradient(var(--shade-scroll), var(--shade-none)) scroll top / 100%
-      20px no-repeat,
+      calc(var(--unit) * 5) no-repeat,
     linear-gradient(var(--shade-none), var(--shade-scroll)) scroll bottom / 100%
-      20px no-repeat,
+      calc(var(--unit) * 5) no-repeat,
     var(--scroll-base, transparent);
 }
 
-/* Panels that scroll their whole selves keep their translucent fill under
-   the shading. */
+/* Regions that scroll their whole selves keep their sheet fill under the
+   shading. */
 .material-panel,
 .sim-panel,
-.sketch-panel {
-  --scroll-base: var(--surface-float-90);
-}
-
+.sketch-panel,
 .dialog-body,
 .dialog pre {
-  --scroll-base: var(--surface-panel);
+  --scroll-base: var(--plane-sheet);
 }
 
-/* The Simulate panel scrolls as a whole, so its title and tab strip stay
-   pinned: the tab you are on is always visible, whatever you scrolled to. */
-.sim-panel > header,
-.sim-panel > .sim-tabs {
-  position: sticky;
-  z-index: 3;
-  background: var(--surface-float-96);
-}
-
+/* The Simulate panel scrolls as a whole, so its title stays pinned. */
 .sim-panel > header {
-  top: calc(var(--space-5) * -1);
-  margin: calc(var(--space-5) * -1) calc(var(--space-5) * -1) 0;
-  padding: var(--space-5) var(--space-5) var(--space-3);
-}
-
-.sim-panel > .sim-tabs {
-  top: 44px;
+  position: sticky;
+  top: calc(var(--inset) * -1);
+  z-index: 3;
+  margin: calc(var(--inset) * -1) calc(var(--inset) * -1) 0;
+  padding: var(--inset);
+  background: var(--plane-sheet);
 }
 
 /* ── motion primitives ─────────────────────────────────────────────────── */

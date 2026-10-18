@@ -7,6 +7,7 @@
  * belongs in this chain; nothing else here decides anything.
  */
 
+import { Show } from "solid-js";
 import {
   bcPickArmed,
   editingMode,
@@ -14,7 +15,6 @@ import {
   nodeById,
   pendingLoft,
   selection,
-  simView,
   sketchPlane,
   tool,
 } from "../../state";
@@ -58,7 +58,7 @@ export interface PlaneHover {
  * literal the gizmo moves, a plane derived from a face that follows its
  * parent and will not, and a plane the source could not be traced for.
  */
-export function planeSentence(plane: PlaneHover): string {
+function planeSentence(plane: PlaneHover): string {
   if (plane.derived) {
     return `Sketch plane of ${plane.name} · derived from a face (SketchPlane.${plane.reference ?? "on"}): follows its parent, not draggable — edit the reference in the code`;
   }
@@ -97,8 +97,9 @@ function faceSentence(): string {
 /**
  * What dragging the hovered handle will cost.
  *
- * The one line that says out loud what the filled and hollow handles mean, at
- * the moment it matters — pointing at one — rather than as a standing legend.
+ * The handle's shape says whether the point is free (hollow circle) or held
+ * (filled square); this line says what a drag of it will cost, at the moment
+ * it matters — pointing at one — rather than as a standing legend.
  * A free parameter has a slot in the shader's uniform buffer, so the solid
  * follows the pointer; anything else is a literal in the program text, and
  * the solid only catches up when the rewritten source recompiles.
@@ -110,44 +111,48 @@ function handleSentence(handle: { name: string | null; state: BindingState }): s
     : `${label} · fixed value: the solid follows on release, after a recompile`;
 }
 
+/**
+ * The hint line speaks only when there is a step to prompt or a hovered
+ * thing to name; at rest it is absent (A1).
+ */
 export function ViewerHint(props: ViewerHintProps) {
+  const sentence = (): string | null =>
+    editingMode() === "simulate"
+      ? bcPickArmed()
+        ? "Pick BC: click the mesh → sphere · Shift-drag → box · confirm in the builder"
+        : null
+      : pendingLoft()
+      ? "Loft: click the second sketch in the viewport · Esc to cancel"
+      : tool() === "sketch"
+      ? sketchPlane() === "face"
+        ? "Sketch: click a solid's face to place it there · the ghost shows where the plane lands · Esc to cancel"
+        : `Sketch: click to place on the ${sketchPlane().toUpperCase()} plane · the ghost shows where it lands · Esc to cancel`
+      : tool() === "face"
+      ? faceSentence()
+      : tool() === "polygon"
+      ? "Point: click sketch edges to add vertices · Esc to finish"
+      : isVertexConstraintTool(tool())
+        ? props.pendingConstraint
+          ? `${CONSTRAINT_TOOL_NAMES[tool() as VertexConstraintTool]}: choose a second point in the same sketch`
+          : `${CONSTRAINT_TOOL_NAMES[tool() as VertexConstraintTool]}: choose the first sketch point`
+      : isEdgeConstraintTool(tool())
+        ? props.pendingConstraint
+          ? `${CONSTRAINT_TOOL_NAMES[tool() as EdgeConstraintTool]}: choose a second edge in the same sketch`
+          : `${CONSTRAINT_TOOL_NAMES[tool() as EdgeConstraintTool]}: choose the first sketch edge`
+        : tool() !== "select"
+          ? `Click to place a ${tool()} · Esc to cancel`
+          : props.handle
+            ? handleSentence(props.handle)
+            : props.plane
+              ? planeSentence(props.plane)
+              : null;
   return (
-    <p class="viewer-hint" data-testid="viewer-hint">
-      <b class="hint-mode" data-testid="hint-mode">
-        {editingMode()}
-      </b>
-      {" · "}
-      {editingMode() === "simulate"
-        ? bcPickArmed()
-          ? "Pick BC: click the mesh → sphere · Shift-drag → box · confirm in the builder"
-          : simView()
-            ? "Click the mesh to probe values · pick BC regions from the study builder · Esc steps back to model"
-            : "Simulation setup · M cycles modes · Esc steps back to model"
-        : pendingLoft()
-        ? "Loft: click the second sketch in the viewport · Esc to cancel"
-        : tool() === "sketch"
-        ? sketchPlane() === "face"
-          ? "Sketch: click a solid's face to place it there · the ghost shows where the plane lands · Esc to cancel"
-          : `Sketch: click to place on the ${sketchPlane().toUpperCase()} plane · the ghost shows where it lands · Esc to cancel`
-        : tool() === "face"
-        ? faceSentence()
-        : tool() === "polygon"
-        ? "Point: click sketch edges to add vertices · Esc to finish"
-        : isVertexConstraintTool(tool())
-          ? props.pendingConstraint
-            ? `${CONSTRAINT_TOOL_NAMES[tool() as VertexConstraintTool]}: choose a second point in the same sketch`
-            : `${CONSTRAINT_TOOL_NAMES[tool() as VertexConstraintTool]}: choose the first sketch point`
-        : isEdgeConstraintTool(tool())
-          ? props.pendingConstraint
-            ? `${CONSTRAINT_TOOL_NAMES[tool() as EdgeConstraintTool]}: choose a second edge in the same sketch`
-            : `${CONSTRAINT_TOOL_NAMES[tool() as EdgeConstraintTool]}: choose the first sketch edge`
-          : tool() !== "select"
-            ? `Click to place a ${tool()} · Esc to cancel`
-            : props.handle
-              ? handleSentence(props.handle)
-              : props.plane
-                ? planeSentence(props.plane)
-                : "Drag handles or the gizmo · Drag to orbit · Right-drag to pan"}
-    </p>
+    <Show when={sentence()}>
+      {(text) => (
+        <p class="viewer-hint" data-testid="viewer-hint">
+          {text()}
+        </p>
+      )}
+    </Show>
   );
 }

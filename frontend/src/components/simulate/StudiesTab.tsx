@@ -11,7 +11,7 @@
  * and its builder live inside the card rather than in a tab of their own.
  */
 
-import { For, Show } from "solid-js";
+import { For, Show, createSignal } from "solid-js";
 import { setStudyDomainRequest, setStudyMeshRequest } from "../../meshes";
 import { simMeshes, simView, studies } from "../../state";
 import {
@@ -22,7 +22,16 @@ import {
   setArgumentRequest,
   studyArguments,
 } from "../../studies";
-import { Card, CardHeader, CardList, NumberField, ToggleSwitch } from "../ui";
+import {
+  Card,
+  CardHeader,
+  CardList,
+  MenuItem,
+  NumberField,
+  Select,
+  ToggleSwitch,
+  createDismiss,
+} from "../ui";
 import { BcBuilder } from "./BcBuilder";
 import { BcList } from "./BcList";
 import { bcSwatch } from "./colors";
@@ -32,8 +41,23 @@ export interface StudiesTabProps {
   sim: SimulateController;
 }
 
+/** The kinds "+ Study" offers, named as Simulate › New study names them. */
+const STUDY_KINDS: { kind: "thermal" | "elastic" | "flow"; label: string; hint: string }[] = [
+  { kind: "thermal", label: "Thermal", hint: "A ThermalStudy: steady heat conduction" },
+  { kind: "elastic", label: "Elastic", hint: "An ElasticStudy: linear elasticity" },
+  { kind: "flow", label: "Flow", hint: "A flow study on its own lattice" },
+];
+
 export function StudiesTab(props: StudiesTabProps) {
   const sim = () => props.sim;
+  const [kindsOpen, setKindsOpen] = createSignal(false);
+  let anchor: HTMLDivElement | undefined;
+  createDismiss({
+    open: kindsOpen,
+    close: () => setKindsOpen(false),
+    within: () => anchor,
+    escape: true,
+  });
 
   return (
     <>
@@ -90,48 +114,38 @@ export function StudiesTab(props: StudiesTabProps) {
                     <Show when={simMeshes().length > 0 && study.kind !== "flow"}>
                       <label>
                         <span>mesh</span>
-                        <select
+                        <Select
                           value={study.mesh ?? ""}
                           disabled={sim().solving() !== null}
-                          onChange={(event) => {
-                            const value = event.currentTarget.value;
+                          options={[
+                            ...(study.mesh === null ? [{ value: "", label: "(implicit)" }] : []),
+                            ...simMeshes().map((mesh) => ({ value: mesh.name })),
+                          ]}
+                          onChange={(value) => {
                             if (value) void sim().patch(setStudyMeshRequest(study, value));
                           }}
-                          data-testid={`simulate-mesh-${study.name}`}
-                        >
-                          <Show when={study.mesh === null}>
-                            <option value="">(implicit)</option>
-                          </Show>
-                          <For each={simMeshes()}>
-                            {(mesh) => <option value={mesh.name}>{mesh.name}</option>}
-                          </For>
-                        </select>
+                          testId={`simulate-mesh-${study.name}`}
+                        />
                       </label>
                     </Show>
                     <Show when={study.mesh === null && sim().namedObjects().length > 0}>
                       <label>
                         <span>domain</span>
-                        <select
+                        <Select
                           value={study.domain?.name ?? ""}
                           disabled={sim().solving() !== null}
-                          onChange={(event) => {
-                            const value = event.currentTarget.value;
-                            if (value) {
-                              void sim().patch(setStudyDomainRequest(study, value));
-                            }
+                          options={[
+                            ...(study.domain === null ? [{ value: "", label: "(whole scene)" }] : []),
+                            ...(study.domain && study.domain.name === null
+                              ? [{ value: "", label: `(${study.domain.type})` }]
+                              : []),
+                            ...sim().domainOptions(study.domain?.name).map((name) => ({ value: name })),
+                          ]}
+                          onChange={(value) => {
+                            if (value) void sim().patch(setStudyDomainRequest(study, value));
                           }}
-                          data-testid={`simulate-domain-${study.name}`}
-                        >
-                          <Show when={study.domain === null}>
-                            <option value="">(whole scene)</option>
-                          </Show>
-                          <Show when={study.domain && study.domain.name === null}>
-                            <option value="">{`(${study.domain!.type})`}</option>
-                          </Show>
-                          <For each={sim().domainOptions(study.domain?.name)}>
-                            {(name) => <option value={name}>{name}</option>}
-                          </For>
-                        </select>
+                          testId={`simulate-domain-${study.name}`}
+                        />
                       </label>
                     </Show>
                   </div>
@@ -226,28 +240,36 @@ export function StudiesTab(props: StudiesTabProps) {
         </CardList>
       </Show>
 
-      <div class="sim-row sim-add-study">
+      {/* One add button, the kinds behind it — the same three as Simulate › New study. */}
+      <div class="sim-add-study-anchor" ref={anchor}>
         <button
           type="button"
-          onClick={() => void sim().patch(addStudyRequest("thermal"))}
-          data-testid="simulate-add-thermal"
+          class="sim-add-bc sim-add-study-toggle"
+          aria-haspopup="menu"
+          aria-expanded={kindsOpen()}
+          onClick={() => setKindsOpen(!kindsOpen())}
+          title="Declare a new study in the code"
+          data-testid="simulate-add-study"
         >
-          + Thermal study
+          + Study
         </button>
-        <button
-          type="button"
-          onClick={() => void sim().patch(addStudyRequest("elastic"))}
-          data-testid="simulate-add-elastic"
-        >
-          + Elastic study
-        </button>
-        <button
-          type="button"
-          onClick={() => void sim().patch(addStudyRequest("flow"))}
-          data-testid="simulate-add-flow"
-        >
-          + Flow study
-        </button>
+        <Show when={kindsOpen()}>
+          <div class="menu-dropdown study-kinds" role="menu" aria-label="Study kind">
+            <For each={STUDY_KINDS}>
+              {(entry) => (
+                <MenuItem
+                  onClick={() => {
+                    setKindsOpen(false);
+                    void sim().patch(addStudyRequest(entry.kind));
+                  }}
+                  title={entry.hint}
+                  data-testid={`simulate-add-${entry.kind}`}
+                  label={entry.label}
+                />
+              )}
+            </For>
+          </div>
+        </Show>
       </div>
     </>
   );

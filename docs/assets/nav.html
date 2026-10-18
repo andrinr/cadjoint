@@ -1,0 +1,54 @@
+<script>
+// One navigation panel. The page outline moves under the current page's
+// entry in the sidebar and takes the same collapse toggle as a sidebar
+// section. Moving the outline element keeps its id, so Quarto's scroll
+// highlighting still works.
+document.addEventListener("DOMContentLoaded", () => {
+  const sidebar = document.querySelector("#quarto-sidebar");
+  if (!sidebar) return;
+
+  // quartodoc lists the reference index inside the section whose header
+  // already links to it; drop the repeat.
+  sidebar.querySelectorAll(".sidebar-item-section").forEach((section) => {
+    const head = section.querySelector(":scope > .sidebar-item-container > a.sidebar-link[href]");
+    if (!head) return;
+    section.querySelectorAll(":scope > ul > li > .sidebar-item-container > a.sidebar-link").forEach((a) => {
+      if (a.getAttribute("href") === head.getAttribute("href")) a.closest("li").remove();
+    });
+  });
+
+  const toc = document.querySelector("nav#TOC");
+  const list = toc && toc.querySelector(":scope > ul");
+  const active = sidebar.querySelector(".sidebar-link.active");
+  if (!toc || !list || !active) return;
+  document.body.classList.add("toc-in-sidebar");
+
+  // No outline on a section's landing page (Guides, API reference), whose
+  // contents the sidebar already lists, or where it would be one entry (a
+  // reference object page outlines only its own name).
+  if (active.closest(".sidebar-item-section > .sidebar-item-container") ||
+      list.querySelectorAll("a").length < 2) {
+    toc.remove();
+    return;
+  }
+
+  const toggle = document.createElement("a");
+  toggle.className = "sidebar-item-toggle text-start";
+  toggle.setAttribute("data-bs-toggle", "collapse");
+  toggle.setAttribute("data-bs-target", "#page-outline");
+  toggle.setAttribute("aria-expanded", "true");
+  toggle.setAttribute("aria-label", "Toggle page outline");
+  toggle.innerHTML = '<i class="bi bi-chevron-right ms-2"></i>';
+
+  const wrap = document.createElement("div");
+  wrap.id = "page-outline";
+  wrap.className = "collapse show";
+  list.classList.remove("collapse");
+  wrap.appendChild(list);
+
+  toc.replaceChildren(wrap);
+  toc.classList.add("in-sidebar");
+  active.closest(".sidebar-item").appendChild(toc);
+  active.closest(".sidebar-item-container").appendChild(toggle);
+});
+</script>

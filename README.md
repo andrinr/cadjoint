@@ -1,158 +1,124 @@
 # cadjoint
 
+[![PyPI](https://img.shields.io/pypi/v/cadjoint?label=PyPI)](https://pypi.org/project/cadjoint/)
+[![Python](https://img.shields.io/pypi/pyversions/cadjoint?label=Python)](https://pypi.org/project/cadjoint/)
+[![License](https://img.shields.io/pypi/l/cadjoint?label=License)](https://github.com/andrinr/cadjoint/blob/main/LICENSE)
+
 Differentiable code-first CAD: sketches, constraints, SDF geometry, meshing and
 FEM simulation composed into one function JAX can differentiate end to end.
 
 > [!WARNING]
 > The API is not stable. Expect breaking changes.
 
-[![The bracket scene in the cadjoint playground: with the pointer in vertex selection, the tip of the bracket's triangular gusset rib is dragged up the vertical web. The rib re-attaches where the pointer puts it and the smooth union re-blends the joint at frame rate while the plate and web stay put; the editor on the left holds the highlighted line rib_tip = Vector2(value=[-0.9, -0.62], free=True, ...). Then the camera makes one full turn around the bracket.](docs/assets/motion/bracket-orbit-drag.webp)](https://andrinr.github.io/cadjoint/docs/viewer.html)
+[![The bracket in the playground's Sketch mode. The camera turns around the part, then the free handle at the tip of the gusset rib is dragged up the vertical web; the rib and its smooth-union blend follow at frame rate, and the rib_tip literal in the editor is rewritten on release.](https://raw.githubusercontent.com/andrinr/cadjoint/main/docs/assets/motion/bracket-orbit-drag.webp)](https://andrinr.github.io/cadjoint/docs/viewer.html)
 
-*The handle under the pointer is a named `Vector2` in `scene.py`, and the
-joint it moves is a smooth union of three extrusions. Dragging it writes the
-parameter buffer the shader already reads, so the blend follows at frame
-rate; releasing it patches the literal in the source. The source is the
-model.*
+*Dragging the `rib_tip` handle updates the shader's parameter buffer each frame and rewrites the `Vector2` literal in `scene.py` on release.*
 
-## The chain
-
-One Python program declares the whole thing, and every arrow is a derivative
-JAX can take:
+## Pipeline
 
 ```
 sketch vertices ─► constraints ─► SDF ─► mesh ─► FEM solve ─► objective
        └─────────────────────────── ∂J/∂θ ◄───────────────────────────┘
 ```
 
-A sketch profile is a list of named `Vector2` parameters. Constraints are
-residuals on those parameters, solved by Newton projection onto the constraint
-manifold. Extruding or revolving the profile produces an SDF that *shares* those
-parameter objects. Dual contouring turns the field into a surface, TetGen or
-Gmsh fills it, and jax-fem or CalculiX solves on it. A study is declared in the
-scene beside the geometry it loads — here the end cap's `ThermalStudy`, a heat
-flux on the bearing boss and a fixed temperature on the flange — and solving it
-is one click, meshing included:
+One Python program declares every stage, and JAX differentiates through each:
 
-[![The end cap's cap-conduction thermal study is run from the Simulate panel. Its mesh is declared as cut cells, so no volume mesh is built: the job chip counts up while the lattice's cut cells are assembled and solved, then the temperature field lands on the solid with its legend, and the part is turned with the field on it.](docs/assets/motion/end-cap-solve.webp)](scenes/end_cap.py)
+- A sketch profile is a list of named `Vector2` parameters.
+- Constraints are residuals on those parameters, solved by Newton projection
+  onto the constraint manifold.
+- Extruding or revolving the profile gives an SDF that shares the parameter
+  objects.
+- Dual contouring extracts a surface, TetGen or Gmsh fills it, and jax-fem or
+  CalculiX solves on it.
+- A study and an `Optimization` are declared in the scene beside the geometry.
+  Each optimization step is a mesh, a solve and an adjoint, projected back onto
+  the constraints.
+- No boundary representation is stored; every surface is extracted from the
+  SDF at a chosen resolution.
 
-The same study is a function of the sketch, so `jax.grad` reaches from its
-objective back to a fin's tip coordinate. An `Optimization` declared in the
-scene descends on that gradient, every step a mesh, a solve and an adjoint,
-projected back onto the constraints. The heat sink below starts deliberately
-overbuilt and slims as its peak temperature falls:
+[![The end cap's cap-conduction thermal study solved from the Simulate desk: the job chip counts the seconds while the cut-cell mesh is assembled and solved, then the temperature field appears on the part with its legend and the camera turns around it.](https://raw.githubusercontent.com/andrinr/cadjoint/main/docs/assets/motion/end-cap-solve.webp)](https://github.com/andrinr/cadjoint/blob/main/scenes/end_cap.py)
 
-[![The heat sink's cool-sink optimisation is run from the Optimize panel. Eight gradient steps, each a mesh, a thermal solve and an adjoint, replayed as a time-lapse: the fin comb reproportions as the peak temperature falls in the panel's trace.](docs/assets/motion/heat-sink-optimize.webp)](scenes/starter.py)
+*The end cap's `ThermalStudy` is meshed and solved with one click.*
 
-A work plane taken from a face (`SketchPlane.on(body.cap("+"))`) is an
-expression over the parent feature's parameters, so a boss extruded from it
-differentiates with respect to its parent's depth. While sketching, the plane
-of the sketch you touch is drawn with its origin and normal (every plane, in
-every mode, is one switch away); the sketch tool shows where a new one will
-land before it exists, and a plane written as literals can be taken by its
-frame and moved, which rewrites the `SketchPlane(origin=...)` in the source:
+[![The heat sink's cool-sink optimization run from the Optimize panel: eight Adam steps stream in with the objective trace, then the scrubber replays the path while the fin comb changes proportions.](https://raw.githubusercontent.com/andrinr/cadjoint/main/docs/assets/motion/heat-sink-optimize.webp)](https://github.com/andrinr/cadjoint/blob/main/scenes/starter.py)
 
-[![The heat sink in the playground, switched to Sketch mode: no plane is drawn yet. The sketch tool is armed and a ghost frame labelled new sketch follows the pointer across the floor. Then the pointer lands on one of the fin comb's handles and the comb's plane appears — a translucent frame, an origin cross and a normal glyph, named — and stays once the handle is clicked; the plane is taken by its frame edge, the gizmo appears at its origin, and dragging the gizmo's Z arrow lifts the whole comb; the editor's SketchPlane(origin=[...]) literal is rewritten on release.](docs/assets/motion/sketch-planes.webp)](scenes/starter.py)
+*The heat sink starts overbuilt; its declared `Optimization` slims it by descending on the gradient of peak temperature with respect to the sketch.*
 
-No boundary representation is stored: the field is the model, and every
-surface is derived from it at a resolution you choose.
+[![The heat sink in Sketch mode: the armed sketch tool shows a ghost plane labelled new sketch on the floor; hovering the fin comb shows its plane, frame and normal, and dragging the gizmo's Z arrow lifts the comb while the editor's SketchPlane origin is rewritten.](https://raw.githubusercontent.com/andrinr/cadjoint/main/docs/assets/motion/sketch-planes.webp)](https://github.com/andrinr/cadjoint/blob/main/scenes/starter.py)
 
-## What ships
+*In Sketch mode, dragging a literal work plane by its gizmo rewrites its `SketchPlane(origin=...)`; a plane taken from a face (`SketchPlane.on(body.cap("+"))`) is instead an expression over the parent feature's parameters, so it is differentiable.*
 
-- **Geometry** — SDF primitives, smooth booleans, transforms, patterns;
+## Features
+
+- **Geometry**: SDF primitives, smooth booleans, transforms, patterns;
   sketches on work planes extruded, revolved or lofted into solids that share
-  their parameters; reference planes taken from faces, offsets and midplanes
-- **Constraints** — distance, angle, coincident, horizontal, vertical,
+  their parameters; reference planes from faces, offsets and midplanes
+- **Constraints**: distance, angle, coincident, horizontal, vertical,
   parallel, perpendicular, equal-length, point-on-line, fixed
-- **Materials** — a sourced catalogue carrying density, conductivity, elastic
+- **Materials**: a sourced catalogue of density, conductivity, elastic
   constants and yield strength in SI, sampled per element by the solver
-- **Meshing** — dual contouring with sharp-feature vertices; TET4/TET10 through
-  TetGen, second-order tets through Gmsh, or a voxelize-and-snap HEX8 path;
-  OBJ, STL and faceted STEP export
-- **Simulation** — thermal and linear-elastic studies with programmatic node
+- **Meshing**: dual contouring with sharp-feature vertices; TET4/TET10 through
+  TetGen, second-order tets through Gmsh, a voxelize-and-snap HEX8 path, or cut
+  cells with no volume mesh; OBJ, STL and faceted STEP export
+- **Simulation**: thermal and linear-elastic studies with programmatic node
   selections, solved by jax-fem or CalculiX 2.23; a lattice-Boltzmann flow
   prototype
-- **Optimization** — declared in the scene, descended with optax, every step
+- **Optimization**: declared in the scene, descended with optax, every step
   projected back onto the constraints
-- **Plugins** — every non-JAX component (meshers, solvers) is a
-  [Tesseract](https://github.com/pasteurlabs/tesseract-core) behind one
-  `apply`/`vjp` interface, run in-process, in a container or remotely
-- **Rendering** — a forward raymarcher in JAX, and a StableHLO → WGSL shader
+- **Plugins**: every non-JAX component (meshers, solvers) behind one
+  `apply`/`vjp` interface, implemented as a
+  [Tesseract](https://github.com/pasteurlabs/tesseract-core) and run
+  in-process, in a container or remotely
+- **Rendering**: a forward raymarcher in JAX, and a StableHLO → WGSL shader
   compiler for the browser
-- **Playground** — a WebGPU app where every edit rewrites the Python source
+- **Playground**: a WebGPU app in which every edit rewrites the Python source
   that produced it
 
 ## Install
 
 ```bash
-git clone https://github.com/andrinr/cadjoint
-cd cadjoint
-uv sync                      # CPU JAX — macOS, Linux, Windows
-uv sync --extra cuda         # Linux + NVIDIA GPU instead
+pip install cadjoint         # pin an exact version: the API is not stable
 ```
 
-Everything beyond the geometry core is an extra, one `--extra` per name:
+Everything beyond the geometry core is an extra (`pip install "cadjoint[fem]"`,
+or `uv sync --extra fem` in a checkout, one `--extra` per name):
 
 | Extra | Pulls in |
 | --- | --- |
-| `fem` | jax-fem finite-element stack (basix, meshio, petsc4py, gmsh) |
+| `cuda` | GPU JAX (Linux + NVIDIA only; no macOS wheels, so avoid `--all-extras` on a Mac) |
+| `fem` | jax-fem finite-element stack (basix, meshio, petsc4py, gmsh); compiles PETSc |
 | `tesseract` | tesseract-core + tesseract-jax, the plugin runtime |
 | `gmsh` | Gmsh in-process for the tet10 mesher (GPL, hence its own extra) |
-| `viewer` | Jupyter widget (`anywidget`) and the playground's process monitor (`psutil`) |
+| `viewer` | the playground server (`pydantic`), the Jupyter widget (`anywidget`) and the process monitor (`psutil`) |
 | `editor` | playground lint, completion and signature help (`ruff`, `jedi`) |
 | `stepcheck` | OCCT validation of STEP exports (dev) |
 | `docs` | Quarto API reference (`quartodoc`) |
 
-Avoid `--all-extras` on macOS: `cuda` has no macOS wheels.
+Installing from a checkout, the platforms CI verifies, and the toolchain the
+`fem` extra needs are in
+[Getting started](https://andrinr.github.io/cadjoint/docs/getting-started.html#install).
 
-`fem` is the one extra that compiles. petsc4py publishes no wheels, so
-`uv sync --extra fem` builds PETSc from source and needs a C compiler,
-gfortran and BLAS/LAPACK headers (`apt install build-essential gfortran
-libopenblas-dev` on Debian/Ubuntu). To skip the toolchain, run the solvers
-as Tesseracts: their images get PETSc from conda-forge and are published
-prebuilt to GHCR for amd64 and arm64, so Docker is the only requirement
-(see [prebuilt images](docs/plugins.qmd#prebuilt-images)).
-
-### Supported platforms
-
-| Platform | `uv sync` | `uv sync --extra fem` |
-| --- | --- | --- |
-| Linux x86_64 | yes | compiles PETSc |
-| Linux ARM64 | yes | no: gmsh has no Linux ARM wheel |
-| macOS arm64 | yes | compiles PETSc |
-| macOS x86_64 (Intel) | no: jaxlib has no Intel-Mac wheel for Python 3.11+ | no |
-| Windows x86_64 | yes | no: PETSc does not build natively |
-
-Every "yes" is a fresh `uv sync --locked` and `import cadjoint` in
-[`install.yml`](.github/workflows/install.yml), run on each push. Where
-the `fem` column says no, the prebuilt solver Tesseracts above run the
-same solvers in Docker.
-
-## The playground
+## Playground
 
 ```bash
-uv run cadjoint-viewer --open      # serves http://127.0.0.1:8765/
+uvx --from "cadjoint[viewer,editor]" cadjoint-viewer --open      # no checkout
+uv run --extra viewer --extra editor cadjoint-viewer --open      # from a checkout
 ```
 
-The editor on the left holds `scene.py`; the viewport shows the compiled
-field. Vertex handles, gizmos, material swatches, face picks, constraint chips
-and solver runs all write back into the source. A properties window follows
-the selection and shows every argument the call was written with: literals
-as fields you can edit, expressions as the text they are.
+The editor holds `scene.py` and the viewport shows the compiled field. Vertex
+handles, gizmos, material swatches, face picks, constraint chips, solver runs
+and the properties window all write back into the source.
 
-[![The properties window in the playground. Clicking the fin comb's extrude row in the object tree fills the window with the call's arguments: the profile, the depth, which is the named parameter fin_depth, and the material. Typing a new depth and pressing Enter rewrites fin_depth's declaration in the editor and the comb deepens; choosing copper from the material dropdown rewrites the extrude call and the comb changes colour.](docs/assets/motion/properties-window.webp)](scenes/starter.py)
+[![The properties window: clicking the fin comb's extrude row in the object tree shows its profile, its depth (the named parameter fin_depth) and its material. Typing a new depth deepens the comb, and choosing copper from the material dropdown recolours it.](https://raw.githubusercontent.com/andrinr/cadjoint/main/docs/assets/motion/properties-window.webp)](https://github.com/andrinr/cadjoint/blob/main/scenes/starter.py)
 
-Three desks, Model, Sketch and Simulate, share one viewport. Studies solve
-with one click, results land in a labelled legend, and a declared
-optimization streams step by step and writes its optimized values into the
-program.
+*The properties window edits the arguments of the selected call: here the comb's depth and material.*
 
-The server only listens on localhost and compiles each edit in a timed child
-process, but it executes Python on your machine: only run code you trust.
+The server listens only on localhost but executes the scene's Python on your
+machine; only run code you trust. The
+[playground guide](https://andrinr.github.io/cadjoint/docs/viewer.html) covers
+every window, the scenes directory and browser support.
 
-The [playground guide](https://andrinr.github.io/cadjoint/docs/viewer.html)
-walks through every window with recorded clips.
-
-## In Python
+## Python example
 
 ```python
 from cadjoint.construction import PolygonProfile, SketchPlane, extrude
@@ -174,27 +140,33 @@ grid = GridSpec.from_bounds((-0.5, -0.5, -0.5), (2.0, 2.0, 1.5), 32)
 mesh = extract_mesh(block, grid)
 ```
 
-`functionalize(block)` returns a pure function of the free parameters, so
-`jax.grad` of anything downstream reaches `a`, `b`, `c`, `d` and `depth`. The
-[getting-started guide](https://andrinr.github.io/cadjoint/docs/getting-started.html)
-continues from here to meshing, a thermal study and an optimization;
+`functionalize(block)` returns a pure function of the parameter values, so
+`jax.grad` of anything downstream reaches `a`, `b`, `c`, `d` and `depth`.
+[Modelling](https://andrinr.github.io/cadjoint/docs/modelling.html) covers
+sketches, features and constraints, and the
+[guides](https://andrinr.github.io/cadjoint/docs/guides.html) continue to
+meshing, a thermal study and an optimization;
 `examples/fem_bracket_optimization.py` runs the full chain from the command
 line, with the adjoint checked against finite differences at every boundary.
 
 ## Documentation
 
 - [Getting started](https://andrinr.github.io/cadjoint/docs/getting-started.html)
+- [Modelling](https://andrinr.github.io/cadjoint/docs/modelling.html):
+  parameters, sketches, features, faces and constraints
 - [Differentiable meshing](https://andrinr.github.io/cadjoint/docs/meshing.html),
   [simulation](https://andrinr.github.io/cadjoint/docs/simulation.html),
+  [flow solver](https://andrinr.github.io/cadjoint/docs/flow.html),
   [optimization](https://andrinr.github.io/cadjoint/docs/optimization.html),
   [materials](https://andrinr.github.io/cadjoint/docs/materials.html)
 - [Plugins](https://andrinr.github.io/cadjoint/docs/plugins.html): the Tesseract
   contract, the shipped packages, containers and remote transports
 - [Rendering](https://andrinr.github.io/cadjoint/docs/rendering.html) and the
   [playground](https://andrinr.github.io/cadjoint/docs/viewer.html)
-- [Research notes](research/README.md): design records for the meshing
-  pipeline, FEM integration, the flow solver, the constraint system, and the
-  measured [performance profile](research/performance.md)
+- [Research notes](https://github.com/andrinr/cadjoint/blob/main/research/README.md):
+  design records for the meshing pipeline, FEM integration, the flow solver,
+  the constraint system, and the measured
+  [performance profile](https://github.com/andrinr/cadjoint/blob/main/research/performance.md)
 
 ## Developing
 
@@ -206,26 +178,20 @@ uv run pre-commit install                   # ruff on commit
 
 The playground UI is a Solid + TypeScript app in `frontend/`, built into
 `cadjoint/viewer/static` and committed, so installing cadjoint needs no Node
-toolchain. `npm run dev` proxies to a running server, `npm run build` refreshes
-the bundle, `npm test` and `npm run e2e` run the unit and Playwright suites.
-
+toolchain; its workflow is in
+[developing the UI](https://andrinr.github.io/cadjoint/docs/viewer.html#developing-the-ui).
 Docs need [Quarto](https://quarto.org/docs/get-started/) and the `docs` extra:
-`uv run quartodoc build` then `quarto preview`.
+`uv run quartodoc build`, then `quarto preview`.
+`benchmarks/jax_compile_profile.py` splits a worker request into trace, lower,
+XLA compile and cache time per program;
+[`research/performance.md`](https://github.com/andrinr/cadjoint/blob/main/research/performance.md)
+records what each optimization bought.
 
-Performance work is measured, not guessed: `benchmarks/jax_compile_profile.py`
-breaks a worker request into trace, lower, XLA compile and cache time per
-program, and [`research/performance.md`](research/performance.md) records what
-each lever bought.
+## Acknowledgements
 
-## History
-
-cadjoint was an entry in the
-[Tesseract Hackathon 2026](https://si-tesseract.discourse.group) (Track 01,
-inverse design and shape optimization). That state is frozen on the
-[`tesseract-hackathon-2026`](https://github.com/andrinr/cadjoint/tree/tesseract-hackathon-2026)
-branch. Inspired by [Fidget](https://www.mattkeeter.com/projects/fidget/) and
+Inspired by [Fidget](https://www.mattkeeter.com/projects/fidget/) and
 [Inigo Quilez's distance functions](https://iquilezles.org/articles/distfunctions/).
 
 ## License
 
-[Apache License 2.0](LICENSE).
+[Apache License 2.0](https://github.com/andrinr/cadjoint/blob/main/LICENSE).

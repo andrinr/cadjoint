@@ -17,6 +17,7 @@ import {
   elements,
   inspected,
   materials,
+  nodeById,
   nodes,
   selection,
   setInspected,
@@ -25,10 +26,11 @@ import {
   elementTitle,
   formatArgument,
   kindLabel,
+  materialTargetLine,
   resolveSections,
   runtimePlaneRows,
 } from "../properties";
-import { NumberInput } from "./ui";
+import { NumberInput, PanelHeader, Select } from "./ui";
 import type { ConstructionArgument, ConstructionElement, PatchAddress } from "../types";
 
 export interface PropertiesPanelProps {
@@ -36,6 +38,8 @@ export interface PropertiesPanelProps {
   onSetValue: (address: PatchAddress, value: number | number[]) => Promise<void>;
   /** Assign a named material at the published address. */
   onAssignMaterial: (address: PatchAddress, material: string) => Promise<void>;
+  /** Assign a material to the object declared at `line` (the swatch-drop patch). */
+  onAssignMaterialToLine: (line: number, material: string) => Promise<void>;
 }
 
 /** How a number box steps: one part in a hundred of the value's own scale. */
@@ -114,21 +118,35 @@ export function PropertiesPanel(props: PropertiesPanelProps) {
     return (
       <label class="properties-row">
         <span>material</span>
-        <select
-          data-testid={testId(element, "material")}
+        <Select
+          testId={testId(element, "material")}
           value={String(argument.value ?? "")}
-          onChange={(event) => void props.onAssignMaterial(patch, event.currentTarget.value)}
-        >
-          <For each={materials()}>
-            {(material) => (
-              <option value={material.name} selected={material.name === argument.value}>
-                {material.name}
-              </option>
-            )}
-          </For>
-        </select>
+          options={materials().map((material) => ({ value: material.name }))}
+          onChange={(value) => void props.onAssignMaterial(patch, value)}
+        />
       </label>
     );
+  };
+
+  /** The material field for a call that does not name one yet. */
+  const newMaterialRow = (element: ConstructionElement, line: number) => (
+    <label class="properties-row">
+      <span>material</span>
+      <Select
+        testId={testId(element, "material")}
+        title="Assign a material from the library (or drag a swatch onto the object)"
+        value=""
+        options={[{ value: "", label: "default" }, ...materials().map((material) => ({ value: material.name }))]}
+        onChange={(name) => {
+          if (name) void props.onAssignMaterialToLine(line, name);
+        }}
+      />
+    </label>
+  );
+
+  const selectedNode = () => {
+    const active = selection();
+    return active ? nodeById(active.nodeId) : undefined;
   };
 
   const readOnlyRow = (element: ConstructionElement, argument: ConstructionArgument) => (
@@ -161,11 +179,7 @@ export function PropertiesPanel(props: PropertiesPanelProps) {
 
   return (
     <aside class="properties-panel" data-testid="properties-panel">
-      <header>
-        <span>
-          <small>selection</small>
-          Properties
-        </span>
+      <PanelHeader kicker="selection" title="Properties">
         <Show when={inspected()}>
           <button
             type="button"
@@ -176,7 +190,7 @@ export function PropertiesPanel(props: PropertiesPanelProps) {
             follow selection
           </button>
         </Show>
-      </header>
+      </PanelHeader>
       <Show
         when={sections().length > 0}
         fallback={
@@ -206,6 +220,14 @@ export function PropertiesPanel(props: PropertiesPanelProps) {
                 </p>
               </Show>
               <For each={element.arguments}>{(argument) => row(element, argument)}</For>
+              <Show
+                when={
+                  materials().length > 0 &&
+                  materialTargetLine(elements(), selectedNode(), element)
+                }
+              >
+                {(line) => newMaterialRow(element, line())}
+              </Show>
               <For each={runtimePlaneRows(element, nodes())}>
                 {(runtime) => (
                   <div class="properties-row properties-readonly" title="Evaluated at compile">

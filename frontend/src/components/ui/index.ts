@@ -15,6 +15,7 @@
 
 export {
   AXIS_LABELS,
+  axisOptions,
   NumberField,
   NumberInput,
   ToggleSwitch,
@@ -47,3 +48,12 @@ export {
 } from "./Section";
 export { Segmented, type SegmentedOption, type SegmentedProps } from "./Segmented";
 export { SPARK_HEIGHT, SPARK_WIDTH, Sparkline, type SparklineProps } from "./Sparkline";
+export { Select, type SelectOption, type SelectProps } from "./Select";
+export { MenuItem, type MenuItemProps } from "./MenuItem";
+export {
+  DialogHeader,
+  PanelHeader,
+  type DialogHeaderProps,
+  type PanelHeaderProps,
+} from "./Panel";
+export { createDismiss, type DismissOptions } from "./dismiss";

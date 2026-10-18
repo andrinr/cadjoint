@@ -21,7 +21,7 @@ import { createThumbnailer, type ThumbnailOutcome } from "../sceneThumbnailer";
 import { createQueue, firstLine, formatFileSize, formatModified } from "../thumbnails";
 import { confirmDiscardChanges } from "../scenes";
 import { sceneName, setStatus } from "../state";
-import { Section, Stat, StatRow } from "./ui";
+import { PanelHeader, Section, Stat, StatRow } from "./ui";
 import type { SceneEntry } from "../types";
 import "./scenes.css";
 
@@ -147,12 +147,7 @@ export function ScenesPanel(props: ScenesPanelProps) {
 
   return (
     <aside class="sim-panel scenes-panel" data-testid="scenes-panel">
-      <header>
-        <span>
-          <small>FILES</small>
-          Scenes
-        </span>
-      </header>
+      <PanelHeader kicker="FILES" title="Scenes" />
 
       <Section
         title="Saved"

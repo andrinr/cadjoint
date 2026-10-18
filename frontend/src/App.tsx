@@ -29,12 +29,18 @@ import { createSimulateController } from "./components/simulate/controller";
 import { SketchPanel } from "./components/SketchPanel";
 import { ToolRail } from "./components/ToolRail";
 import { Toolbar } from "./components/Toolbar";
-import { ViewCube } from "./components/ViewCube";
+import { ProjectionToggle, ViewCube } from "./components/ViewCube";
+import { LayoutGrid } from "./shell/layoutGrid";
+import { removalLabel } from "./shell/removal";
+import "./shell/layoutGrid.css";
+import { RenderSettingsButton } from "./components/viewer/RenderSettingsButton";
 import { ViewerPane } from "./components/ViewerPane";
 import { createCompileCycle } from "./shell/compileCycle";
 import { createPatchOperations } from "./shell/patchOperations";
 import { createRenderState } from "./shell/renderState";
+import { createAppCommands } from "./shell/appCommands";
 import { createShellShortcuts } from "./shell/shellShortcuts";
+import { fixSelectedPoint } from "./shell/toolActions";
 import { createSourceActions, createSourceHistory } from "./shell/sourceHistory";
 import { WindowLayout } from "./windows/WindowLayout";
 import type { WindowId } from "./windows/panels";
@@ -59,6 +65,10 @@ import {
   setSource,
   reportViewerError,
   setStatus,
+  studies,
+  simMeshes,
+  optimizations,
+  source,
 } from "./state";
 import { transformState, vertexState, type BindingState } from "./viewer/dragBinding";
 import { Renderer, type ShaderStats } from "./viewer/renderer";
@@ -137,7 +147,26 @@ export function App() {
     history,
     display: render.display,
   });
-  const ops = createPatchOperations(compile.applyPatch);
+  /**
+   * The last removal, while the source is still the one it produced (F7).
+   * Named here because every edit goes through `applyPatch`.
+   */
+  const [lastRemoval, setLastRemoval] = createSignal<{ label: string; source: string } | null>(null);
+  const applyPatch = async (body: Record<string, unknown>) => {
+    const label = removalLabel(body, {
+      nodes: nodes(),
+      studies: studies(),
+      meshes: simMeshes(),
+      optimizations: optimizations(),
+    });
+    await compile.applyPatch(body);
+    if (label) setLastRemoval({ label, source: source() });
+  };
+  const removal = () => {
+    const last = lastRemoval();
+    return last && last.source === source() ? last.label : null;
+  };
+  const ops = createPatchOperations(applyPatch);
   /**
    * One simulation controller for four windows.
    *
@@ -149,7 +178,7 @@ export function App() {
    */
   const sim = createSimulateController({
     renderer,
-    onPatch: compile.applyPatch,
+    onPatch: applyPatch,
     onAdoptSource: compile.adoptSource,
     onGhostCompile: compile.ghostCompile,
   });
@@ -159,9 +188,38 @@ export function App() {
     example,
   });
 
-  createShellShortcuts({
+  /** Delete the selection: the rail's Delete, ⌫ and Edit › Delete. */
+  const deleteSelection = () => {
+    const active = selection();
+    const node = active && nodeById(active.nodeId);
+    if (!node?.editable || node.line === null) return;
+    if (active!.vertexIndex !== null) {
+      void ops.patch("delete_vertex", node.line, active!.vertexIndex);
+    } else {
+      void ops.deleteObject(node.line);
+    }
+    setSelection(null);
+  };
+
+  // Every command the menu bar and the keys reach, in one registry; the
+  // menu bar adds its own dialogs' commands when it mounts.
+  createAppCommands({
+    renderer,
+    render,
+    ops,
+    sim,
+    run: () => void compile.run(),
+    wgslReady: () => compile.wgsl() !== null,
+    showWgsl: () => setWgslOpen(true),
     undo: actions.undo,
     redo: actions.redo,
+    canUndo: history.canUndo,
+    canRedo: history.canRedo,
+    newScene: actions.newScene,
+    deleteSelection,
+  });
+
+  createShellShortcuts({
     wgslOpen,
     closeWgsl: () => setWgslOpen(false),
   });
@@ -182,7 +240,9 @@ export function App() {
   // Pointing the properties window at an element is one gesture; picking a
   // node is another, and the later one wins: a fresh selection ends the
   // inspection so the window follows the viewport again.
-  createEffect(on(selection, () => setInspected(null), { defer: true }));
+  // Clearing the selection does not end an inspection: the tree clears the
+  // selection itself when it starts one.
+  createEffect(on(selection, (next) => next && setInspected(null), { defer: true }));
 
   /** Character span of the selected vertex's literal, for the editor. */
   // A vertex reveals its own literal; a whole object reveals the statement
@@ -235,6 +295,21 @@ export function App() {
     await ops.setSketchPlane(line, reference);
   };
 
+  /** Everything the render-settings popover forwards to RenderPanel. */
+  const renderPanelProps = () => ({
+    display: render.display(),
+    presets: render.presets(),
+    selectedPreset: render.selectedPreset(),
+    pathTracing: render.pathTracing(),
+    quality: render.quality(),
+    onChange: render.applyDisplay,
+    onQualityChange: render.applyQuality,
+    onPresetActivate: render.activateRenderPreset,
+    onPresetSave: render.saveRenderPreset,
+    onPresetReset: render.resetRenderPreset,
+    onPathTracingChange: render.applyPathTracing,
+  });
+
   /**
    * One window's contents.
    *
@@ -263,20 +338,19 @@ export function App() {
             overlay={
               <>
                 <ToolRail
-                  onDelete={() => {
-                    const active = selection();
-                    const node = active && nodeById(active.nodeId);
-                    if (!node?.editable || node.line === null) return;
-                    if (active!.vertexIndex !== null) {
-                      void ops.patch("delete_vertex", node.line, active!.vertexIndex);
-                    } else {
-                      void ops.deleteObject(node.line);
-                    }
-                    setSelection(null);
-                  }}
+                  onDelete={deleteSelection}
                   onExtrude={ops.extrudeSelection}
                   onRevolve={ops.revolveSelection}
+                  onFix={() => fixSelectedPoint(ops.addConstraint)}
                 />
+                {/* Projection and render settings, over the view cube. */}
+                <div class="view-controls" data-testid="view-controls">
+                  <ProjectionToggle
+                    projection={render.display().projection}
+                    onProjection={(projection) => render.applyDisplay({ projection })}
+                  />
+                  <RenderSettingsButton render={renderPanelProps()} />
+                </div>
                 <ViewCube
                   yaw={cameraAngles().yaw}
                   pitch={cameraAngles().pitch}
@@ -313,6 +387,7 @@ export function App() {
           <PropertiesPanel
             onSetValue={ops.setValueAt}
             onAssignMaterial={ops.assignMaterialAt}
+            onAssignMaterialToLine={ops.assignMaterial}
           />
         );
 
@@ -330,25 +405,7 @@ export function App() {
       case "sketch":
         return (
           <SketchPanel
-            onFix={() => {
-              const active = selection();
-              const node = active && nodeById(active.nodeId);
-              if (
-                !node ||
-                node.kind !== "profile" ||
-                node.line === null ||
-                active!.vertexIndex === null
-              ) {
-                return;
-              }
-              const vertex = node.vertices[active!.vertexIndex];
-              void ops.addConstraint(
-                node.line,
-                "fixed",
-                [active!.vertexIndex],
-                vertex.uv,
-              );
-            }}
+            onFix={() => fixSelectedPoint(ops.addConstraint)}
             onSolve={(method, iterations) => {
               const active = selection();
               const node = active && nodeById(active.nodeId);
@@ -371,7 +428,7 @@ export function App() {
       case "optimize":
         return (
           <OptimizePanel
-            onPatch={compile.applyPatch}
+            onPatch={applyPatch}
             onAdoptSource={compile.adoptSource}
             onGhostCompile={compile.ghostCompile}
           />
@@ -399,36 +456,12 @@ export function App() {
     // data-mode drives the per-mode accent variables in the stylesheet, so
     // the switcher, rail, dock, hint bar, and viewport border stay in step.
     <div class="app" data-mode={editingMode()}>
-      <MenuBar
-        canUndo={history.canUndo()}
-        canRedo={history.canRedo()}
-        onUndo={actions.undo}
-        onRedo={actions.redo}
-        onNew={actions.newScene}
-        onAdoptScene={actions.adoptScene}
-      />
+      <MenuBar />
+      <LayoutGrid />
       <Toolbar
         onRun={() => void compile.run()}
-        onReset={() => {
-          setSource(example());
-          setSelection(null);
-          void compile.run();
-        }}
-        onShowWgsl={() => setWgslOpen(true)}
-        wgslReady={compile.wgsl() !== null}
-        render={{
-          display: render.display(),
-          presets: render.presets(),
-          selectedPreset: render.selectedPreset(),
-          pathTracing: render.pathTracing(),
-          quality: render.quality(),
-          onChange: render.applyDisplay,
-          onQualityChange: render.applyQuality,
-          onPresetActivate: render.activateRenderPreset,
-          onPresetSave: render.saveRenderPreset,
-          onPresetReset: render.resetRenderPreset,
-          onPathTracingChange: render.applyPathTracing,
-        }}
+        removal={removal()}
+        onUndo={actions.undo}
       />
 
       <WindowLayout renderWindow={renderWindow} />

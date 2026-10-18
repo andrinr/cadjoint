@@ -96,6 +96,7 @@ print("OK", len(str(shader)), namespace["__studies__"][0].name)
         assert "OK" in finished.stdout
         assert "duct-cooling" in finished.stdout
 
+    @pytest.mark.sweep
     @pytest.mark.parametrize(
         "name",
         [

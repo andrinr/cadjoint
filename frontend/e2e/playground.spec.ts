@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { expectValue, pickOption } from "./helpers/select";
 
 /**
  * End-to-end coverage of viewer ↔ code parity.
@@ -684,18 +685,28 @@ test("the projection toggle works on its own", async ({ page }) => {
   expect(await projectionMode(page)).toContain("Orthographic");
 });
 
-test("the projection toggle sits inside the cube's square", async ({ page }) => {
-  // It used to hang under the widget, which read as orphaned. It belongs to
-  // the cube cluster, in the corner of the stage the silhouette never reaches
-  // — the top right — so its box is inside the stage's box, in the upper-right
-  // quarter. (This asserted the *lower* right while the stylesheet had already
-  // moved it to the top, and had been failing for it.)
-  const stage = (await page.locator(".cube-stage").boundingBox())!;
+test("the projection toggle sits in the viewport bar beside render settings", async ({ page }) => {
+  // Projection is not a direction, and the cube is the direction control, so
+  // the toggle left the cube's square for the bar of controls for how the
+  // picture is drawn: it shares a row with the render-settings button, right
+  // beside it, and no longer overlaps the cube's stage.
+  const bar = page.getByTestId("view-controls");
+  await expect(bar.getByTestId("projection-toggle")).toBeVisible();
+  await expect(bar.getByTestId("display-options")).toBeVisible();
   const toggle = (await page.getByTestId("projection-toggle").boundingBox())!;
-  expect(toggle.x).toBeGreaterThanOrEqual(stage.x + stage.width / 2);
-  expect(toggle.y).toBeGreaterThanOrEqual(stage.y - 0.5);
-  expect(toggle.x + toggle.width).toBeLessThanOrEqual(stage.x + stage.width + 0.5);
-  expect(toggle.y + toggle.height).toBeLessThanOrEqual(stage.y + stage.height / 2);
+  const render = (await page.getByTestId("display-options").boundingBox())!;
+  const middle = (box: { y: number; height: number }) => box.y + box.height / 2;
+  expect(Math.abs(middle(toggle) - middle(render))).toBeLessThanOrEqual(1);
+  const gap = Math.max(render.x - (toggle.x + toggle.width), toggle.x - (render.x + render.width));
+  expect(gap).toBeGreaterThanOrEqual(0);
+  expect(gap).toBeLessThanOrEqual(16);
+  const stage = (await page.locator(".cube-stage").boundingBox())!;
+  const overlaps =
+    toggle.x < stage.x + stage.width &&
+    toggle.x + toggle.width > stage.x &&
+    toggle.y < stage.y + stage.height &&
+    toggle.y + toggle.height > stage.y;
+  expect(overlaps, "the toggle is outside the cube's square").toBe(false);
 });
 
 /** The union of the client rects of every element a selector matches. */
@@ -840,10 +851,14 @@ test("render presets activate, edit, and persist without bloating the closed UI"
   // Closed, the panel holds the three preset cards and the distance-field
   // switch — a *view* selector, sibling to the presets rather than a detail of
   // one — and nothing else. The budget covers those two blocks; the preset
-  // editor, which is the bulky part, is still absent above.
+  // editor, which is the bulky part, is still absent above. The design
+  // language gave each preset card an icon tile and the panel a titled
+  // header, which together cost ~40px over the old 380 budget (measured 422
+  // at 288px wide); 440 keeps that and still fails if the editor or any
+  // other block leaks into the closed state.
   const compactPanel = await page.getByTestId("render-panel").boundingBox();
   expect(compactPanel!.width).toBeLessThanOrEqual(310);
-  expect(compactPanel!.height).toBeLessThan(380);
+  expect(compactPanel!.height).toBeLessThan(440);
 
   await page.getByTestId("render-preset-studio").click();
   await expect(page.getByTestId("render-preset-studio")).toHaveClass(/active/);
@@ -1299,7 +1314,9 @@ test("sketch constraints and extrusion are represented in UI and code", async ({
   await waitForCompile(page);
   await expect(page.getByTestId("sketch-panel")).toContainText("fix · P1");
 
-  await page.getByTestId("constraint-distance").click();
+  // The panel lists constraints; adding one is the rail's (and the
+  // Constrain menu's) job.
+  await railTool(page, "annotate", "annotate-distance");
   await expect(page.getByTestId("status")).toContainText("choose the second point");
   metrics = await canvasMetrics(page);
   await page.mouse.click(metrics.left + second.x, metrics.top + second.y);
@@ -1315,7 +1332,7 @@ test("sketch constraints and extrusion are represented in UI and code", async ({
   // point, arm the tool (which adopts the selection), then pick the second.
   metrics = await canvasMetrics(page);
   await page.mouse.click(metrics.left + first.x, metrics.top + first.y);
-  await page.getByTestId("constraint-horizontal").click();
+  await railTool(page, "annotate", "annotate-horizontal");
   await page.mouse.click(metrics.left + second.x, metrics.top + second.y);
   await expect(page.getByTestId("sketch-panel")).toContainText("horiz · P1–P2", {
     timeout: 45_000,
@@ -1325,7 +1342,7 @@ test("sketch constraints and extrusion are represented in UI and code", async ({
   await expect(page.getByTestId("solver-panel")).toHaveCount(0);
   await page.getByTestId("solver-toggle").click();
   await expect(page.getByTestId("solver-panel")).toBeVisible();
-  await page.getByTestId("solver-method").selectOption("adam");
+  await pickOption(page, "solver-method", "adam");
   await page.getByTestId("solver-iterations").fill("24");
   await expect(page.getByTestId("solver-loss-chart")).toHaveCount(0);
   await page.getByTestId("constraint-solve").click();
@@ -1502,14 +1519,14 @@ test("path tracing yields to interactive dragging and resumes afterwards", async
 test("editing modes scope the tool rail and Escape returns to model", async ({ page }) => {
   // Model mode is the default: the create cluster is offered, no simulate slot.
   await expect(page.getByTestId("editmode-model")).toHaveClass(/active/);
-  await expect(page.getByTestId("hint-mode")).toHaveText("model");
   await expect(page.getByTestId("tool-group-create")).toBeVisible();
   await expect(page.getByTestId("mode-simulate")).toHaveCount(0);
 
   // Simulate mode swaps the tool clusters for the simulation slot.
   await page.getByTestId("editmode-simulate").click();
   await expect(page.getByTestId("mode-simulate")).toBeVisible();
-  await expect(page.getByTestId("hint-mode")).toHaveText("simulate");
+  await expect(page.getByTestId("editmode-simulate")).toHaveClass(/active/);
+  await expect(page.getByTestId("editmode-model")).not.toHaveClass(/active/);
   await expect(page.getByTestId("tool-group-create")).toHaveCount(0);
 
   // Render is not a mode: the eye-icon popover opens from Simulate too, and
@@ -1573,6 +1590,7 @@ test("studies are declared, edited, and deleted through source patches", async (
   await expect(page.getByTestId("simulate-empty")).toBeVisible();
 
   // Adding a study writes a ThermalStudy declaration into the program.
+  await page.getByTestId("simulate-add-study").click();
   await page.getByTestId("simulate-add-thermal").click();
   await editorHas("ThermalStudy(");
   const card = page.locator("[data-testid^=simulate-study-]").first();
@@ -1581,7 +1599,7 @@ test("studies are declared, edited, and deleted through source patches", async (
 
   // A boundary condition built from a box vertex selection lands as source.
   await page.getByTestId(`simulate-add-bc-${name}`).click();
-  await page.getByTestId("simulate-builder-selection").selectOption("box");
+  await pickOption(page, "simulate-builder-selection", "box");
   await page.getByTestId("simulate-builder-value").fill("250");
   await page.getByTestId("simulate-builder-add").click();
   await editorHas("Nodes.box(");
@@ -1710,7 +1728,7 @@ test("clicking the inspected mesh proposes a sphere BC selection", async ({ page
   const point = projectToCss([0.5, -0.6, 0.1], metrics);
   await page.mouse.click(metrics.left + point.x, metrics.top + point.y);
 
-  await expect(page.getByTestId("simulate-builder-selection")).toHaveValue("sphere");
+  await expectValue(page.getByTestId("simulate-builder-selection"), "sphere");
   const radius = await page.getByTestId("simulate-builder-radius").inputValue();
   expect(Number(radius)).toBeGreaterThan(0);
 
@@ -1741,9 +1759,9 @@ test("the construction overlay can be switched off for a presentation frame", as
   // Every mark the app draws *about* the model is gone…
   await expect(page.locator(".constraint-distance")).toHaveCount(0);
   await expect(page.getByTestId("constraint-overlay")).toHaveCount(0);
-  // …while the viewport, its ground grid and the title block stay.
+  // …while the viewport, its ground grid and the performance readout stay.
   await expect(page.getByTestId("viewer-canvas")).toBeVisible();
-  await expect(page.getByTestId("title-block")).toBeVisible();
+  await expect(page.getByTestId("perf-readout")).toBeVisible();
   await expect(page.getByTestId("graticule-gain")).toBeVisible();
 
   await toggle.check();

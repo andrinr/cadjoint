@@ -1,61 +1,14 @@
 ---
-title: Flow Solver
+title: Flow solver
 description: Conjugate heat transfer with no mesh in the loop — Brinkman-penalised lattice Boltzmann and a single-domain energy solve on the scene's own field.
 ---
 
-::: {.callout-important}
-## What this is, and what it is not
+`cadjoint.flow` solves forced convection over a part (air pushed along a duct,
+heat conducted out of the part and carried away by the air) on a fixed lattice,
+and differentiates the pressure drop and the temperature with respect to the
+geometry with no mesh generation in the loop.
 
-`cadjoint.flow` solves forced convection over a part: air pushed along a duct,
-heat conducted out of the part and carried away by the air, and a derivative of
-the result with respect to the geometry — with no mesh generation anywhere in
-the loop. It is verified against a closed-form conduction profile, a two-layer
-series resistance, an analytic advection–diffusion column, a textbook Nusselt
-number, and finite differences through both adjoints; the numbers are below and
-in [the research note](../research/flow-solver.md).
-
-It is **laminar**. Turbulence is not modelled, and a real forced-convection
-heat sink often runs above the duct transition at `Re ≈ 2300`, where this
-solver reports the laminar answer and so overstates the temperature. It runs on
-CPU at a speed that makes a trustworthy resolution expensive — a Nusselt number
-good to a couple of percent wants about 22 cells across a channel, and the
-examples here use 12 to 16. A scene declaring a flow study opens, renders and
-compiles in the playground, and the Studies window reads and edits one like
-any other study. Read
-[§8.9 of the note](../research/flow-solver.md) before quoting an absolute number
-from it.
-:::
-
-## The idea
-
-Every solver on the [simulation page](simulation.qmd) needs a mesh, and a mesh
-is where differentiability is hardest won. A penalised flow needs none. The
-scene's SDF is sampled on a fixed lattice and squashed to a **solid fraction**
-`chi(x)` in `[0, 1]`; `chi` enters the momentum equation as a Brinkman drag
-`−alpha_max · chi · u`, so where the design is solid the fluid stops, and
-where it is not it flows. The design never becomes a mesh; it becomes a
-field, and the grid never moves. The chain from a sketch point to a pressure
-drop is one JAX expression:
-
-```
-sketch point → SDF → chi = profile(−f(x) / ε) → alpha = alpha_max · chi
-             → D3Q19 lattice-Boltzmann fixed point → pressure drop, heat proxy
-```
-
-The solve is a fixed point, and its gradient is taken by the implicit function
-theorem rather than by taping the pseudo-time march: one adjoint solve at the
-converged state, with memory independent of how many steps convergence took.
-On the starter sink that is 457 MB where the tape needs 21 GB, and the two
-agree to 5.6e-11 once the tape's own march has converged.
-
-## Set up a grid and a solid fraction
-
-`FlowGrid` is the lattice in world coordinates, with the duct running along
-`+Y`; `sample_solid_fraction` evaluates a scene SDF on it. The profile that
-squashes distance to occupancy has **compact support** on purpose: a sigmoid
-never reaches zero, and multiplied by `alpha_max` its tail plugs every open
-channel — the finding that mattered most while building this. The default is
-a C² quintic, which is also what keeps a finite-difference check second order.
+## Example
 
 ```python
 import jax
@@ -73,17 +26,7 @@ evaluate = functionalize(fin)
 grid = FlowGrid(shape=(16, 32, 16), origin=(-1.0, -2.0, -1.0), size=(2.0, 4.0, 2.0))
 chi = sample_solid_fraction(evaluate(free, fixed), grid)
 print(chi.shape, float(chi.max()), grid.suggested_epsilon())   # (16, 32, 16) 1.0 0.0625
-```
 
-## Solve
-
-`FlowConfig` holds the lattice-unit settings — inlet speed, Reynolds number,
-the drag at `chi = 1` — and derives the BGK relaxation rate from them. It
-refuses an `omega` above 1.95 at construction, because BGK loses stability as
-`omega` approaches 2 and the penalised solid brings that on sooner; a `NaN` an
-hour into a march is a much worse error message.
-
-```python
 config = FlowConfig(
     shape=grid.shape, inlet_speed=0.02, reynolds=30.0,
     steady=SteadyOptions(tol=1e-10, adjoint_solver="fixed_point",
@@ -95,17 +38,45 @@ result = solve(chi, config, cell_volume=grid.cell_volume)
 print(float(result.pressure_drop), float(result.heat_transfer))
 ```
 
+## Brinkman penalisation
+
+The scene's SDF is sampled on a fixed lattice and mapped to a solid fraction
+`chi(x)` in `[0, 1]`. `chi` enters the momentum equation as a Brinkman drag
+`−alpha_max · chi · u`, which stops the fluid where the design is solid. The
+grid never moves, so the chain from a sketch point to a pressure drop is one
+JAX expression:
+
+```
+sketch point → SDF → chi = profile(−f(x) / ε) → alpha = alpha_max · chi
+             → D3Q19 lattice-Boltzmann fixed point → pressure drop, heat proxy
+```
+
+## Grid and solid fraction
+
+`FlowGrid` is the lattice in world coordinates, with the duct along `+Y`;
+`sample_solid_fraction` evaluates a scene SDF on it. The profile that maps
+distance to occupancy has compact support, because a sigmoid never reaches
+zero and, multiplied by `alpha_max`, its tail blocks every open channel. The
+default is a C² quintic, which also keeps a finite-difference check second
+order.
+
+## Solver settings
+
+`FlowConfig` holds the lattice-unit settings (inlet speed, Reynolds number,
+drag at `chi = 1`) and derives the BGK relaxation rate `omega` from them. It
+rejects an `omega` above 1.95 at construction: BGK loses stability as `omega`
+approaches 2, and the penalised solid lowers that limit.
+
 `FlowResult` carries the converged populations, density and velocity fields
-and two scalars read off them: the inlet-to-outlet `pressure_drop`, and
-`heat_transfer`, an `∫ chi |u|` proxy kept for callers who want a cooling
-number without an energy solve. Since `FlowStudy` (below) reports an actual
-temperature, the proxy is no longer the recommended objective.
-`convergence` returns the residual history if you want to see the march.
+and two scalars: the inlet-to-outlet `pressure_drop`, and `heat_transfer`, an
+`∫ chi |u|` proxy for a cooling number without an energy solve. `FlowStudy`
+(below) reports a temperature and is the recommended objective. `convergence`
+returns the residual history.
 
-## Differentiate
+## Gradients
 
-Nothing in the chain contours, meshes, or decides membership, so `jax.grad`
-runs straight through it — the SDF, the profile, and the fixed point:
+Nothing in the chain contours, meshes or decides membership, so `jax.grad`
+runs through the SDF, the profile and the fixed point:
 
 ```python
 def objective(free):
@@ -118,28 +89,36 @@ print(float(value), grad["size"])
 ```
 
 Widening the fin across the duct (`size[0]`) raises the pressure drop at
-6.9e-4 per unit; lengthening it along the flow (`size[1]`) costs four times
-as much again, and its height (`size[2]`) almost nothing, because the box
+6.9e-4 per unit; lengthening it along the flow (`size[1]`) costs about four
+times as much, and its height (`size[2]`) almost nothing, because the box
 already spans most of the duct's height. A central difference on `size[0]`
-with `h = 1e-3` gives 6.897e-4 — 0.2 % from the adjoint, which is the
-difference scheme's own truncation. On the starter sink's real sketch
-handles the note measures 3e-8.
+with `h = 1e-3` gives 6.897e-4, 0.2 % from the adjoint, which is the difference
+scheme's truncation. On the starter sink's sketch handles the
+[research note](https://github.com/andrinr/cadjoint/blob/main/research/flow-solver.md)
+measures 3e-8.
 
-Two adjoint solvers are offered because they fail differently: `"gmres"` is
-fastest when it converges; `"fixed_point"` is Richardson iteration on the same
-system, so it converges exactly when the forward march does. Disagreement
-between them means one of the two solves had not converged — and note that
-the default `adjoint_max_steps` of 400 is not enough on this duct for either
-solver (with it, the example above reports 8.1e-4 rather than 6.9e-4), which
-is why the configuration raises it. Check a new configuration against a
-finite difference once before trusting it.
+The gradient comes from the implicit function theorem rather than from taping
+the pseudo-time march: one adjoint solve at the converged state, with memory
+independent of the number of steps. On the starter sink that is 457 MB against
+the tape's 21 GB, and the two agree to 5.6e-11 once the tape's march has
+converged.
 
-## Conjugate heat transfer: `FlowStudy`
+| `adjoint_solver` | Behaviour |
+|---|---|
+| `"gmres"` | fastest when it converges; holds `restart` Krylov vectors |
+| `"fixed_point"` | Richardson iteration on the same system; converges exactly when the forward march does; three states of memory |
 
-The flow on its own is half the answer. A `FlowStudy` declares the whole
-problem the way a `ThermalStudy` declares conduction — in the scene, captured
-by `capture_studies`, with `describe()` and its own boundary conditions — and
-solves the flow *and* the temperature:
+Disagreement between the two means one solve had not converged. The default
+`adjoint_max_steps` of 400 is too few on this duct for either solver (with it,
+the example reports 8.1e-4 rather than 6.9e-4), so the configuration above
+raises it. Check a new configuration against a finite difference once.
+
+## Conjugate heat transfer
+
+A `FlowStudy` declares the coupled problem the way a `ThermalStudy` declares
+conduction (in the scene, captured by `capture_studies`, with `describe()` and
+its own boundary conditions) and solves both the flow and the temperature. On
+the fin box from above:
 
 ```python
 from cadjoint.studies import Nodes
@@ -157,12 +136,12 @@ cooling = FlowStudy(
         HeatSource(Nodes.box([-0.14, -0.18, -0.42], [0.14, 0.18, -0.18]), power=1.0),
     ],
 )
-result = cooling.solve(scene_sdf)
+result = cooling.solve(evaluate(free, fixed))
 print(float(result.peak_temperature), float(result.pressure_drop))
 ```
 
-`scenes/duct_sink.py` is that scene — a three-fin sink in a duct — and running
-it takes well under a minute:
+`scenes/duct_sink.py` declares the same study around a three-fin sink.
+`python scenes/duct_sink.py` runs in well under a minute and prints:
 
 ```
 peak temperature     0.42973      thermal resistance   0.42973
@@ -170,40 +149,94 @@ mean temperature     0.41265      pressure drop        0.010414
 outlet bulk air      0.27618      energy imbalance    -2.566e-11
 ```
 
-The cubic cells in that declaration are load-bearing rather than tidy. The
-solve is entirely in lattice units — streaming moves one cell per axis, the
-energy stencil is one cell wide — so `size` reaches it only by deciding where
-the SDF is sampled, and a lattice whose spacings differ hands the solver the
-duct stretched by their ratio. `warnings()` reports it; nothing else would.
+The cells must be cubic. The solve is entirely in lattice units (streaming
+moves one cell per axis, the energy stencil is one cell wide), so `size` only
+decides where the SDF is sampled, and a lattice with unequal spacings solves the
+duct stretched by their ratio.
 
-### One equation, two phases
+A scene declaring a flow study opens, renders and compiles in the playground,
+and the Studies window reads and edits it like any other study.
 
-The energy equation is solved **once, over the whole lattice**, with the
+### Energy equation
+
+The energy equation is solved once over the whole lattice, with the
 conductivity interpolated by `chi` between the air's and the solid's:
 
 ```
 div(k grad T)  =  (rho cp)_f  u · grad T  −  q
 ```
 
-Inside the metal `u` is zero (the Brinkman drag killed it) so the equation
-degenerates to conduction; in the channels `k` is the air's and advection
-dominates. **There is no interface condition to impose** — one unknown field
-admits no temperature jump, and a conservative finite-volume flux is shared by
-the cells either side of a face, so continuity of temperature and of heat flux
-hold by construction. A two-domain formulation would have to find the
-interface, mesh it, and match fluxes across it: the three things this project
-exists not to do.
+Inside the metal `u` is zero (removed by the Brinkman drag), so the equation
+reduces to conduction; in the channels `k` is the air's and advection
+dominates. No interface condition is imposed: one unknown field admits no
+temperature jump, and a conservative finite-volume flux is shared by the cells
+on either side of a face, so temperature and heat flux are continuous by
+construction, with no interface to locate or mesh.
 
-The coupling is **one-way**, and in this model that is exact rather than a
-simplification: the momentum solve takes `chi`, an inlet velocity and a
-viscosity, and none of them depends on temperature, so there is nothing to
-iterate. What a two-way coupling would add is buoyancy, which is negligible
-when the Richardson number is small — `result.richardson` reports it (2.1e-4 on
-the scene above) and `result.warnings()` complains above 0.1.
+The coupling is one-way, which is exact in this model: the momentum solve takes
+`chi`, an inlet velocity and a viscosity, none of which depends on temperature.
+Two-way coupling would add buoyancy, which is negligible at small Richardson
+number; `result.richardson` reports it (2.1e-4 on `scenes/duct_sink.py`).
 
-### It is checked against things that are not itself
+### Volumetric selections
 
-| check | result |
+`HeatSource` and `HeldTemperature` take the same `Nodes.box` / `sphere` /
+`halfspace` / `cylinder` selections as a mesh study, composed with `&`, `|` and
+`~`. A lattice has no boundary surface, so a selection picks every cell centre
+satisfying the criterion rather than boundary nodes. `Nodes.side` and
+`Nodes.predicate` are rejected with the alternative named. A region thinner
+than a cell contains no centres and is rejected as well.
+
+### Warnings
+
+`result.warnings()` reports:
+
+- a lattice whose cells are not cubes, which solves a stretched duct;
+- a Richardson number above 0.1;
+- a Reynolds number past the turbulent transition;
+- an under-resolved thermal boundary layer;
+- an energy balance that does not close.
+
+### Gradient through both solves
+
+`d(peak temperature)/d(geometry)` runs through the momentum fixed point's
+adjoint and the energy solve's transposed linear solve, which are independent:
+
+```python
+from cadjoint.flow.precision import double_precision
+
+def objective(parameters):
+    return cooling.solve(evaluate(parameters, fixed)).peak_temperature
+
+with double_precision():
+    gradient = jax.grad(objective)(free)
+```
+
+Against a central difference on a box in a duct, the difference converges to
+the adjoint at second order, down to 4.6e-8 relative. On a new configuration,
+check the convergence rate, not one step size: where a perturbation puts the
+surface exactly on a plane of cell centres, the objective has a kink and the
+difference converges only at first order. It still converges to the adjoint,
+but a single ratio at a single `h` cannot distinguish that from a wrong
+gradient.
+
+### Precision
+
+The solve needs float64 and enables it for the duration of the call. A scene
+therefore sets no jax flags: setting `jax_enable_x64` at module scope would make
+the whole process float64, and the WGSL backend has no 64-bit type, so the
+scene would not open in the viewer.
+
+The scope covers a forward solve but not a gradient, because `jax.grad` runs
+its backward pass after the call returns. Differentiating through a study
+needs x64 around the gradient, as with the FEM solvers: `double_precision()`
+above, or `precision="double"` on an `Optimization`. Without it the backward
+pass fails with `lax.dynamic_update_slice requires arguments to have the same
+dtypes, got float32, float64`.
+
+### Verification
+
+| Check | Result |
 |---|---|
 | pure conduction vs. the analytic parabola | 3.9e-3 → 6.1e-5 over 8 → 64 cells, exactly 2nd order |
 | the same problem on the FEM `ThermalStudy` | agrees to 2.4e-4 of the peak at 32 cells (all of it the lattice's truncation; the FEM side is exact to 1e-14) |
@@ -212,127 +245,57 @@ the scene above) and `result.warnings()` complains above 0.1.
 | square-duct Nusselt number vs. the textbook 2.976 | 2.927 at 22 cells across (−1.65%), 2.857 at 14 (−4.0%) |
 | global energy balance | 2.6e-11 of the injected power |
 
-`warnings()` reports what the study will not let you assume — a lattice whose
-cells are not cubes and so is solving a stretched duct, a Richardson number
-that has stopped being small, a Reynolds number past the turbulent transition,
-an under-resolved thermal boundary layer, or an energy balance that has stopped
-closing.
+## Shape optimization
 
-### The gradient survives both solvers
-
-`d(peak temperature)/d(geometry)` runs through the momentum fixed point's
-adjoint **and** the energy solve's transposed linear solve, and neither knows
-the other exists:
+`scenes/duct_fairing.py` optimizes one blunt body immersed in a duct, with the
+pressure drop of the converged flow as the objective. Run from the repository
+root:
 
 ```python
-def objective(parameters):
-    return cooling.solve(evaluate(parameters, fixed)).peak_temperature
+from cadjoint.optimize import Optimization
+from scenes.duct_fairing import fairing, streamlining_cost
 
-gradient = jax.grad(objective)(free)
-```
-
-Against a central difference on a box in a duct, the difference converges on
-the adjoint at second order down to **4.6e-8** relative. Check the *rate* on any
-new configuration, not just one step size: where a design perturbation puts the
-geometry's surface exactly on a plane of cell centres, the objective picks up a
-kink and the difference converges only at first order — still to the adjoint,
-but a single ratio at a single `h` cannot then distinguish that from a wrong
-gradient.
-
-### Precision
-
-The solve needs float64 and turns it on for itself, scoped to the call and
-restored afterwards. A scene therefore sets no jax flags — one that flipped
-`jax_enable_x64` at module scope would make the whole process float64, and
-the WGSL backend has no 64-bit type to emit, so merely declaring a flow study
-would stop the scene opening in the viewer.
-
-The scope covers a forward solve and cannot cover a gradient: `jax.grad` runs
-its backward pass after the call has returned. **A caller who differentiates
-through a study must enable x64 for the process**, the same rule the FEM
-solvers follow:
-
-```python
-from cadjoint.flow.precision import double_precision
-
-with double_precision():
-    gradient = jax.grad(objective)(free)
-```
-
-### Selections are volumetric here
-
-`HeatSource` and `HeldTemperature` take the same `Nodes.box` / `sphere` /
-`halfspace` / `cylinder` selections a mesh study takes, composed with `&`, `|`
-and `~`. One difference is deliberate: a lattice has no boundary surface, so a
-selection picks every *cell centre* satisfying the criterion rather than the
-boundary nodes. `Nodes.side` and `Nodes.predicate` are refused with the
-alternative named. A region thinner than a cell falls between centres, and that
-is refused too rather than silently ignored.
-
-## Immersed shape optimization
-
-A derivative is not a design change. `scenes/duct_fairing.py` is the smallest
-scene that closes the loop: one blunt body immersed in a duct, the pressure
-drop off the converged flow as the objective, and a declared `Optimization`
-descending on it.
-
-```python
 streamline = Optimization(
     name="streamline",
     objective=streamlining_cost,   # dp / dp_ref + 6 (V/V_ref - 1)^2
     of=fairing,                    # the box's free half-extents
     steps=16, learning_rate=0.005, method="adam",
-    precision="double",            # see below — it is load bearing
+    precision="double",
 )
 ```
 
-**The second term is the whole design problem.** Pressure drop alone is
-minimized by deleting the obstacle, so the volume is held and what is left to
-optimize is the shape at fixed material. In a duct the pressure drop is
-dominated by blockage, so at constant volume the descent trades frontal area
-for length — which is streamlining, and it is already visible in the gradient
-before a single step is taken: at the starting box the adjoint gives
-`d(dp)/d(half-width) = +5.709e-2` across the flow against `+1.242e-2` along it.
-Both are positive, but growing across the flow costs 4.6× as much, and the
-volume constraint turns that ratio into a direction.
+The volume term is required because pressure drop alone is minimized by
+removing the obstacle. In a duct the pressure drop is dominated by blockage,
+so at constant volume the descent trades frontal area for length. At the
+starting box `d(dp)/d(half-width) = +5.709e-2` across the flow against
+`+1.242e-2` along it.
 
-Sixteen steps, about two and a half minutes on a laptop CPU:
+Sixteen steps take about two and a half minutes on a laptop CPU:
 
 ```
 aspect (y/x)  0.750 -> 1.011      frontal area  0.16000 -> 0.13277
 volume        0.04800 -> 0.04892  pressure drop 4.597e-3 -> 2.684e-3
 ```
 
-**And the gain is shape, not shrinkage.** The volume drifts 1.9%, which is
-enough to muddy a 42% claim, so the scene ends by solving one more design: the
-*start* box scaled isotropically to the volume the descent finished with. That
-costs `4.706e-3` against `2.684e-3` for the optimized shape at the identical
-volume — a 43% reduction attributable to proportions alone.
+The volume drifts 1.9%, so the scene also solves the start box scaled
+isotropically to the final volume. It costs `4.706e-3` against `2.684e-3` for
+the optimized shape at the same volume: a 43% reduction from proportions alone.
 
-**Verify the gradient before trusting the descent.** A wrong gradient often
-descends too, just to the wrong place, and the loss curve does not reveal it.
-`main()` re-runs the check every time and asserts what makes it meaningful: the
-relative error against a central difference falls by about 100× when the step
-size falls by 10×, which is the second-order convergence a central difference
-has on a smooth objective — and which the `"smootherstep"` solid-fraction
-profile exists to preserve. Agreement at a single step size only proves the
-truncation error happened to be small.
+`main()` verifies the gradient on every run: it asserts that the relative
+error against a central difference falls by about 100× when the step size
+falls by 10×, the second-order convergence that the `"smootherstep"`
+solid-fraction profile preserves.
 
-**`precision="double"` is not decoration.** `FlowStudy.solve` scopes
-`jax_enable_x64` around its own forward pass, but `jax.grad` runs the
-transposed pass *after* that scope has closed, and a float32 process cannot
-then materialize the float64 intermediates the forward built — the descent dies
-with `lax.dynamic_update_slice requires arguments to have the same dtypes, got
-float32, float64`. Declaring the precision on the optimization holds the flag
-for the whole loop and restores it afterwards, which is what lets the scene
-itself stay float32 for the WGSL shader: it still opens in the viewer, and the
-viewer can still run the descent.
+A heat-sink objective needs both temperature and pressure drop: on
+`scenes/duct_sink.py` the sink costs 11.7× the empty duct's pressure drop while
+holding the die 0.430 above inlet air, and thickening a fin moves the two in
+opposite directions. Without the pressure term an optimizer converges to a
+solid block. One `FlowStudy` reports both.
 
-## As a plugin
+## Plugin
 
 The solver ships as `flow_brinkman`, a [plugin](plugins.qmd) of kind
-`flow_solver`. Its wire contract is unusually small — the solver plugins
-beside it ship a mesh; this one ships one array:
+`flow_solver`. The other solver plugins take a mesh; this one takes one array:
 
 ```python
 from cadjoint.plugins import plugin_for_kind
@@ -344,33 +307,34 @@ print(flow.name, sorted(flow.capabilities.differentiable_inputs))
 
 `apply` and `vector_jacobian_product` through the runtime are bit-identical to
 the in-process solve and gradient, because both sides run the same
-`custom_vjp`. It needs no conda and no new extra: `cadjoint.flow` is pure JAX
-over a fixed array.
+`custom_vjp`. It needs no conda and no extra: `cadjoint.flow` is pure JAX.
 
-## What it costs, and what is next
+## Limitations
 
-The CPU implementation runs at 12–16 million lattice updates a second — about
-2 % of the memory roofline, because `stream()` is nineteen `jnp.roll`s where a
-fused kernel makes one pass. Iterations to convergence grow linearly with the
-grid's linear size (about `119·N + 1400`), so a 128³ solve is 48 minutes on
-this CPU, four minutes on an A100 as written, and seconds with a fused stream.
-The adjoint's memory is the constraint nobody expects: GMRES holds `restart`
-Krylov vectors, 12.8 GB at 128³, where `"fixed_point"` needs three states.
+- The model is laminar. A forced-convection heat sink often runs above the
+  duct transition at `Re ≈ 2300`, where this solver reports the laminar answer
+  and so overstates the temperature.
+- It runs on CPU at 12–16 million lattice updates a second, about 2 % of the
+  memory roofline, because `stream()` is nineteen `jnp.roll`s where a fused
+  kernel makes one pass. Iterations to convergence grow linearly with the
+  grid's linear size (about `119·N + 1400`), so a 128³ solve takes 48 minutes
+  on this CPU and four minutes on an A100 as written.
+- A Nusselt number within a couple of percent needs about 22 cells across a
+  channel; the examples here use 12 to 16.
+- Adjoint memory: GMRES at 128³ holds 12.8 GB of Krylov vectors.
+- The design space is a few primitive dimensions.
+- Read
+  [§8.9 of the research note](https://github.com/andrinr/cadjoint/blob/main/research/flow-solver.md)
+  before quoting an absolute number; it lists which results speed, turbulence
+  and a wider design space would change.
 
-The objective a designer actually wants — junction temperature under real
-airflow, against the pressure drop the fan has to pay — is now available from a
-single `FlowStudy`, and both terms are needed: on `scenes/duct_sink.py` the
-sink costs 11.7× the empty duct's pressure drop while holding the die 0.430
-above inlet air, and thickening a fin moves those two the opposite way. Without
-the pressure term an optimizer walks straight into a solid block — and there is
-now an optimizer to walk it, in `scenes/duct_fairing.py` above.
+## API
 
-What is left is speed and turbulence, and — on the optimization side — a design
-space wider than a handful of primitive dimensions. Neither of the first two is
-a small job, and §8.9 of the note says which answers each one would change.
-
-## Further reading
-
-- [A differentiable flow solver](../research/flow-solver.md) — XLB evaluated and rejected, the compact-profile finding, the stability ceiling, the adjoint measured against finite differences and against a tape, the conjugate coupling in §8, and **§8.9, what is still not true**.
-- [Plugins](plugins.qmd) — the `flow_solver` slot this fills.
-- [Simulation](simulation.qmd) — the mesh-based thermal and elastic studies, and the `ThermalStudy` the still-inlet case is checked against.
+- [`flow.FlowGrid`](../reference/flow.FlowGrid.qmd)
+- [`flow.sample_solid_fraction`](../reference/flow.sample_solid_fraction.qmd)
+- [`flow.FlowConfig`](../reference/flow.FlowConfig.qmd), [`flow.SteadyOptions`](../reference/flow.SteadyOptions.qmd)
+- [`flow.solve`](../reference/flow.solve.qmd), [`flow.FlowResult`](../reference/flow.FlowResult.qmd), [`flow.convergence`](../reference/flow.convergence.qmd)
+- [`flow.FlowStudy`](../reference/flow.FlowStudy.qmd), [`flow.FlowStudyResult`](../reference/flow.FlowStudyResult.qmd)
+- [`flow.Inlet`](../reference/flow.Inlet.qmd), [`flow.Outlet`](../reference/flow.Outlet.qmd), [`flow.Walls`](../reference/flow.Walls.qmd), [`flow.HeatSource`](../reference/flow.HeatSource.qmd), [`flow.HeldTemperature`](../reference/flow.HeldTemperature.qmd)
+- [`studies.Nodes`](../reference/studies.Nodes.qmd)
+- [`optimize.Optimization`](../reference/optimize.Optimization.qmd)

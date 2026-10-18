@@ -26,6 +26,7 @@ import {
   NumberField,
   SectionHead,
   Segmented,
+  Select,
   VectorField,
 } from "../ui";
 import { MeshStats } from "./MeshStats";
@@ -178,24 +179,18 @@ export function MeshesTab(props: MeshesTabProps) {
                     {(domain) => (
                       <label class="sim-builder-vector">
                         <span>domain</span>
-                        <select
+                        <Select
                           value={domain().name ?? ""}
                           disabled={sim().solving() !== null}
-                          onChange={(event) => {
-                            const value = event.currentTarget.value;
-                            if (value) {
-                              void sim().patch(setMeshValueRequest(mesh, "domain", value));
-                            }
+                          options={[
+                            ...(domain().name === null ? [{ value: "", label: `(${domain().type})` }] : []),
+                            ...sim().domainOptions(domain().name).map((name) => ({ value: name })),
+                          ]}
+                          onChange={(value) => {
+                            if (value) void sim().patch(setMeshValueRequest(mesh, "domain", value));
                           }}
-                          data-testid={`mesh-domain-${mesh.name}`}
-                        >
-                          <Show when={domain().name === null}>
-                            <option value="">{`(${domain().type})`}</option>
-                          </Show>
-                          <For each={sim().domainOptions(domain().name)}>
-                            {(name) => <option value={name}>{name}</option>}
-                          </For>
-                        </select>
+                          testId={`mesh-domain-${mesh.name}`}
+                        />
                       </label>
                     )}
                   </Show>

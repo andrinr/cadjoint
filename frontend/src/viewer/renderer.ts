@@ -101,7 +101,7 @@ export interface ShaderStats {
   /** Shader modules that had to be compiled. */
   misses: number;
 }
-import { CHROME, hexToRgb } from "../tokens";
+import { CHROME, VIEWPORT_BACKGROUND, hexToRgb } from "../tokens";
 
 export {
   DEFAULT_DISPLAY,
@@ -133,10 +133,29 @@ export {
  * The colour target is `bgra8unorm` and the SDF shaders gamma-encode
  * themselves, so this is a *display-encoded* value: it is what a `loadOp:
  * "clear"` writes, and it is what the fullscreen preview pass has to land on
- * for a ray that hits nothing. Mirrored as `VIEWPORT_BACKGROUND` in
- * `src/simColors.ts`, which is where every overlay measures itself against it.
+ * for a ray that hits nothing. It is `VIEWPORT_BACKGROUND` from tokens.ts,
+ * which is where every overlay measures itself against it.
  */
-const BACKGROUND: GPUColorDict = { r: 0.902, g: 0.902, b: 0.914, a: 1 };
+const BACKGROUND: GPUColorDict = {
+  r: VIEWPORT_BACKGROUND[0],
+  g: VIEWPORT_BACKGROUND[1],
+  b: VIEWPORT_BACKGROUND[2],
+  a: 1,
+};
+
+/**
+ * The display value a linear radiance has to be to land on `display` after
+ * `pow(aces_tone_map(x), 1 / 2.2)` — the Narkowicz fit `_webgpu.py` uses,
+ * `x (2.51 x + 0.03) / (x (2.43 x + 0.59) + 0.14)`, inverted as the positive
+ * root of its quadratic. Tone-map constants, not colours.
+ */
+function inverseAcesDisplay(display: number): number {
+  const y = Math.pow(display, 2.2);
+  const a = 2.51 - 2.43 * y;
+  const b = 0.03 - 0.59 * y;
+  const c = -0.14 * y;
+  return (-b + Math.sqrt(b * b - 4 * a * c)) / (2 * a);
+}
 
 /**
  * The same paper, as *linear radiance* for `u.bg_color`.
@@ -145,9 +164,13 @@ const BACKGROUND: GPUColorDict = { r: 0.902, g: 0.902, b: 0.914, a: 1 };
  * unchanged and the result goes through ACES then gamma 2.2, so handing it the
  * display value would land the background near `#c4c4c8` — visibly grey
  * against the chrome. These are the pre-images of the three channels above
- * under `pow(aces(x), 1/2.2)`, solved once here rather than per fragment.
+ * under `pow(aces(x), 1/2.2)`, solved once at load rather than per fragment.
  */
-const BACKGROUND_RADIANCE: readonly [number, number, number] = [0.9684, 0.9684, 1.0819];
+const BACKGROUND_RADIANCE: readonly [number, number, number] = [
+  inverseAcesDisplay(VIEWPORT_BACKGROUND[0]),
+  inverseAcesDisplay(VIEWPORT_BACKGROUND[1]),
+  inverseAcesDisplay(VIEWPORT_BACKGROUND[2]),
+];
 
 /**
  * Key-light intensity for the PBR and path-traced modes.
@@ -320,6 +343,9 @@ export class Renderer {
   private simRange: [number, number] = [0, 0];
   private simBounds = { min: [0, 0, 0], max: [0, 0, 0] };
   private simHighlight: { start: number; count: number } | null = null;
+  // The hovered face group's outline: index pairs over the surface vertices.
+  private simOutlineBuffer: GPUBuffer | null = null;
+  private simOutlineCount = 0;
   private simClip: SliceState = { ...DEFAULT_SLICE };
   private _simulationActive = false;
   // Current surface payload plus the display overrides layered over it:
@@ -586,6 +612,9 @@ export class Renderer {
   setSimulationMesh(payload: SimulationMeshPayload | null): void {
     this.simIndexCount = 0;
     this.simHighlight = null;
+    this.simOutlineBuffer?.destroy();
+    this.simOutlineBuffer = null;
+    this.simOutlineCount = 0;
     this.simPayload = payload;
     this.simScalarOverride = null;
     this.simPositionOverride = null;
@@ -688,9 +717,29 @@ export class Renderer {
     this.invalidate();
   }
 
-  /** Tint one face group's triangle range on hover (null clears it). */
+  /**
+   * Outline one face group's triangle range on hover (null clears it). Over a
+   * solved field hover is drawn, not tinted (V2): the boundary edges go to an
+   * index buffer the element-edge pipeline draws three pixels wide.
+   */
   setSimulationHighlight(range: { start: number; count: number } | null): void {
     this.simHighlight = range;
+    this.simOutlineBuffer?.destroy();
+    this.simOutlineBuffer = null;
+    this.simOutlineCount = 0;
+    const indices = this.simPayload?.indices;
+    if (range && indices && this.device) {
+      const outline = groupOutline(indices, range.start, range.count);
+      if (outline.length >= 2) {
+        this.simOutlineBuffer = this.device.createBuffer({
+          label: "simulation hover outline",
+          size: outline.byteLength,
+          usage: GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST,
+        });
+        this.device.queue.writeBuffer(this.simOutlineBuffer, 0, outline);
+        this.simOutlineCount = outline.length;
+      }
+    }
     this.scheduleRender();
   }
 
@@ -727,10 +776,6 @@ export class Renderer {
       this.program = program;
       this.parameterOverrides = null;
       this.uploadParameters();
-      // Which handles are live is a property of the program, so the marks
-      // are repacked whenever it is installed — including here, where
-      // nothing else about the scene changed.
-      this.uploadOverlay();
       this.parameterUploads += 1;
       this.destroyAccumulation();
       this.invalidate();
@@ -810,9 +855,6 @@ export class Renderer {
     // `pathReady` is false, so nothing draws it — dropping it says so.
     this.pathParameterGroup = null;
     this.uploadParameters();
-    // Which handles are live is a property of the program, so the marks are
-    // repacked with it.
-    this.uploadOverlay();
     this.destroyAccumulation();
     this.invalidate();
 
@@ -1039,9 +1081,7 @@ export class Renderer {
    * The installed scene's uniform contract, or null in the literal form.
    *
    * Read by the drag path, which has to know whether the parameter a handle
-   * names actually has a slot before it promises a live drag, and by the
-   * overlay, which draws the handles that do differently from the ones that
-   * do not.
+   * names actually has a slot before it promises a live drag.
    */
   get parameterProgram(): ShaderProgramPayload | null {
     return this.program;
@@ -1143,7 +1183,6 @@ export class Renderer {
       this.profiles,
       this.selection,
       this.hover,
-      this.program,
     );
 
     // Transform controls have their own buffer and pass.
@@ -1472,8 +1511,10 @@ export class Renderer {
       // silhouette, which is what separates a hot field from the background.
       sim.set([ramp, position[0], position[1], position[2]], 24);
       device.queue.writeBuffer(this.simUniformBuffer, 0, sim);
-      // The highlight pass re-draws a face group's range with a warm tint.
-      sim.set([low, inverseRange, 0.55, this.simClip.enabled ? 1 : 0], 20);
+      // The hover-outline pass: params.z is one framebuffer pixel in NDC, the
+      // step vs_sim_edge shifts each copy of the outline by.
+      const pixel = 2 / Math.max(this.canvas.width, 1);
+      sim.set([low, inverseRange, pixel, this.simClip.enabled ? 1 : 0], 20);
       device.queue.writeBuffer(this.simHighlightUniformBuffer, 0, sim);
     }
   }
@@ -1535,7 +1576,7 @@ export class Renderer {
     pass.draw(3);
   }
 
-  /** Draw the FEM surface (and its hovered face group) into the pass. */
+  /** Draw the FEM surface (and its hovered face group's outline) into the pass. */
   private drawSimulation(pass: GPURenderPassEncoder): void {
     if (
       !this._simulationActive ||
@@ -1552,13 +1593,6 @@ export class Renderer {
     pass.setVertexBuffer(0, this.simVertexBuffer);
     pass.setIndexBuffer(this.simIndexBuffer, "uint32");
     pass.drawIndexed(this.simIndexCount);
-    // The BC preview is a mark on the surface, not part of the field, so it
-    // goes with the rest of the construction overlay.
-    const highlight = this.display.showOverlays ? this.simHighlight : null;
-    if (highlight && this.simHighlightBindGroup) {
-      pass.setBindGroup(0, this.simHighlightBindGroup);
-      pass.drawIndexed(highlight.count, 1, highlight.start);
-    }
     if (
       this._simulationEdgesVisible &&
       this.simEdgePipeline &&
@@ -1570,6 +1604,22 @@ export class Renderer {
       pass.setVertexBuffer(0, this.simVertexBuffer);
       pass.setIndexBuffer(this.simEdgeIndexBuffer, "uint32");
       pass.drawIndexed(this.simEdgeIndexCount);
+    }
+    // The hover outline is construction overlay, not field; drawn after the
+    // element edges so it lands on top.
+    if (
+      this.display.showOverlays &&
+      this.simHighlight &&
+      this.simOutlineBuffer &&
+      this.simOutlineCount > 0 &&
+      this.simEdgePipeline &&
+      this.simHighlightBindGroup
+    ) {
+      pass.setPipeline(this.simEdgePipeline);
+      pass.setBindGroup(0, this.simHighlightBindGroup);
+      pass.setVertexBuffer(0, this.simVertexBuffer);
+      pass.setIndexBuffer(this.simOutlineBuffer, "uint32");
+      pass.drawIndexed(this.simOutlineCount, 3);
     }
   }
 
@@ -1698,7 +1748,42 @@ export class Renderer {
     device.queue.submit([encoder.finish()]);
   }
 
+  /** Wall-clock times of recent frames, for the viewport's FPS readout. */
+  private frameLog: number[] = [];
+  /** CPU milliseconds spent encoding and submitting each recent frame. */
+  private cpuLog: number[] = [];
+
+  /**
+   * What the last second of drawing cost, for the performance readout. `fps`
+   * is null when nothing was drawn for a second (rendering is on demand);
+   * `cpuMs` is CPU encode-and-submit time, not GPU time.
+   */
+  get frameStats(): { fps: number | null; cpuMs: number | null; width: number; height: number } {
+    const now = performance.now();
+    const recent = this.frameLog.filter((time) => now - time <= 1000);
+    const cpu = this.cpuLog.length
+      ? this.cpuLog.reduce((sum, value) => sum + value, 0) / this.cpuLog.length
+      : null;
+    return {
+      fps: recent.length ? recent.length : null,
+      cpuMs: recent.length ? cpu : null,
+      // Before the viewport mounts there is no canvas to measure.
+      width: this.canvas?.width ?? 0,
+      height: this.canvas?.height ?? 0,
+    };
+  }
+
   private render(): void {
+    const started = performance.now();
+    this.renderFrame();
+    const ended = performance.now();
+    this.frameLog.push(ended);
+    if (this.frameLog.length > 240) this.frameLog.splice(0, this.frameLog.length - 240);
+    this.cpuLog.push(ended - started);
+    if (this.cpuLog.length > 30) this.cpuLog.shift();
+  }
+
+  private renderFrame(): void {
     this.framePending = false;
     if (!this.device || !this.context) return;
     this.resize();
@@ -1823,7 +1908,39 @@ export class Renderer {
     this.handleBuffer?.destroy();
     this.gizmoBuffer?.destroy();
     this.simVertexBuffer?.destroy();
+    this.simOutlineBuffer?.destroy();
     this.simIndexBuffer?.destroy();
     this.device?.destroy();
   }
+}
+
+/**
+ * The boundary of a face group, as line-list index pairs.
+ *
+ * `indices[start, start + count)` is the group's triangle list. An edge two
+ * of its triangles share is interior — including the diagonal that splits
+ * each hex face in two — and an edge only one of them has is the group's
+ * outline, which is all the hover draws.
+ */
+function groupOutline(
+  indices: ArrayLike<number>,
+  start: number,
+  count: number,
+): Uint32Array<ArrayBuffer> {
+  const seen = new Map<string, [number, number, number]>();
+  const end = Math.min(start + count, indices.length);
+  for (let base = start; base + 2 < end; base += 3) {
+    const corners = [indices[base], indices[base + 1], indices[base + 2]];
+    for (let side = 0; side < 3; side++) {
+      const a = corners[side];
+      const b = corners[(side + 1) % 3];
+      const key = a < b ? `${a},${b}` : `${b},${a}`;
+      const entry = seen.get(key);
+      if (entry) entry[2] += 1;
+      else seen.set(key, [a, b, 1]);
+    }
+  }
+  const pairs: number[] = [];
+  for (const [a, b, uses] of seen.values()) if (uses === 1) pairs.push(a, b);
+  return new Uint32Array(pairs);
 }

@@ -144,3 +144,19 @@ export function runtimePlaneRows(
   }
   return rows;
 }
+
+/**
+ * The source line a new material field assigns at — the same patch a swatch
+ * drop sends — for the selected, editable node's own section when it has no
+ * `material=` argument yet; otherwise null.
+ */
+export function materialTargetLine(
+  elements: readonly ConstructionElement[],
+  node: ConstructionNode | undefined,
+  element: ConstructionElement,
+): number | null {
+  if (!node?.editable || node.line === null) return null;
+  if (elementForNode(elements, node)?.id !== element.id) return null;
+  if (element.arguments.some((argument) => argument.patch?.op === "assign_material")) return null;
+  return node.line;
+}

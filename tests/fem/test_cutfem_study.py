@@ -107,6 +107,7 @@ def test_the_study_payload_renders_the_cut_surface():
 
 
 def test_the_viewer_simulates_and_inspects_a_cut_cell_study():
+    pytest.importorskip("jax_fem", reason="the viewer's simulate needs the fem extra")
     from cadjoint.viewer.worker.fem import _inspect_mesh, _simulate_study
 
     ball, mesh, study = _ball_study(10, "ball-viewer")

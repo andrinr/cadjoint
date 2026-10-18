@@ -1402,6 +1402,10 @@ def test_intelligence_endpoints_require_the_session_token(path):
 
 
 def test_a_failed_compile_is_reported_again_by_the_linter():
+    from cadjoint.viewer._intelligence import _ruff_binary
+
+    if _ruff_binary() is None:
+        pytest.skip("/api/lint needs the ruff executable (cadjoint[editor])")
     # The routing table taps /compile so a traceback that named a line of the
     # user's program comes back as the first lint diagnostic.
     source = (
