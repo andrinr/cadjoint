@@ -32,6 +32,7 @@ import type {
   MaterialDefinition,
   MeshEdgePayload,
   OptimizationPayload,
+  SceneTree,
   SimMeshPayload,
   StudyBc as StudyBcPayload,
   StudyPayload as StudyPayloadShape,
@@ -126,6 +127,8 @@ export interface CompileResponse {
   construction: ConstructionNode[];
   /** Every construction call with its written arguments; absent from an older worker. */
   elements?: ConstructionElement[];
+  /** What `scene` evaluates to, boolean by boolean; absent from an older worker. */
+  scene_tree?: SceneTree | null;
   relations: ConstructionRelation[];
   solver_runs: ConstraintSolverRun[];
   materials: MaterialDefinition[];

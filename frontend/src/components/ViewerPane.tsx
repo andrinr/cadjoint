@@ -37,7 +37,9 @@ import {
   planeFrames,
   planePreview,
   relations,
+  sceneTree,
   selection,
+  treeFocus,
   setPlanePreview,
   sketchPlane,
   setDrag,
@@ -56,6 +58,7 @@ import { intersectPlane, rayFromPixel, worldToPlane } from "../viewer/math";
 import { GRID_ALPHA } from "../viewer/graticule";
 import { pickEdge, pickNode, pickPlane, pickVertex, type PickView } from "../viewer/hittest";
 import { previewFrame, visiblePlaneFrames } from "../planes";
+import { descendantNodes } from "../objectTree";
 import { quickPlaneEmission } from "../sketchPlanes";
 import { resolveSurfaceHit } from "../faces";
 import {
@@ -750,6 +753,12 @@ export function ViewerPane(props: ViewerPaneProps) {
   // Keep the GPU overlay buffers in step with the construction tree.
   createEffect(() => {
     renderer.setConstruction(displayProfiles(), selection(), hover(), visibleFrames());
+  });
+
+  // A boolean picked in the object tree lights every solid it is built from.
+  createEffect(() => {
+    const focus = treeFocus();
+    renderer.setFocusGroup(focus === null ? new Set() : descendantNodes(sceneTree(), focus));
   });
 
   createEffect(() => {

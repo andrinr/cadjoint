@@ -421,6 +421,7 @@ export class Renderer {
   private _gizmoAxis: AxisIndex | null = null;
   private selection: Selection | null = null;
   private hover: Selection | null = null;
+  private focusGroup: ReadonlySet<string> = new Set();
 
   constructor(private callbacks: RendererCallbacks = {}) {}
 
@@ -1258,6 +1259,17 @@ export class Renderer {
     this.scheduleRender();
   }
 
+  /**
+   * The construction nodes under the boolean the object tree picked: their
+   * skeletons draw as selected, since the boolean has no outline of its own.
+   */
+  setFocusGroup(nodes: ReadonlySet<string>): void {
+    if (nodes.size === 0 && this.focusGroup.size === 0) return;
+    this.focusGroup = nodes;
+    this.uploadOverlay();
+    this.scheduleRender();
+  }
+
   /** Replace the dual-contour mesh edges gated by the mesh-edges display flag. */
   setMeshEdges(payload: MeshEdgePayload | null): void {
     this.meshEdges = payload;
@@ -1294,6 +1306,7 @@ export class Renderer {
       this.selection,
       this.hover,
       this._simulationActive,
+      this.focusGroup,
     );
 
     // Transform controls have their own buffer and pass.

@@ -42,6 +42,7 @@ import {
 import { DEFAULT_SKETCH_PLANE, type SketchPlaneChoice } from "./sketchPlanes";
 import type { FacePick } from "./faces";
 import type { ConstructionElement } from "./types";
+import type { SceneTree } from "./objectTree";
 import { planeFrames as framesOf, type PlaneFrame } from "./planes";
 import type { Vec3 } from "./viewer/math";
 
@@ -64,7 +65,25 @@ export const [elements, setElements] = createSignal<ConstructionElement[]>([]);
  * click, so the tree's operator rows name their element here instead; the
  * window shows it until the next node selection replaces it.
  */
-export const [inspected, setInspected] = createSignal<string | null>(null);
+export const [inspected, setInspectedSignal] = createSignal<string | null>(null);
+
+/** What `scene` evaluates to, boolean by boolean; null from an older worker. */
+export const [sceneTree, setSceneTree] = createSignal<SceneTree | null>(null);
+
+/**
+ * The scene-tree item the object tree's last click picked, when that was a
+ * boolean or a transform: the viewport lights up every solid under it.
+ *
+ * It is part of the one selection, not beside it — any other pick (a node,
+ * another element, a clear) replaces it, which is why `setSelection` and
+ * `setInspected` both drop it and the tree sets it last.
+ */
+export const [treeFocus, setTreeFocus] = createSignal<string | null>(null);
+
+export function setInspected(id: string | null): void {
+  setTreeFocus(null);
+  setInspectedSignal(id);
+}
 
 /** Where the sketch tool would plant a plane right now, or null. */
 export const [planePreview, setPlanePreview] = createSignal<{
@@ -173,7 +192,12 @@ export const [meshEdges, setMeshEdges] = createSignal<MeshEdgePayload | null>(nu
  * tangent plane.
  */
 export const [faceHover, setFaceHover] = createSignal<FacePick | null>(null);
-export const [selection, setSelection] = createSignal<Selection | null>(null);
+export const [selection, setSelectionSignal] = createSignal<Selection | null>(null);
+/** Select a node (or clear); also ends a tree focus on a boolean, see `treeFocus`. */
+export function setSelection(next: Selection | null): void {
+  setTreeFocus(null);
+  setSelectionSignal(next);
+}
 export const [hover, setHover] = createSignal<Selection | null>(null);
 export const [tool, setTool] = createSignal<ToolMode>("select");
 /** Armed first sketch of a two-click loft; the viewport picks the second. */

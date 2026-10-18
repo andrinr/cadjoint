@@ -53,7 +53,9 @@ from cadjoint.viewer.source_map import (
     capture_profiles,
     describe_identities,
 )
+from cadjoint.viewer.source_map.capture import capture_scene_graph
 from cadjoint.viewer.source_map.elements import build_element_payload
+from cadjoint.viewer.source_map.tree import build_scene_tree
 from cadjoint.viewer.worker.declarations import (
     _mesh_entries,
     _optimization_entries,
@@ -239,6 +241,7 @@ def _compile_source(source: str) -> dict[str, Any]:
             capture=(
                 ("__solver_reports__", capture_constraint_solves),
                 ("__profiles__", lambda: capture_profiles(PLAYGROUND_FILENAME)),
+                ("__scene_graph__", lambda: capture_scene_graph(PLAYGROUND_FILENAME)),
             ),
         )
         solver_reports = namespace["__solver_reports__"]
@@ -254,6 +257,10 @@ def _compile_source(source: str) -> dict[str, Any]:
         ).hexdigest()
         table_hash = _table_hash(namespace["scene"])
         construction = build_construction_payload(profiles, source)
+        elements = build_element_payload(source)
+        scene_tree = build_scene_tree(
+            namespace["scene"], profiles, namespace["__scene_graph__"], elements, namespace
+        )
         relations = build_construction_relations(profiles)
         materials = build_material_payload(namespace, source)
         # Declaration only: studies, meshes, and optimizations are serialized
@@ -292,7 +299,8 @@ def _compile_source(source: str) -> dict[str, Any]:
             # Every stable id the text declares, so the viewer can name anything
             # the payload reports only by line.
             "identities": describe_identities(source),
-            "elements": build_element_payload(source),
+            "elements": elements,
+            "scene_tree": scene_tree,
             "relations": relations,
             "materials": materials,
             "studies": studies_payload,

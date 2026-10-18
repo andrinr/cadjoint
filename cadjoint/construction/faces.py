@@ -493,13 +493,25 @@ class Feature:
         faces: The feature's analytic faces.
         axis: The feature's axis, for revolves.
         solid: The generated SDF, for callers that want to walk back to it.
+        profiles: Every profile the feature consumed, when there is more than
+            the one it is registered on — a loft's two ends.  The feature is
+            registered on the first; the rest are only reachable from here.
     """
 
-    def __init__(self, kind: str, faces: FaceSet, *, axis: Axis | None = None, solid=None):
+    def __init__(
+        self,
+        kind: str,
+        faces: FaceSet,
+        *,
+        axis: Axis | None = None,
+        solid=None,
+        profiles: tuple = (),
+    ):
         self.kind = kind
         self.faces = faces
         self.axis = axis
         self.solid = solid
+        self.profiles = tuple(profiles)
 
     def __repr__(self) -> str:
         return f"Feature({self.kind}, {self.faces.keys()})"
