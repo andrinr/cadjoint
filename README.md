@@ -142,14 +142,18 @@ mesh = extract_mesh(block, grid)
 
 `functionalize(block)` returns a pure function of the parameter values, so
 `jax.grad` of anything downstream reaches `a`, `b`, `c`, `d` and `depth`.
-[Getting started](https://andrinr.github.io/cadjoint/docs/getting-started.html)
-continues to meshing, a thermal study and an optimization;
+[Modelling](https://andrinr.github.io/cadjoint/docs/modelling.html) covers
+sketches, features and constraints, and the
+[guides](https://andrinr.github.io/cadjoint/docs/guides.html) continue to
+meshing, a thermal study and an optimization;
 `examples/fem_bracket_optimization.py` runs the full chain from the command
 line, with the adjoint checked against finite differences at every boundary.
 
 ## Documentation
 
 - [Getting started](https://andrinr.github.io/cadjoint/docs/getting-started.html)
+- [Modelling](https://andrinr.github.io/cadjoint/docs/modelling.html):
+  parameters, sketches, features, faces and constraints
 - [Differentiable meshing](https://andrinr.github.io/cadjoint/docs/meshing.html),
   [simulation](https://andrinr.github.io/cadjoint/docs/simulation.html),
   [flow solver](https://andrinr.github.io/cadjoint/docs/flow.html),
@@ -183,13 +187,9 @@ XLA compile and cache time per program;
 [`research/performance.md`](https://github.com/andrinr/cadjoint/blob/main/research/performance.md)
 records what each optimization bought.
 
-## History
+## Acknowledgements
 
-cadjoint began as an entry in the
-[Tesseract Hackathon 2026](https://si-tesseract.discourse.group) (Track 01,
-inverse design and shape optimization); that state is frozen on the
-[`tesseract-hackathon-2026`](https://github.com/andrinr/cadjoint/tree/tesseract-hackathon-2026)
-branch. Inspired by [Fidget](https://www.mattkeeter.com/projects/fidget/) and
+Inspired by [Fidget](https://www.mattkeeter.com/projects/fidget/) and
 [Inigo Quilez's distance functions](https://iquilezles.org/articles/distfunctions/).
 
 ## License

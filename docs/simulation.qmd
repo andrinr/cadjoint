@@ -3,17 +3,49 @@ title: Simulation
 description: Declared meshes, declared studies, and node selections that survive a change of shape.
 ---
 
-`cadjoint.fem` turns an SDF into a finite-element solution. The
-discretization and the physics are declared as objects in the scene file (a
-`SimMesh` and a study), because the same declarations are read by the
-playground's Meshes and Studies windows, re-solved by the optimizer, and
+`cadjoint.fem` turns an SDF into a finite-element solution: temperature or
+displacement fields, mass, safety factor, and gradients of them with respect to
+the design. The discretization and the physics are declared as objects in the
+scene file (a `SimMesh` and a study); the playground's Meshes and Studies
+windows read the same declarations, the optimizer re-solves them, and they are
 refrozen whenever the geometry moves.
+
+## Example
 
 The solvers need the `fem` extra (see [install](getting-started.qmd#install)):
 
 ```bash
 uv sync --extra fem
 ```
+
+```python
+import numpy as np
+from cadjoint.fem import Dirichlet, Nodes, SimMesh, ThermalStudy
+from cadjoint.geometry.parameters import Vector
+from cadjoint.sdf.primitives import Box
+
+bar = Box(Vector([1.0, 0.15, 0.15], free=True, name="size"))
+mesh = SimMesh(name="bar-mesh", resolution=(22, 5, 5),
+               bounds=(-1.1, -0.25, -0.25), size=(2.2, 0.5, 0.5))
+
+study = ThermalStudy(
+    name="bar-conduction",
+    conductivity=2.0,
+    bcs=[
+        Dirichlet(Nodes.side("-x"), 1.0),
+        Dirichlet(Nodes.side("+x"), 0.0),
+    ],
+    mesh=mesh,
+)
+
+result = study.solve(bar)
+temperature = np.asarray(result.temperature)
+x = result.mesh.points[:, 0]
+print(np.abs(temperature - (1.0 - x) / 2.0).max())  # 4.4e-10
+```
+
+The exact solution is a linear ramp between the two prescribed ends, and the
+solve reproduces it to 4.4e-10.
 
 ## Meshes
 
@@ -82,7 +114,7 @@ Tets sized by the part rather than the lattice come from Gmsh,
 Its midside nodes sit on the true surface, but whether they follow the design
 parameters depends on the `node_map` plugin kind. Nothing in this repository
 fills it, so the mesh reports frozen geometry; see
-[kinds that can be filled](getting-started.qmd#pluggable-kinds).
+[kinds that can be filled](plugins.qmd#pluggable-kinds).
 
 ## Mesh quality
 
@@ -139,53 +171,11 @@ optimization.
 ## Studies
 
 `ThermalStudy` solves steady-state conduction; `ElasticStudy` solves linear
-elasticity. Both take a `SimMesh` and a list of boundary conditions. Material
-properties are keyword-only: pass a number, or omit them and the scene's
-materials supply them per element (see
-[material properties](#materials-drive-the-solve)).
-
-```python
-import numpy as np
-from cadjoint.fem import Dirichlet, Nodes, SimMesh, ThermalStudy
-from cadjoint.geometry.parameters import Vector
-from cadjoint.sdf.primitives import Box
-
-bar = Box(Vector([1.0, 0.15, 0.15], free=True, name="size"))
-mesh = SimMesh(name="bar-mesh", resolution=(22, 5, 5),
-               bounds=(-1.1, -0.25, -0.25), size=(2.2, 0.5, 0.5))
-
-study = ThermalStudy(
-    name="bar-conduction",
-    conductivity=2.0,
-    bcs=[
-        Dirichlet(Nodes.side("-x"), 1.0),
-        Dirichlet(Nodes.side("+x"), 0.0),
-    ],
-    mesh=mesh,
-)
-
-result = study.solve(bar)
-temperature = np.asarray(result.temperature)
-x = result.mesh.points[:, 0]
-print(np.abs(temperature - (1.0 - x) / 2.0).max())  # 4.4e-10
-```
-
-The exact solution is a linear ramp between the two prescribed ends, and the
-solve reproduces it to 4.4e-10.
-
-The boundary conditions are `Dirichlet(nodes, value)` and `HeatFlux(nodes, flux)`
-for thermal, `Fixed(nodes)` and `Traction(nodes, vector)` for elastic. A thermal
-study needs at least one `Dirichlet` and an elastic study at least one `Fixed`;
-otherwise the system is singular and `solve` raises. `HeatFlux` and `Traction` are
-integrated over boundary faces, so their selection has to span complete faces
-rather than isolated nodes.
-
-Explicit scalars carry no units: `conductivity`, `youngs`, `poisson`,
-`source`, `flux` and `vector` are floats in any consistent system. Properties
-from a `Material` are SI (W/(m·K), Pa, kg/m³), so a scene that mixes the two
-must be in SI throughout.
-
-An elastic study:
+elasticity. Both take a `SimMesh` and a list of boundary conditions; the
+[example](#example) is a thermal study. Material properties are keyword-only:
+pass a number, or omit them and the scene's materials supply them per element
+(see [material properties](#materials-drive-the-solve)). An elastic study that
+fixes one end and loads the other:
 
 ```python
 from cadjoint.fem import ElasticStudy, Fixed, Nodes, SimMesh, Traction
@@ -203,12 +193,27 @@ study = ElasticStudy(
 `mesh=` and the inline meshing keywords (`resolution`, `bounds`, `size`,
 `domain`) are mutually exclusive.
 
+## Boundary conditions
+
+The boundary conditions are `Dirichlet(nodes, value)` and `HeatFlux(nodes, flux)`
+for thermal, `Fixed(nodes)` and `Traction(nodes, vector)` for elastic. A thermal
+study needs at least one `Dirichlet` and an elastic study at least one `Fixed`;
+otherwise the system is singular and `solve` raises. `HeatFlux` and `Traction` are
+integrated over boundary faces, so their selection has to span complete faces
+rather than isolated nodes.
+
+Explicit scalars carry no units: `conductivity`, `youngs`, `poisson`,
+`source`, `flux` and `vector` are floats in any consistent system. Properties
+from a `Material` are SI (W/(m·K), Pa, kg/m³), so a scene that mixes the two
+must be in SI throughout.
+
 ## Material properties {#materials-drive-the-solve}
 
 A single scalar cannot describe a design with two materials: a copper slug in
 an aluminium sink has no meaningful average conductivity. A property omitted
 from the study (or passed as the sentinel `"material"`) comes from the scene's
-materials, sampled per element at solve time:
+materials ([Materials](materials.qmd) lists the properties and the catalogue),
+sampled per element at solve time:
 
 ```python
 import jax.numpy as jnp
@@ -224,14 +229,14 @@ slug = Translate(Box([0.5, 0.15, 0.15], material=copper_c11000()),
                  offset=jnp.array([-0.5, 0.0, 0.0]))
 scene = Union((sink, slug), smoothness=0.03)
 
-study = ThermalStudy(                       # no conductivity= at all
+mixed_study = ThermalStudy(                 # no conductivity= at all
     name="two-metal-bar",
     bcs=[HeatFlux(Nodes.side("-x"), 4.0), Dirichlet(Nodes.side("+x"), 0.0)],
     mesh=SimMesh(name="bar-mesh", resolution=(22, 5, 5),
                  bounds=(-1.1, -0.25, -0.25), size=(2.2, 0.5, 0.5)),
 )
-result = study.solve(scene)
-print(result.describe()["range"], result.mass)   # [0.0, 0.0335] 1062.4
+mixed = mixed_study.solve(scene)
+print(mixed.describe()["range"], mixed.mass)   # [0.0, 0.0335] 1062.4
 ```
 
 Every SDF answers `material_at(p)` and the smooth booleans blend the answers,
@@ -366,9 +371,11 @@ ranks 31 further candidates for that slot.
 `elastic_calculix` plugin — so a `plugins.toml` that points that kind at a
 container or a cluster URL moves the solve without changing the study.
 
+## Limitations
+
 CalculiX is elastic and HEX8 only, and its derivative is objective-valued:
 cotangents on the raw displacement field are refused, because what ccx
-differentiates is a strain energy. And tet meshes
+differentiates is a strain energy. Tet meshes
 (`"tet4"` / `"tet10"`) solve on the direct jax-fem path only — use a hex
 `SimMesh` for the other backends. Cut cells (`"cutfem"`) are their own
 solver and take no backend at all.
@@ -382,9 +389,16 @@ import jax
 jax.config.update("jax_enable_x64", True)
 ```
 
-## Further reading
+The adjoint mechanics, the `SolverBackend` ABI and the ccx 2.23 sensitivity
+correction are documented in the
+[FEM integration notes](https://github.com/andrinr/cadjoint/blob/main/research/fem-integration.md).
 
-- [FEM integration](https://github.com/andrinr/cadjoint/blob/main/research/fem-integration.md) — the `SolverBackend` ABI, adjoint mechanics, and the ccx 2.23 sensitivity correction.
-- [Materials](materials.qmd) — the property field a study samples, and the catalogue of real values.
-- [Meshing](meshing.qmd) — the surface extractor underneath the tet methods.
-- [Optimization](optimization.qmd) — making a study the objective of a descent.
+## API
+
+- [`fem.SimMesh`](../reference/fem.SimMesh.qmd)
+- [`fem.ThermalStudy`](../reference/fem.ThermalStudy.qmd), [`fem.ElasticStudy`](../reference/fem.ElasticStudy.qmd)
+- [`fem.Dirichlet`](../reference/fem.Dirichlet.qmd), [`fem.HeatFlux`](../reference/fem.HeatFlux.qmd), [`fem.Fixed`](../reference/fem.Fixed.qmd), [`fem.Traction`](../reference/fem.Traction.qmd)
+- [`fem.SimulationResult`](../reference/fem.SimulationResult.qmd)
+- [`fem.properties.total_mass`](../reference/fem.properties.total_mass.qmd), [`fem.properties.quantize_to_materials`](../reference/fem.properties.quantize_to_materials.qmd)
+- [`fem.backends.SolverBackend`](../reference/fem.backends.SolverBackend.qmd), [`fem.backends.register_backend`](../reference/fem.backends.register_backend.qmd), [`fem.backends.available_backends`](../reference/fem.backends.available_backends.qmd)
+- [`enums.MeshMethod`](../reference/enums.MeshMethod.qmd), [`enums.Side`](../reference/enums.Side.qmd), [`enums.FemBackend`](../reference/enums.FemBackend.qmd)

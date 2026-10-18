@@ -26,8 +26,8 @@ supported platforms and the playground command; the
 |---|---|
 | **Geometry** | Parametric `Vector` / `Scalar` carrying `free` / `fixed` flags |
 | **SDF** | Primitives, booleans and transforms, all differentiable |
-| **Sketches** | 2D profiles on work planes, extruded or revolved into solids that share their parameters |
-| **Constraints** | Geometric relationships that reduce DOF, with Newton projection onto the constraint manifold |
+| **[Sketches](docs/modelling.qmd#profiles)** | 2D profiles on work planes, extruded or revolved into solids that share their parameters |
+| **[Constraints](docs/modelling.qmd#constraints)** | Geometric relationships that reduce DOF, with Newton projection onto the constraint manifold |
 | **Functionalize** | Convert a parametric scene to a pure JAX function for `jit` / `grad` / `vmap` |
 | **[Meshing](docs/meshing.qmd)** | Dual contouring built bottom-up in JAX; exact gradients through every continuous stage; OBJ / STL / STEP export |
 | **[Simulation](docs/simulation.qmd)** | Declared `SimMesh` and thermal/elastic studies, node selections, and pluggable solver backends |
@@ -95,5 +95,6 @@ sdf = functionalize(scene)(solved, fixed)
 print(sdf(true_p))  # ≈ -0.5 — the solved sphere is centred on the true point
 ```
 
-[Getting started](docs/getting-started.qmd) continues through meshing,
-simulation and optimization.
+[Modelling](docs/modelling.qmd) covers constraints and degrees of freedom; the
+[guides](docs/guides.qmd) continue through meshing, simulation and
+optimization.

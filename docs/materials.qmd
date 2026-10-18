@@ -3,10 +3,34 @@ title: Materials
 description: One object for a part's optical and physical properties, read by the renderer and the solver.
 ---
 
-A `Material` in cadjoint carries two families of properties at once:
+A `Material` carries a part's optical properties, which the renderer shades
+with, and its physical properties, which the solver reads in SI units. This page
+covers stating them, the catalogue of sourced values, free properties, the
+material field of a multi-material scene, and mass.
+
+## Example
+
+```python
+import jax.numpy as jnp
+from cadjoint.materials import aluminium_6061, copper_c11000
+from cadjoint.sdf.boolean import Union
+from cadjoint.sdf.primitives import Box, Cylinder
+from cadjoint.sdf.transforms import Translate
+
+sink = Box([0.6, 0.6, 0.2], material=aluminium_6061())
+slug = Translate(Cylinder(radius=0.2, height=0.4, material=copper_c11000()),
+                 offset=jnp.array([0.0, 0.0, 0.1]))
+scene = Union((sink, slug), smoothness=0.03)
+
+print(slug.material_at(jnp.array([0.0, 0.0, 0.1])).get("conductivity"))  # 391.0
+```
+
+## Properties
+
+A `Material` has two families of properties:
 
 - **Optical** — `color`, `roughness`, `metallic`, `opacity`, `ior`,
-  `reflectivity`. What the renderer shades with. Every one has a default, so a
+  `reflectivity`. What the [renderer](rendering.qmd) shades with. Every one has a default, so a
   bare `Material()` is white matte plastic.
 - **Physical** — `density`, `conductivity`, `specific_heat`,
   `youngs_modulus`, `poisson_ratio`, `thermal_expansion`, `yield_strength`.
@@ -54,20 +78,7 @@ value with a stated one yields `NaN`.
 
 `cadjoint.materials` ships sourced values. Each entry is a factory, not a
 singleton, so marking one scene's copper `free` does not affect another
-scene:
-
-```python
-import jax.numpy as jnp
-from cadjoint.materials import aluminium_6061, copper_c11000
-from cadjoint.sdf.boolean import Union
-from cadjoint.sdf.primitives import Box, Cylinder
-from cadjoint.sdf.transforms import Translate
-
-sink = Box([0.6, 0.6, 0.2], material=aluminium_6061())
-slug = Translate(Cylinder(radius=0.2, height=0.4, material=copper_c11000()),
-                 offset=jnp.array([0.0, 0.0, 0.1]))
-scene = Union((sink, slug), smoothness=0.03)
-```
+scene. The [example](#example) builds a scene from two of them.
 
 | Factory | Density (kg/m³) | k (W/(m·K)) | cₚ (J/(kg·K)) | E (GPa) | ν | α (1/K) | Yield (MPa) |
 |---|---|---|---|---|---|---|---|
@@ -127,7 +138,7 @@ interface moves the property field smoothly, so the gradient flows through it.
 ## Mass
 
 With densities on the materials, mass is computable and differentiable, so it
-can regularize an optimization:
+can regularize an [optimization](optimization.qmd):
 
 ```python
 from cadjoint.sdf import material_mass, volume
@@ -193,8 +204,9 @@ Material("al", color=[0.8, 0.8, 0.82], density=2700.0, conductivity=167.0).descr
 panel can label a field without hard-coding it; `free` flags which properties an
 optimizer controls.
 
-## Further reading
+## API
 
-- [Simulation](simulation.qmd) — how a study samples this field per element.
-- [Forward renderer](rendering.qmd) — the optical half of the same object.
-- [Optimization](optimization.qmd) — regularizing a descent by mass.
+- [`Material`](../reference/Material.qmd)
+- [`materials.catalogue`](../reference/materials.catalogue.qmd), [`materials.aluminium_6061`](../reference/materials.aluminium_6061.qmd), [`materials.copper_c11000`](../reference/materials.copper_c11000.qmd), [`materials.steel_1018`](../reference/materials.steel_1018.qmd), [`materials.titanium_ti6al4v`](../reference/materials.titanium_ti6al4v.qmd), [`materials.fr4`](../reference/materials.fr4.qmd), [`materials.silicon`](../reference/materials.silicon.qmd), [`materials.thermal_pad`](../reference/materials.thermal_pad.qmd), [`materials.pla`](../reference/materials.pla.qmd)
+- [`sdf.material_mass`](../reference/sdf.material_mass.qmd), [`sdf.volume`](../reference/sdf.volume.qmd)
+- [`fem.properties.total_mass`](../reference/fem.properties.total_mass.qmd)

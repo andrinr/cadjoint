@@ -7,8 +7,6 @@ project:
   render:
     - index.qmd
     - docs/*.qmd
-    - examples/index.qmd
-    - examples/*.ipynb
     - reference/*.qmd
   resources:
     - docs/assets/**
@@ -35,8 +33,6 @@ website:
         href: docs/getting-started.qmd
       - text: Guides
         href: docs/guides.qmd
-      - text: Examples
-        href: examples/index.qmd
       - text: Playground
         href: docs/viewer.qmd
       - text: API reference
@@ -50,24 +46,14 @@ website:
       style: floating
       contents:
         - docs/guides.qmd
+        - docs/modelling.qmd
         - docs/meshing.qmd
         - docs/simulation.qmd
-        - docs/optimization.qmd
-        - docs/plugins.qmd
         - docs/materials.qmd
+        - docs/optimization.qmd
         - docs/rendering.qmd
+        - docs/plugins.qmd
         - docs/flow.qmd
-    - id: examples
-      title: Examples
-      style: floating
-      contents:
-        - examples/index.qmd
-        - examples/basics.ipynb
-        - examples/sketch_construction.ipynb
-        - examples/constraints.ipynb
-        - examples/optimization.ipynb
-        - examples/constrained_optimization.ipynb
-        - examples/rendering.ipynb
   page-footer:
     left: "cadjoint"
     right:

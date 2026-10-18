@@ -1,24 +1,13 @@
 ---
-title: Differentiable Meshing
+title: Meshing
 description: Dual contouring built bottom-up in JAX, so every continuous stage carries an exact derivative.
 ---
 
-`cadjoint.meshing` turns a signed distance field into a surface mesh. Every
-stage is written against the field callable and its `jax.grad`, so the
-continuous half of the pipeline differentiates exactly with respect to the CAD
-parameters that produced the field.
+`cadjoint.meshing` turns a signed distance field into a surface mesh by dual
+contouring, with an exact derivative through every continuous stage, and
+`SimMesh` turns that surface into a tet or hex volume mesh for the solvers.
 
-The governing split is discrete topology, continuous motion. Which lattice
-edges cross the surface, which cells are active and how cells connect are
-discrete choices, frozen per extraction and not differentiable. Crossing
-positions, Hermite normals and QEF vertices are continuous and carry
-derivatives. An optimization loop therefore holds topology fixed while
-gradients flow through node positions, and re-extracts every few steps.
-
-## Extraction
-
-`GridSpec` describes the sampling lattice; `extract_mesh` runs the whole chain
-and returns a `Mesh`.
+## Example
 
 ```python
 import jax.numpy as jnp
@@ -34,7 +23,10 @@ print(mesh.vertices.shape, mesh.faces.shape, mesh.quads.shape)
 # (1832, 3) (3660, 3) (1830, 4)
 ```
 
-`from_bounds(bounds, size, resolution)` takes a corner, an extent, and either
+## Extraction
+
+`GridSpec` describes the sampling lattice; `extract_mesh` runs the whole chain
+and returns a `Mesh`. `GridSpec.from_bounds(bounds, size, resolution)` takes a corner, an extent, and either
 one cell count or a per-axis triple. A `Mesh` is a `NamedTuple` of `vertices`
 and `normals` (JAX arrays, one per active cell), `faces` (triangles), `quads`
 (the native dual-contour output), and `cells` (the lattice index each vertex
@@ -47,9 +39,14 @@ the Tikhonov-regularized QEF, which is smooth and differentiable everywhere.
 
 ## Gradients
 
-The differentiable recipe is explicit: sample the lattice, freeze the
-discrete structure, then rebuild only the continuous stages inside the traced
-function.
+Which lattice edges cross the surface, which cells are active and how cells
+connect are discrete choices, frozen per extraction and not differentiable.
+Crossing positions, Hermite normals and QEF vertices are continuous and carry
+derivatives. An optimization loop holds topology fixed while gradients flow
+through node positions, and re-extracts every few steps.
+
+To differentiate, sample the lattice, freeze the discrete structure, then
+rebuild only the continuous stages inside the traced function.
 
 ```python
 import jax
@@ -93,7 +90,9 @@ crease.
 ## Stages
 
 `extract_mesh` composes stages that are individually public, so a caller can
-substitute or instrument any of them.
+substitute or instrument any of them. The stage-to-test map and the benchmark
+policy are in
+[the meshing pipeline note](https://github.com/andrinr/cadjoint/blob/main/research/differentiable-meshing-pipeline.md).
 
 | Stage | Module | Key entry points |
 |---|---|---|
@@ -135,9 +134,33 @@ print(cells.shape[0], stats["evaluations"])  # 2216 5857
 That is 5857 field evaluations instead of the 19683 lattice points of a dense
 sweep, for the same set of crossings.
 
-## Export
+## Diagnostics
 
-Three writers, all taking the `Mesh` and a path:
+`mesh_report` bundles four diagnostics: watertightness, Euler characteristic,
+surface deviation and triangle quality.
+
+```python
+import jax.numpy as jnp
+from cadjoint.meshing import GridSpec, extract_mesh, mesh_report
+
+sdf = lambda p: jnp.sqrt(jnp.sum(p * p)) - 1.0
+grid = GridSpec.from_bounds((-1.3, -1.3, -1.3), (2.6, 2.6, 2.6), 26)
+mesh = extract_mesh(sdf, grid)
+
+report = mesh_report(sdf, mesh, samples=512, pairs=1024, seed=1)
+print(report["watertight"], report["euler_characteristic"])
+print(report["surface_deviation"])
+# True 2
+# {'max_abs': 0.00294, 'mean_abs': 0.00083, 'samples': 512}
+```
+
+Surface deviation evaluates the true field at points sampled on the mesh,
+measuring how far the discretization strays from the geometry: a maximum
+absolute error of 0.0029 on a unit sphere at 26 cells.
+
+## Export {#export}
+
+Three writers, each taking a `Mesh` and a path:
 
 ```python
 import jax.numpy as jnp
@@ -167,32 +190,34 @@ of three thousand, the bore one `CYLINDRICAL_SURFACE`, is the job of the
 `step_export` [plugin kind](plugins.qmd#the-five-in-process-kinds); with nothing
 registered for it, exports use the writers on this page and the report says so.
 
-## Diagnostics
+## Program size {#program-size}
 
-`mesh_report` bundles the four diagnostics used throughout the test suite:
+Every stage above evaluates the scene's SDF under `jax.jit`, so the wall
+clock of a first mesh is mostly XLA compiling one program per stage, and the
+size of those programs is decided by `functionalize`, not by the mesher. Three
+measures keep the tree from flattening as it is traced:
 
-```python
-import jax.numpy as jnp
-from cadjoint.meshing import GridSpec, extract_mesh, mesh_report
+- A sketch profile's vertices are stacked into one `(N, 2)` array and its edge
+  loop becomes two reductions, so a 168-vertex profile emits the same
+  operations as a 12-vertex one.
+- A pattern traces its child once, over an array of instance transforms, and
+  a node reachable from more than one parent is built once and outlined into its
+  own StableHLO function.
+- Passing the parameter dicts to the jitted function rather than closing over
+  them (`functionalize_parametric`) keeps values out of the program entirely, so
+  a re-dimensioned design reuses the executable the
+  [compilation cache](https://github.com/andrinr/cadjoint/blob/main/research/performance.md)
+  already holds.
 
-sdf = lambda p: jnp.sqrt(jnp.sum(p * p)) - 1.0
-grid = GridSpec.from_bounds((-1.3, -1.3, -1.3), (2.6, 2.6, 2.6), 26)
-mesh = extract_mesh(sdf, grid)
+On `scenes/end_cap.py` (eight gusset ribs, three polar bolt circles, a mirrored
+dowel) these reduce the gradient program from 1.62 MB / 18 090 operations to
+0.58 MB / 5 771, and its XLA compile from 25.4 s to 0.68 s.
 
-report = mesh_report(sdf, mesh, samples=512, pairs=1024, seed=1)
-print(report["watertight"], report["euler_characteristic"])
-print(report["surface_deviation"])
-# True 2
-# {'max_abs': 0.00294, 'mean_abs': 0.00083, 'samples': 512}
-```
+## Volume meshes
 
-Surface deviation evaluates the true field at points sampled on the mesh,
-measuring how far the discretization strays from the geometry: a maximum
-absolute error of 0.0029 on a unit sphere at 26 cells.
-
-## Tet meshes and resolution
-
-The same declared resolution means different things per method.
+`SimMesh` builds the volume mesh a solver uses; see
+[simulation](simulation.qmd). The same declared resolution means different
+things per `method`.
 `method="hex"` only decides in/out per lattice cell, so a rib 1.3 cells thick
 still produces a legal, staircased HEX8 mesh. `method="tet4"` / `"tet10"` hand
 the dual-contour surface to TetGen as a piecewise linear complex (or to Gmsh,
@@ -203,7 +228,7 @@ passing through one cell, so where a wall is thinner than about two cells the
 extracted quads fold over each other and TetGen rejects the surface.
 `method="cutfem"` builds no volume mesh: the lattice's cut cells are the
 discretization, and the dual-contour surface is extracted only to be drawn and
-selected on; see [simulation](simulation.qmd).
+selected on.
 
 ```
 RuntimeError: TetGen rejected the surface: The input surface mesh contain
@@ -285,7 +310,7 @@ declared resolution or use method='hex'.
 ```
 
 Refinement fixes a surface that is only under-resolved. It does not fix a
-feature that is small in absolute terms. `scenes/end_cap.py`'s `housing` is the standing example: measured over
+feature that is small in absolute terms. `scenes/end_cap.py`'s `housing`, measured over
 the ladder and well past it, it self-intersects at (26, 26, 13), (39, 39, 20),
 (59, 59, 30), (78, 78, 39), (104, 104, 52) and (130, 130, 65) alike. Only the
 kind of defect changes with resolution: at the declared (26, 26, 13)
@@ -302,53 +327,6 @@ same end-cap surface at (26, 26, 13) has 1 self-intersecting pair before
 projection and 48 after, because the projection clamp is half the cell
 diagonal and a vertex can be dragged across a thin wall. Refining shrinks the
 clamp with the cells, which is part of why the ladder works.
-
-## Gmsh {#the-gmsh-route}
-
-`mesher` selects what fills a `tet4`/`tet10` mesh. The default, `"tetgen"`, is
-everything above: the lattice sizes the elements and every node follows the
-design through `recompute_tet_points`. The example below is a plate with a
-through bore, a hard `Difference` with sharp edges:
-
-```python
-from cadjoint.sdf.boolean import Difference
-from cadjoint.sdf.primitives import Cylinder
-
-plate = Difference((Box([0.6, 0.6, 0.4]), Cylinder(radius=0.25, height=0.9)),
-                   smoothness=0.0)
-mesh = SimMesh(name="plate", resolution=20, method="tet10", mesher="gmsh",
-               bounds=(-0.83, -0.83, -0.63), size=(1.66, 1.66, 1.26))
-```
-
-`mesher="gmsh"` takes the same dual-contour surface, writes it as an STL, and
-hands it to Gmsh through the `tet_mesher` plugin. Gmsh's `classifySurfaces` and
-`createGeometry` split the triangle soup into one reparametrised surface per
-smooth region, so it meshes a dozen faces of a part rather than three thousand
-facets; HXT fills the volume, and `setOrder(2)` puts the midside nodes on those
-surfaces rather than at chord midpoints. Three things differ from TetGen:
-
-* **Element size is the part's, not the lattice's.** The lattice is only how
-  the surface was extracted; `target_size` (the grid's smallest spacing by
-  default) is what sizes the tets, and the refinement ladder does not run.
-* **Quality is an order of magnitude better.** At `target_size=0.16` the
-  plate's worst radius ratio is 0.293 against the DC/TetGen path's 0.04, with
-  the median at 0.74.
-* **Every node is tagged with the patches that own it.** `assign_ownership`
-  evaluates `|f_p|` on each Gmsh surface entity's nodes for every patch of
-  the scene's decomposition and keeps the ones that clear the bar; the mesh
-  carries the resulting `OwnedNodes` record.
-
-```python
-built = mesh.build(plate)
-built.mesher                      # 'gmsh'
-built.owned.arity_counts()        # {0: 18281, 1: 9060, 2: 504, 3: 8}: 8 corners
-built.stats["blend_surfaces"]     # 0: a hard CSG solid has no blend faces
-```
-
-Gmsh is GPL-2.0-or-later, so it is an optional extra
-(`pip install 'cadjoint[gmsh]'`) or, in production, the `cadjoint_tet_gmsh`
-image where the licence boundary is a process boundary. Nothing under
-`cadjoint/` imports it at module scope. See [plugins](plugins.qmd).
 
 ### Boundary-vertex projection
 
@@ -372,6 +350,54 @@ tangent-plane constructor all call this one kernel.
 A scene that cannot be lowered (a bare callable field) uses the single-field
 projection.
 
+## Gmsh {#the-gmsh-route}
+
+`mesher` selects what fills a `tet4`/`tet10` mesh. The default, `"tetgen"`, is
+everything above: the lattice sizes the elements and every node follows the
+design through `recompute_tet_points`. The example below is a plate with a
+through bore, a hard `Difference` with sharp edges:
+
+```python
+from cadjoint.sdf.boolean import Difference
+from cadjoint.sdf.primitives import Cylinder
+
+plate = Difference((Box([0.6, 0.6, 0.4]), Cylinder(radius=0.25, height=0.9)),
+                   smoothness=0.0)
+mesh = SimMesh(name="plate", resolution=20, method="tet10", mesher="gmsh",
+               bounds=(-0.83, -0.83, -0.63), size=(1.66, 1.66, 1.26))
+```
+
+`mesher="gmsh"` takes the same dual-contour surface, writes it as an STL, and
+hands it to Gmsh through the `tet_mesher` plugin. Gmsh's `classifySurfaces` and
+`createGeometry` split the triangle soup into one reparametrised surface per
+smooth region, so it meshes a dozen faces of a part rather than three thousand
+facets; HXT fills the volume, and `setOrder(2)` puts the midside nodes on those
+surfaces rather than at chord midpoints. Differences from TetGen:
+
+* **Element size is the part's, not the lattice's.** The lattice is only how
+  the surface was extracted; `target_size` (the grid's smallest spacing by
+  default) is what sizes the tets, and the refinement ladder does not run.
+* **Quality is an order of magnitude better.** At `target_size=0.16` the
+  plate's worst radius ratio is 0.293 against the DC/TetGen path's 0.04, with
+  the median at 0.74.
+* **Every node is tagged with the patches that own it.** `assign_ownership`
+  evaluates `|f_p|` on each Gmsh surface entity's nodes for every patch of
+  the scene's decomposition and keeps the ones that clear the bar; the mesh
+  carries the resulting `OwnedNodes` record.
+
+```python
+built = mesh.build(plate)
+built.mesher                      # 'gmsh'
+built.owned.arity_counts()        # {0: 18281, 1: 9060, 2: 504, 3: 8}: 8 corners
+built.stats["blend_surfaces"]     # 0: a hard CSG solid has no blend faces
+```
+
+Gmsh is GPL-2.0-or-later, so it is an optional extra
+(`pip install 'cadjoint[gmsh]'`) or, in production, the `cadjoint_tet_gmsh`
+image where the licence boundary is a process boundary. Nothing under
+`cadjoint/` imports it at module scope; see
+[the `tet_gmsh` plugin](plugins.qmd#tet_gmsh).
+
 ### Frozen geometry
 
 A Gmsh mesh's topology is decided once and held. Its positions follow the
@@ -389,39 +415,28 @@ onto the scene's zero set would produce a gradient, but it would take crease
 nodes off their creases and put midsides back on chords. `mesher="tetgen"`, the
 default, is differentiable throughout.
 
-## Program size {#program-size}
+## Limitations
 
-Every stage above evaluates the scene's SDF under `jax.jit`, so the wall
-clock of a first mesh is mostly XLA compiling one program per stage, and the
-size of those programs is decided by `functionalize`, not by the mesher. Three
-measures keep the tree from flattening as it is traced:
+- One QEF vertex per cell cannot represent two surface sheets crossing one
+  cell face, so when a CSG seam grazes a lattice plane uniform dual contouring
+  can emit nonmanifold edges. This is tracked as a strict `xfail` in
+  `tests/meshing/test_scenes.py` and needs cell disambiguation.
+- Multi-size octree leaves (2:1 balancing, transition stitching) are not
+  implemented.
+- Exports are faceted; an exact-surface STEP needs a `step_export`
+  [plugin](plugins.qmd#the-five-in-process-kinds).
+- A Gmsh mesh is frozen geometry unless a `node_map` plugin is installed.
 
-- A sketch profile's vertices are stacked into one `(N, 2)` array and its edge
-  loop becomes two reductions, so a 168-vertex profile emits the same
-  operations as a 12-vertex one.
-- A pattern traces its child once, over an array of instance transforms, and
-  a node reachable from more than one parent is built once and outlined into its
-  own StableHLO function.
-- Passing the parameter dicts to the jitted function rather than closing over
-  them (`functionalize_parametric`) keeps values out of the program entirely, so
-  a re-dimensioned design reuses the executable the
-  [compilation cache](https://github.com/andrinr/cadjoint/blob/main/research/performance.md)
-  already holds.
+## API
 
-On `scenes/end_cap.py` (eight gusset ribs, three polar bolt circles, a mirrored
-dowel) these reduce the gradient program from 1.62 MB / 18 090 operations to
-0.58 MB / 5 771, and its XLA compile from 25.4 s to 0.68 s.
-
-## Known limitations
-
-One QEF vertex per cell cannot represent two surface sheets crossing one cell
-face, so when a CSG seam grazes a lattice plane uniform dual contouring can
-emit nonmanifold edges. This is tracked as a strict `xfail` in
-`tests/meshing/test_scenes.py` and needs cell disambiguation. Multi-size
-octree leaves (2:1 balancing, transition stitching) are also open.
-
-## Further reading
-
-- [Differentiable meshing pipeline](https://github.com/andrinr/cadjoint/blob/main/research/differentiable-meshing-pipeline.md) — design principles, the full stage/test map, and the benchmark policy.
-- [Plugins](plugins.qmd#the-five-in-process-kinds) — the five in-process kinds: extension points for a component that re-solves this mesh against the field for exact-surface export, dragging and meshing.
-- [Simulation](simulation.qmd) — turning this surface into a volume mesh a solver can use.
+- [`meshing.GridSpec`](../reference/meshing.GridSpec.qmd)
+- [`meshing.extract_mesh`](../reference/meshing.extract_mesh.qmd)
+- [`meshing.Mesh`](../reference/meshing.Mesh.qmd)
+- [`meshing.sample_grid`](../reference/meshing.sample_grid.qmd), [`meshing.find_crossing_edges`](../reference/meshing.find_crossing_edges.qmd), [`meshing.edge_hermite_data`](../reference/meshing.edge_hermite_data.qmd)
+- [`meshing.manifold_cell_incidence`](../reference/meshing.manifold_cell_incidence.qmd), [`meshing.qef_vertices`](../reference/meshing.qef_vertices.qmd), [`meshing.sharp_qef_vertices`](../reference/meshing.sharp_qef_vertices.qmd)
+- [`meshing.classify_feature_cells`](../reference/meshing.classify_feature_cells.qmd), [`meshing.active_branches`](../reference/meshing.active_branches.qmd), [`meshing.detect_branch_changes`](../reference/meshing.detect_branch_changes.qmd)
+- [`meshing.surface_cells`](../reference/meshing.surface_cells.qmd), [`meshing.sparse_crossing_edges`](../reference/meshing.sparse_crossing_edges.qmd)
+- [`meshing.mesh_report`](../reference/meshing.mesh_report.qmd), [`meshing.self_intersections`](../reference/meshing.self_intersections.qmd)
+- [`meshing.save_obj`](../reference/meshing.save_obj.qmd), [`meshing.save_stl`](../reference/meshing.save_stl.qmd), [`meshing.save_step`](../reference/meshing.save_step.qmd), [`meshing.merge_planar_faces`](../reference/meshing.merge_planar_faces.qmd)
+- [`fem.SimMesh`](../reference/fem.SimMesh.qmd), [`fem.sdf_to_tet_mesh`](../reference/fem.sdf_to_tet_mesh.qmd), [`fem.recompute_tet_points`](../reference/fem.recompute_tet_points.qmd)
+- [`fem.gmsh.assign_ownership`](../reference/fem.gmsh.assign_ownership.qmd), [`plugins.OwnedNodes`](../reference/plugins.OwnedNodes.qmd)

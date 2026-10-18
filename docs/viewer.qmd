@@ -188,7 +188,7 @@ coordinates: `SketchPlane.on(body.cap("+"))`, `SketchPlane.on(block.face("+z"))`
 or, on a curved surface with no face to name,
 `SketchPlane.tangent(body, near=[...])`. Re-dimension the parent and the sketch
 moves with it, and gradients downstream still reach the parent's parameters —
-see [faces as references](getting-started.qmd#faces-are-references-not-geometry).
+see [faces as references](modelling.qmd#faces).
 In Model it starts a new sketch; in Sketch it re-plants the selected one. A
 face whose feature is not bound to a variable has no name in the source, and
 the hint says so. A sketch can only sit on geometry built before it.
@@ -534,8 +534,7 @@ widget in place, without recreating its output cell:
 viewer.update_scene(Box(size=[1.0, 0.6, 0.4]))
 ```
 
-See the [rendering notebook](../examples/rendering.ipynb) for a complete
-composition and hot-reload example.
+[Rendering](rendering.qmd) has a complete composition and hot-reload example.
 
 ## Developing the UI
 
