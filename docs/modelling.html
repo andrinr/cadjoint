@@ -1,0 +1,4110 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.10.19">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+<meta name="description" content="Parameters, sketches, features, SDF solids, faces and constraints.">
+
+<title>Modelling – cadjoint</title>
+<style>
+/* Default styles provided by pandoc.
+** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+*/
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: 1.5em;}
+div.column{flex: auto;}
+@media screen {
+div.columns{gap: min(4vw, 1.5em);}
+div.column{overflow-x: auto;}
+}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+</style>
+
+
+<script src="../site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="../site_libs/quarto-nav/headroom.min.js"></script>
+<script src="../site_libs/clipboard/clipboard.min.js"></script>
+<script src="../site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="../site_libs/quarto-search/fuse.min.js"></script>
+<script src="../site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="../">
+<link href="../docs/assets/logo.svg" rel="icon" type="image/svg+xml">
+<script src="../site_libs/quarto-html/quarto.js" type="module"></script>
+<script src="../site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src="../site_libs/quarto-html/popper.min.js"></script>
+<script src="../site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="../site_libs/quarto-html/anchor.min.js"></script>
+<link href="../site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-e5d05eddbe2c608fb9c90784db6be0b0.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="../site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="../site_libs/bootstrap/bootstrap-460dff0a887d68c787af2e9857776100.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<script id="quarto-search-options" type="application/json">{
+  "location": "navbar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "end",
+  "type": "overlay",
+  "limit": 30,
+  "keyboard-shortcut": [
+    "f",
+    "/",
+    "s"
+  ],
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-text-placeholder": "",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit",
+    "search-label": "Search"
+  }
+}</script>
+
+
+</head>
+
+<body class="nav-sidebar floating nav-fixed quarto-light">
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top">
+    <nav class="navbar navbar-expand-lg " data-bs-theme="dark">
+      <div class="navbar-container container-fluid">
+      <div class="navbar-brand-container mx-auto">
+    <a href="../index.html" class="navbar-brand navbar-brand-logo">
+    <img src="../docs/assets/logo.svg" alt="cadjoint" class="navbar-logo light-content">
+    <img src="../docs/assets/logo.svg" alt="cadjoint" class="navbar-logo dark-content">
+    </a>
+    <a class="navbar-brand" href="../index.html">
+    <span class="navbar-title">CADJOINT</span>
+    </a>
+  </div>
+            <div id="quarto-search" class="" title="Search"></div>
+          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" role="menu" aria-expanded="false" aria-label="Toggle navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+  <span class="navbar-toggler-icon"></span>
+</button>
+          <div class="collapse navbar-collapse" id="navbarCollapse">
+            <ul class="navbar-nav navbar-nav-scroll ms-auto">
+  <li class="nav-item compact">
+    <a class="nav-link" href="https://github.com/andrinr/cadjoint"> <i class="bi bi-github" role="img">
+</i> 
+<span class="menu-text"></span></a>
+  </li>  
+</ul>
+          </div> <!-- /navcollapse -->
+            <div class="quarto-navbar-tools">
+</div>
+      </div> <!-- /container-fluid -->
+    </nav>
+  <nav class="quarto-secondary-nav">
+    <div class="container-fluid d-flex">
+      <button type="button" class="quarto-btn-toggle btn" data-bs-toggle="collapse" role="button" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+        <i class="bi bi-layout-text-sidebar-reverse"></i>
+      </button>
+        <a class="flex-grow-1 no-decor" role="navigation" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">      
+          <h1 class="quarto-secondary-nav-title">Modelling</h1>
+        </a>     
+    </div>
+  </nav>
+</header>
+<!-- content -->
+<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
+<!-- sidebar -->
+  <nav id="quarto-sidebar" class="sidebar collapse collapse-horizontal quarto-sidebar-collapse-item sidebar-navigation floating overflow-auto">
+    <div class="sidebar-menu-container"> 
+    <ul class="list-unstyled mt-1">
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../index.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Overview</span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../docs/getting-started.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Getting started</span></a>
+  </div>
+</li>
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a href="../docs/guides.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Guides</span></a>
+          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-1" role="navigation" aria-expanded="true" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-1" class="collapse list-unstyled sidebar-section depth1 show">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../docs/modelling.html" class="sidebar-item-text sidebar-link active">
+ <span class="menu-text">Modelling</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../docs/meshing.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Meshing</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../docs/simulation.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Simulation</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../docs/materials.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Materials</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../docs/optimization.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Optimization</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../docs/rendering.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Rendering</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../docs/plugins.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Plugins</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../docs/flow.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Flow solver</span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../docs/viewer.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Playground</span></a>
+  </div>
+</li>
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a href="../reference/index.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">API reference</span></a>
+          <a class="sidebar-item-toggle text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-2" role="navigation" aria-expanded="false" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-2" class="collapse list-unstyled sidebar-section depth1 ">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/index.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">API reference</span></a>
+  </div>
+</li>
+          <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-3" role="navigation" aria-expanded="false">
+ <span class="menu-text">Parameters and geometry</span></a>
+          <a class="sidebar-item-toggle text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-3" role="navigation" aria-expanded="false" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-3" class="collapse list-unstyled sidebar-section depth2 ">  
+          <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-4" role="navigation" aria-expanded="false">
+ <span class="menu-text">Parameters</span></a>
+          <a class="sidebar-item-toggle text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-4" role="navigation" aria-expanded="false" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-4" class="collapse list-unstyled sidebar-section depth3 ">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/geometry.Parameter.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">geometry.Parameter</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/geometry.Scalar.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">geometry.Scalar</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/geometry.Vector.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">geometry.Vector</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/geometry.Vector2.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">geometry.Vector2</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/geometry.as_parameter.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">geometry.as_parameter</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/geometry.deduplicate_params.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">geometry.deduplicate_params</span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+          <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-5" role="navigation" aria-expanded="false">
+ <span class="menu-text">Parameter extraction</span></a>
+          <a class="sidebar-item-toggle text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-5" role="navigation" aria-expanded="false" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-5" class="collapse list-unstyled sidebar-section depth3 ">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/extract_parameters.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">extract_parameters</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/apply_parameters.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">apply_parameters</span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+      </ul>
+  </li>
+          <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-6" role="navigation" aria-expanded="false">
+ <span class="menu-text">Sketches and construction</span></a>
+          <a class="sidebar-item-toggle text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-6" role="navigation" aria-expanded="false" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-6" class="collapse list-unstyled sidebar-section depth2 ">  
+          <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-7" role="navigation" aria-expanded="false">
+ <span class="menu-text">Sketches</span></a>
+          <a class="sidebar-item-toggle text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-7" role="navigation" aria-expanded="false" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-7" class="collapse list-unstyled sidebar-section depth3 ">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/construction.SketchPlane.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">construction.SketchPlane</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/construction.PolygonProfile.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">construction.PolygonProfile</span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+          <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-8" role="navigation" aria-expanded="false">
+ <span class="menu-text">Features</span></a>
+          <a class="sidebar-item-toggle text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-8" role="navigation" aria-expanded="false" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-8" class="collapse list-unstyled sidebar-section depth3 ">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/construction.extrude.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">construction.extrude</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/construction.revolve.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">construction.revolve</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/construction.loft.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">construction.loft</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/construction.Solid.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">construction.Solid</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/construction.ConstructionPrimitive.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">construction.ConstructionPrimitive</span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+          <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-9" role="navigation" aria-expanded="false">
+ <span class="menu-text">Face references</span></a>
+          <a class="sidebar-item-toggle text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-9" role="navigation" aria-expanded="false" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-9" class="collapse list-unstyled sidebar-section depth3 ">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/construction.Face.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">construction.Face</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/construction.FaceSet.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">construction.FaceSet</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/construction.Feature.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">construction.Feature</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/construction.Axis.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">construction.Axis</span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+      </ul>
+  </li>
+          <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-10" role="navigation" aria-expanded="false">
+ <span class="menu-text">Constraints</span></a>
+          <a class="sidebar-item-toggle text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-10" role="navigation" aria-expanded="false" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-10" class="collapse list-unstyled sidebar-section depth2 ">  
+          <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-11" role="navigation" aria-expanded="false">
+ <span class="menu-text">Constraint types</span></a>
+          <a class="sidebar-item-toggle text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-11" role="navigation" aria-expanded="false" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-11" class="collapse list-unstyled sidebar-section depth3 ">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/constraints.Constraint.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">constraints.Constraint</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/constraints.DistanceConstraint.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">constraints.DistanceConstraint</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/constraints.AngleConstraint.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">constraints.AngleConstraint</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/constraints.HorizontalConstraint.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">constraints.HorizontalConstraint</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/constraints.VerticalConstraint.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">constraints.VerticalConstraint</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/constraints.CoincidentConstraint.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">constraints.CoincidentConstraint</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/constraints.FixedConstraint.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">constraints.FixedConstraint</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/constraints.EqualLengthConstraint.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">constraints.EqualLengthConstraint</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/constraints.PointOnLineConstraint.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">constraints.PointOnLineConstraint</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/constraints.ParallelConstraint.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">constraints.ParallelConstraint</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/constraints.PerpendicularConstraint.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">constraints.PerpendicularConstraint</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/constraints.ParallelEdgesConstraint.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">constraints.ParallelEdgesConstraint</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/constraints.PerpendicularEdgesConstraint.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">constraints.PerpendicularEdgesConstraint</span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+          <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-12" role="navigation" aria-expanded="false">
+ <span class="menu-text">Solving and projection</span></a>
+          <a class="sidebar-item-toggle text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-12" role="navigation" aria-expanded="false" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-12" class="collapse list-unstyled sidebar-section depth3 ">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/solve_constraints.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">solve_constraints</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/constraints.satisfy_constraints.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">constraints.satisfy_constraints</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/constraints.constraint_residuals.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">constraints.constraint_residuals</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/constraints.project_to_manifold.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">constraints.project_to_manifold</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/constraints.make_manifold_projection.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">constraints.make_manifold_projection</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/constraints.project_bounds.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">constraints.project_bounds</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/constraints.make_bounds_projection.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">constraints.make_bounds_projection</span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+          <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-13" role="navigation" aria-expanded="false">
+ <span class="menu-text">Degrees of freedom</span></a>
+          <a class="sidebar-item-toggle text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-13" role="navigation" aria-expanded="false" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-13" class="collapse list-unstyled sidebar-section depth3 ">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/constraints.all_parameters.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">constraints.all_parameters</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/constraints.total_dof_reduction.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">constraints.total_dof_reduction</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/constraints.build_residual_fn.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">constraints.build_residual_fn</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/constraints.compute_param_vector.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">constraints.compute_param_vector</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/constraints.unpack_param_vector.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">constraints.unpack_param_vector</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/constraints.null_space.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">constraints.null_space</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/constraints.NullSpaceMap.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">constraints.NullSpaceMap</span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+      </ul>
+  </li>
+          <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-14" role="navigation" aria-expanded="false">
+ <span class="menu-text">Solids</span></a>
+          <a class="sidebar-item-toggle text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-14" role="navigation" aria-expanded="false" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-14" class="collapse list-unstyled sidebar-section depth2 ">  
+          <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-15" role="navigation" aria-expanded="false">
+ <span class="menu-text">Base class</span></a>
+          <a class="sidebar-item-toggle text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-15" role="navigation" aria-expanded="false" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-15" class="collapse list-unstyled sidebar-section depth3 ">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/SDF.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">SDF</span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+          <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-16" role="navigation" aria-expanded="false">
+ <span class="menu-text">Primitives</span></a>
+          <a class="sidebar-item-toggle text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-16" role="navigation" aria-expanded="false" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-16" class="collapse list-unstyled sidebar-section depth3 ">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/sdf.Primitive.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">sdf.Primitive</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/sdf.Box.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">sdf.Box</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/sdf.RoundBox.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">sdf.RoundBox</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/sdf.Sphere.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">sdf.Sphere</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/sdf.Cylinder.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">sdf.Cylinder</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/sdf.Capsule.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">sdf.Capsule</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/sdf.Torus.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">sdf.Torus</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/sdf.Plane.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">sdf.Plane</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/sdf.primitives.ExtrudedPolygon.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">sdf.primitives.ExtrudedPolygon</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/sdf.primitives.RevolvedPolygon.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">sdf.primitives.RevolvedPolygon</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/sdf.primitives.LoftedPolygon.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">sdf.primitives.LoftedPolygon</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/sdf.primitives.polygon_sdf_2d.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">sdf.primitives.polygon_sdf_2d</span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+          <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-17" role="navigation" aria-expanded="false">
+ <span class="menu-text">Booleans</span></a>
+          <a class="sidebar-item-toggle text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-17" role="navigation" aria-expanded="false" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-17" class="collapse list-unstyled sidebar-section depth3 ">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/sdf.Union.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">sdf.Union</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/sdf.Intersection.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">sdf.Intersection</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/sdf.Difference.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">sdf.Difference</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/sdf.Xor.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">sdf.Xor</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/sdf.BooleanOp.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">sdf.BooleanOp</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/sdf.union.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">sdf.union</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/sdf.intersection.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">sdf.intersection</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/sdf.difference.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">sdf.difference</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/sdf.xor.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">sdf.xor</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/sdf.smooth_min.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">sdf.smooth_min</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/sdf.smooth_max.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">sdf.smooth_max</span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+          <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-18" role="navigation" aria-expanded="false">
+ <span class="menu-text">Transforms</span></a>
+          <a class="sidebar-item-toggle text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-18" role="navigation" aria-expanded="false" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-18" class="collapse list-unstyled sidebar-section depth3 ">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/sdf.Translate.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">sdf.Translate</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/sdf.Rotate.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">sdf.Rotate</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/sdf.Scale.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">sdf.Scale</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/sdf.Twist.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">sdf.Twist</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/sdf.Shell.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">sdf.Shell</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/sdf.Offset.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">sdf.Offset</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/sdf.Mirror.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">sdf.Mirror</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/sdf.shell.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">sdf.shell</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/sdf.offset.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">sdf.offset</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/sdf.mirror.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">sdf.mirror</span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+          <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-19" role="navigation" aria-expanded="false">
+ <span class="menu-text">Patterns</span></a>
+          <a class="sidebar-item-toggle text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-19" role="navigation" aria-expanded="false" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-19" class="collapse list-unstyled sidebar-section depth3 ">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/sdf.LinearPattern.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">sdf.LinearPattern</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/sdf.PolarPattern.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">sdf.PolarPattern</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/sdf.linear_pattern.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">sdf.linear_pattern</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/sdf.polar_pattern.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">sdf.polar_pattern</span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+          <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-20" role="navigation" aria-expanded="false">
+ <span class="menu-text">Measure</span></a>
+          <a class="sidebar-item-toggle text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-20" role="navigation" aria-expanded="false" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-20" class="collapse list-unstyled sidebar-section depth3 ">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/sdf.volume.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">sdf.volume</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/sdf.material_mass.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">sdf.material_mass</span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+      </ul>
+  </li>
+          <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-21" role="navigation" aria-expanded="false">
+ <span class="menu-text">Functionalize and parametrization</span></a>
+          <a class="sidebar-item-toggle text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-21" role="navigation" aria-expanded="false" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-21" class="collapse list-unstyled sidebar-section depth2 ">  
+          <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-22" role="navigation" aria-expanded="false">
+ <span class="menu-text">Functionalize</span></a>
+          <a class="sidebar-item-toggle text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-22" role="navigation" aria-expanded="false" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-22" class="collapse list-unstyled sidebar-section depth3 ">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/functionalize.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">functionalize</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/functionalize_scene.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">functionalize_scene</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/functionalize.functionalize_parametric.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">functionalize.functionalize_parametric</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/functionalize.functionalize_scene_parametric.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">functionalize.functionalize_scene_parametric</span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+          <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-23" role="navigation" aria-expanded="false">
+ <span class="menu-text">Parametrization</span></a>
+          <a class="sidebar-item-toggle text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-23" role="navigation" aria-expanded="false" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-23" class="collapse list-unstyled sidebar-section depth3 ">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/to_unconstrained.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">to_unconstrained</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/to_constrained.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">to_constrained</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/compute_param_scales.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">compute_param_scales</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/normalize.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">normalize</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/unnormalize.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">unnormalize</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/to_normalized.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">to_normalized</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/from_normalized.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">from_normalized</span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+      </ul>
+  </li>
+          <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-24" role="navigation" aria-expanded="false">
+ <span class="menu-text">Meshing</span></a>
+          <a class="sidebar-item-toggle text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-24" role="navigation" aria-expanded="false" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-24" class="collapse list-unstyled sidebar-section depth2 ">  
+          <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-25" role="navigation" aria-expanded="false">
+ <span class="menu-text">Extraction</span></a>
+          <a class="sidebar-item-toggle text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-25" role="navigation" aria-expanded="false" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-25" class="collapse list-unstyled sidebar-section depth3 ">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/meshing.extract_mesh.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">meshing.extract_mesh</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/meshing.Mesh.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">meshing.Mesh</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/meshing.GridSpec.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">meshing.GridSpec</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/meshing.sample_grid.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">meshing.sample_grid</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/meshing.find_crossing_edges.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">meshing.find_crossing_edges</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/meshing.CrossingEdges.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">meshing.CrossingEdges</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/meshing.edge_hermite_data.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">meshing.edge_hermite_data</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/meshing.HermiteData.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">meshing.HermiteData</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/meshing.detect_edges.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">meshing.detect_edges</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/meshing.qef_vertices.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">meshing.qef_vertices</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/meshing.sharp_qef_vertices.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">meshing.sharp_qef_vertices</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/meshing.dual_faces.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">meshing.dual_faces</span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+          <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-26" role="navigation" aria-expanded="false">
+ <span class="menu-text">Sharp features</span></a>
+          <a class="sidebar-item-toggle text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-26" role="navigation" aria-expanded="false" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-26" class="collapse list-unstyled sidebar-section depth3 ">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/meshing.classify_feature_cells.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">meshing.classify_feature_cells</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/meshing.FeatureCells.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">meshing.FeatureCells</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/meshing.cell_edge_incidence.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">meshing.cell_edge_incidence</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/meshing.manifold_cell_incidence.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">meshing.manifold_cell_incidence</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/meshing.CellIncidence.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">meshing.CellIncidence</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/meshing.feature_cell_links.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">meshing.feature_cell_links</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/meshing.active_branches.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">meshing.active_branches</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/meshing.detect_branch_changes.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">meshing.detect_branch_changes</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/meshing.exact_feature_mask.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">meshing.exact_feature_mask</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/meshing.ScenePatchFields.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">meshing.ScenePatchFields</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/meshing.scene_patch_fields.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">meshing.scene_patch_fields</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/meshing.world_frame_leaves.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">meshing.world_frame_leaves</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/meshing.signature_function.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">meshing.signature_function</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/meshing.patch_signatures.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">meshing.patch_signatures</span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+          <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-27" role="navigation" aria-expanded="false">
+ <span class="menu-text">Adaptive extraction and simplification</span></a>
+          <a class="sidebar-item-toggle text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-27" role="navigation" aria-expanded="false" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-27" class="collapse list-unstyled sidebar-section depth3 ">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/meshing.surface_cells.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">meshing.surface_cells</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/meshing.sparse_crossing_edges.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">meshing.sparse_crossing_edges</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/meshing.bounds.fit_bounds.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">meshing.bounds.fit_bounds</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/meshing.bounds.boundary_inside.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">meshing.bounds.boundary_inside</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/meshing.simplify_mesh.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">meshing.simplify_mesh</span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+          <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-28" role="navigation" aria-expanded="false">
+ <span class="menu-text">Export and diagnostics</span></a>
+          <a class="sidebar-item-toggle text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-28" role="navigation" aria-expanded="false" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-28" class="collapse list-unstyled sidebar-section depth3 ">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/meshing.save_obj.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">meshing.save_obj</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/meshing.save_stl.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">meshing.save_stl</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/meshing.save_step.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">meshing.save_step</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/meshing.remove_slivers.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">meshing.remove_slivers</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/meshing.merge_planar_faces.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">meshing.merge_planar_faces</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/meshing.mesh_report.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">meshing.mesh_report</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/meshing.surface_deviation.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">meshing.surface_deviation</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/meshing.triangle_quality.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">meshing.triangle_quality</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/meshing.self_intersections.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">meshing.self_intersections</span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+      </ul>
+  </li>
+          <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-29" role="navigation" aria-expanded="false">
+ <span class="menu-text">Simulation</span></a>
+          <a class="sidebar-item-toggle text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-29" role="navigation" aria-expanded="false" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-29" class="collapse list-unstyled sidebar-section depth2 ">  
+          <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-30" role="navigation" aria-expanded="false">
+ <span class="menu-text">Meshes</span></a>
+          <a class="sidebar-item-toggle text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-30" role="navigation" aria-expanded="false" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-30" class="collapse list-unstyled sidebar-section depth3 ">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/fem.SimMesh.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">fem.SimMesh</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/fem.HexMesh.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">fem.HexMesh</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/fem.TetMesh.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">fem.TetMesh</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/fem.sdf_to_hex_mesh.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">fem.sdf_to_hex_mesh</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/fem.sdf_to_tet_mesh.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">fem.sdf_to_tet_mesh</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/fem.recompute_points.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">fem.recompute_points</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/fem.recompute_tet_points.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">fem.recompute_tet_points</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/fem.project_points.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">fem.project_points</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/fem.Discretization.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">fem.Discretization</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/fem.Surface.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">fem.Surface</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/fem.FaceGroup.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">fem.FaceGroup</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/fem.select_faces.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">fem.select_faces</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/fem.faces_from_nodes.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">fem.faces_from_nodes</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/fem.tet_faces_from_nodes.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">fem.tet_faces_from_nodes</span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+          <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-31" role="navigation" aria-expanded="false">
+ <span class="menu-text">Mesh quality</span></a>
+          <a class="sidebar-item-toggle text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-31" role="navigation" aria-expanded="false" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-31" class="collapse list-unstyled sidebar-section depth3 ">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/fem.scaled_jacobians.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">fem.scaled_jacobians</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/fem.aspect_ratios.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">fem.aspect_ratios</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/fem.corner_tet_volumes.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">fem.corner_tet_volumes</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/fem.tet_aspect_ratios.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">fem.tet_aspect_ratios</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/fem.tet_radius_ratios.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">fem.tet_radius_ratios</span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+          <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-32" role="navigation" aria-expanded="false">
+ <span class="menu-text">Studies</span></a>
+          <a class="sidebar-item-toggle text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-32" role="navigation" aria-expanded="false" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-32" class="collapse list-unstyled sidebar-section depth3 ">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/fem.ThermalStudy.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">fem.ThermalStudy</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/fem.ElasticStudy.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">fem.ElasticStudy</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/fem.SimulationResult.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">fem.SimulationResult</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/fem.ThermalProblem.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">fem.ThermalProblem</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/fem.ElasticProblem.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">fem.ElasticProblem</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/studies.capture_studies.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">studies.capture_studies</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/studies.declared_studies.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">studies.declared_studies</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/studies.register_study.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">studies.register_study</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/fem.capture_sim_meshes.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">fem.capture_sim_meshes</span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+          <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-33" role="navigation" aria-expanded="false">
+ <span class="menu-text">Boundary conditions</span></a>
+          <a class="sidebar-item-toggle text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-33" role="navigation" aria-expanded="false" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-33" class="collapse list-unstyled sidebar-section depth3 ">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/fem.Dirichlet.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">fem.Dirichlet</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/fem.HeatFlux.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">fem.HeatFlux</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/fem.Fixed.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">fem.Fixed</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/fem.Traction.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">fem.Traction</span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+          <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-34" role="navigation" aria-expanded="false">
+ <span class="menu-text">Node selections</span></a>
+          <a class="sidebar-item-toggle text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-34" role="navigation" aria-expanded="false" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-34" class="collapse list-unstyled sidebar-section depth3 ">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/studies.Nodes.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">studies.Nodes</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/studies.NodeSelection.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">studies.NodeSelection</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/studies.selection_from_description.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">studies.selection_from_description</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/studies.boundary_node_mask.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">studies.boundary_node_mask</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/studies.BoundaryMesh.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">studies.BoundaryMesh</span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+          <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-35" role="navigation" aria-expanded="false">
+ <span class="menu-text">Material properties</span></a>
+          <a class="sidebar-item-toggle text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-35" role="navigation" aria-expanded="false" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-35" class="collapse list-unstyled sidebar-section depth3 ">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/fem.properties.sample_material_field.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">fem.properties.sample_material_field</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/fem.properties.sample_cell_property.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">fem.properties.sample_cell_property</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/fem.properties.maybe_sample_cell_property.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">fem.properties.maybe_sample_cell_property</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/fem.properties.cell_centroids.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">fem.properties.cell_centroids</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/fem.properties.cell_volumes.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">fem.properties.cell_volumes</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/fem.properties.total_mass.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">fem.properties.total_mass</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/fem.properties.quantize_to_materials.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">fem.properties.quantize_to_materials</span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+          <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-36" role="navigation" aria-expanded="false">
+ <span class="menu-text">Solver backends</span></a>
+          <a class="sidebar-item-toggle text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-36" role="navigation" aria-expanded="false" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-36" class="collapse list-unstyled sidebar-section depth3 ">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/fem.backends.SolverBackend.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">fem.backends.SolverBackend</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/fem.backends.get_backend.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">fem.backends.get_backend</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/fem.backends.register_backend.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">fem.backends.register_backend</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/fem.backends.available_backends.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">fem.backends.available_backends</span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+          <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-37" role="navigation" aria-expanded="false">
+ <span class="menu-text">Gmsh tet meshing</span></a>
+          <a class="sidebar-item-toggle text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-37" role="navigation" aria-expanded="false" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-37" class="collapse list-unstyled sidebar-section depth3 ">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/fem.gmsh.gmsh_available.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">fem.gmsh.gmsh_available</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/fem.gmsh.gmsh_version.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">fem.gmsh.gmsh_version</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/fem.gmsh.sdf_gmsh_tet_mesh.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">fem.gmsh.sdf_gmsh_tet_mesh</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/fem.gmsh.gmsh_tet_mesh.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">fem.gmsh.gmsh_tet_mesh</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/fem.gmsh.tet_mesh_from_gmsh.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">fem.gmsh.tet_mesh_from_gmsh</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/fem.gmsh.GmshMesh.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">fem.gmsh.GmshMesh</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/fem.gmsh.GmshTetMesh.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">fem.gmsh.GmshTetMesh</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/fem.gmsh.gmsh_topology.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">fem.gmsh.gmsh_topology</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/fem.gmsh.dc_surface_stl.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">fem.gmsh.dc_surface_stl</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/fem.gmsh.surface_stl.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">fem.gmsh.surface_stl</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/fem.gmsh.patch_table.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">fem.gmsh.patch_table</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/fem.gmsh.design_values.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">fem.gmsh.design_values</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/fem.gmsh.snap_toward_patches.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">fem.gmsh.snap_toward_patches</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/fem.gmsh.assign_ownership.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">fem.gmsh.assign_ownership</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/fem.gmsh.owned_nodes.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">fem.gmsh.owned_nodes</span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+      </ul>
+  </li>
+          <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-38" role="navigation" aria-expanded="false">
+ <span class="menu-text">Optimization</span></a>
+          <a class="sidebar-item-toggle text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-38" role="navigation" aria-expanded="false" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-38" class="collapse list-unstyled sidebar-section depth2 ">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/optimize.Optimization.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">optimize.Optimization</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/optimize.OptimizationRun.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">optimize.OptimizationRun</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/optimize.capture_optimizations.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">optimize.capture_optimizations</span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+          <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-39" role="navigation" aria-expanded="false">
+ <span class="menu-text">Materials</span></a>
+          <a class="sidebar-item-toggle text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-39" role="navigation" aria-expanded="false" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-39" class="collapse list-unstyled sidebar-section depth2 ">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/Material.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Material</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/materials.catalogue.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">materials.catalogue</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/materials.aluminium_6061.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">materials.aluminium_6061</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/materials.copper_c11000.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">materials.copper_c11000</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/materials.steel_1018.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">materials.steel_1018</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/materials.titanium_ti6al4v.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">materials.titanium_ti6al4v</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/materials.fr4.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">materials.fr4</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/materials.silicon.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">materials.silicon</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/materials.thermal_pad.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">materials.thermal_pad</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/materials.pla.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">materials.pla</span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+          <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-40" role="navigation" aria-expanded="false">
+ <span class="menu-text">Rendering and shader compilation</span></a>
+          <a class="sidebar-item-toggle text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-40" role="navigation" aria-expanded="false" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-40" class="collapse list-unstyled sidebar-section depth2 ">  
+          <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-41" role="navigation" aria-expanded="false">
+ <span class="menu-text">Forward renderer</span></a>
+          <a class="sidebar-item-toggle text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-41" role="navigation" aria-expanded="false" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-41" class="collapse list-unstyled sidebar-section depth3 ">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/render.Scene.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">render.Scene</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/render.Camera.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">render.Camera</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/render.RenderSettings.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">render.RenderSettings</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/render.render_scene.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">render.render_scene</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/render.render_raymarched.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">render.render_raymarched</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/render.raymarch.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">render.raymarch</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/render.make_gradient_sky.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">render.make_gradient_sky</span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+          <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-42" role="navigation" aria-expanded="false">
+ <span class="menu-text">Construction overlay</span></a>
+          <a class="sidebar-item-toggle text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-42" role="navigation" aria-expanded="false" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-42" class="collapse list-unstyled sidebar-section depth3 ">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/render.project_points.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">render.project_points</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/render.draw_profile.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">render.draw_profile</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/render.draw_plane.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">render.draw_plane</span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+          <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-43" role="navigation" aria-expanded="false">
+ <span class="menu-text">Shader compilation</span></a>
+          <a class="sidebar-item-toggle text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-43" role="navigation" aria-expanded="false" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-43" class="collapse list-unstyled sidebar-section depth3 ">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/backends.compile_sdf_to_wgsl.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">backends.compile_sdf_to_wgsl</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/backends.compile_scene_to_wgsl.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">backends.compile_scene_to_wgsl</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/backends.wgsl.compile_scene_with_uniforms.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">backends.wgsl.compile_scene_with_uniforms</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/backends.wgsl.ShaderProgram.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">backends.wgsl.ShaderProgram</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/backends.wgsl.ShaderParameter.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">backends.wgsl.ShaderParameter</span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+          <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-44" role="navigation" aria-expanded="false">
+ <span class="menu-text">Notebook viewer</span></a>
+          <a class="sidebar-item-toggle text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-44" role="navigation" aria-expanded="false" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-44" class="collapse list-unstyled sidebar-section depth3 ">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/viewer.widget.SDFViewer.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">viewer.widget.SDFViewer</span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+      </ul>
+  </li>
+          <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-45" role="navigation" aria-expanded="false">
+ <span class="menu-text">Plugins and extension contracts</span></a>
+          <a class="sidebar-item-toggle text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-45" role="navigation" aria-expanded="false" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-45" class="collapse list-unstyled sidebar-section depth2 ">  
+          <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-46" role="navigation" aria-expanded="false">
+ <span class="menu-text">Plugins</span></a>
+          <a class="sidebar-item-toggle text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-46" role="navigation" aria-expanded="false" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-46" class="collapse list-unstyled sidebar-section depth3 ">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/plugins.Plugin.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">plugins.Plugin</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/plugins.PythonPlugin.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">plugins.PythonPlugin</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/plugins.TesseractPlugin.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">plugins.TesseractPlugin</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/plugins.Capabilities.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">plugins.Capabilities</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/plugins.PluginProbe.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">plugins.PluginProbe</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/plugins.PluginMismatch.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">plugins.PluginMismatch</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/plugins.PluginConfigError.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">plugins.PluginConfigError</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/plugins.Differentiable.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">plugins.Differentiable</span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+          <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-47" role="navigation" aria-expanded="false">
+ <span class="menu-text">Registry and configuration</span></a>
+          <a class="sidebar-item-toggle text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-47" role="navigation" aria-expanded="false" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-47" class="collapse list-unstyled sidebar-section depth3 ">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/plugins.PluginRegistry.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">plugins.PluginRegistry</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/plugins.PluginSpec.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">plugins.PluginSpec</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/plugins.registry.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">plugins.registry</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/plugins.set_registry.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">plugins.set_registry</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/plugins.get_plugin.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">plugins.get_plugin</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/plugins.plugin_for_kind.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">plugins.plugin_for_kind</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/plugins.register_plugin.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">plugins.register_plugin</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/plugins.available_plugins.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">plugins.available_plugins</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/plugins.build_registry.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">plugins.build_registry</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/plugins.builtin_specs.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">plugins.builtin_specs</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/plugins.entry_point_specs.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">plugins.entry_point_specs</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/plugins.load_config.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">plugins.load_config</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/plugins.parse_config.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">plugins.parse_config</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/plugins.config_path.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">plugins.config_path</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/plugins.runtime_scratch.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">plugins.runtime_scratch</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/plugins.scratch_root.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">plugins.scratch_root</span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+          <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-48" role="navigation" aria-expanded="false">
+ <span class="menu-text">Extension contracts</span></a>
+          <a class="sidebar-item-toggle text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-48" role="navigation" aria-expanded="false" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-48" class="collapse list-unstyled sidebar-section depth3 ">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/plugins.NodeMap.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">plugins.NodeMap</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/plugins.FeatureEdges.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">plugins.FeatureEdges</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/plugins.BRepExtractor.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">plugins.BRepExtractor</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/plugins.StepExporter.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">plugins.StepExporter</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/plugins.Drag.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">plugins.Drag</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/plugins.OwnedNodes.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">plugins.OwnedNodes</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/plugins.EdgeSet.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">plugins.EdgeSet</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/plugins.DragOutcome.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">plugins.DragOutcome</span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+      </ul>
+  </li>
+          <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-49" role="navigation" aria-expanded="false">
+ <span class="menu-text">Flow solver (prototype)</span></a>
+          <a class="sidebar-item-toggle text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-49" role="navigation" aria-expanded="false" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-49" class="collapse list-unstyled sidebar-section depth2 ">  
+          <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-50" role="navigation" aria-expanded="false">
+ <span class="menu-text">Domain and solve</span></a>
+          <a class="sidebar-item-toggle text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-50" role="navigation" aria-expanded="false" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-50" class="collapse list-unstyled sidebar-section depth3 ">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/flow.FlowGrid.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">flow.FlowGrid</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/flow.solid_fraction.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">flow.solid_fraction</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/flow.sample_solid_fraction.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">flow.sample_solid_fraction</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/flow.FlowConfig.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">flow.FlowConfig</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/flow.FlowResult.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">flow.FlowResult</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/flow.solve.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">flow.solve</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/flow.convergence.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">flow.convergence</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/flow.recommended_alpha_max.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">flow.recommended_alpha_max</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/flow.SteadyOptions.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">flow.SteadyOptions</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/flow.steady_populations.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">flow.steady_populations</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/flow.iterate_to_steady.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">flow.iterate_to_steady</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/flow.unrolled_populations.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">flow.unrolled_populations</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/flow.residual_history.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">flow.residual_history</span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+          <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-51" role="navigation" aria-expanded="false">
+ <span class="menu-text">Flow studies</span></a>
+          <a class="sidebar-item-toggle text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-51" role="navigation" aria-expanded="false" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-51" class="collapse list-unstyled sidebar-section depth3 ">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/flow.FlowStudy.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">flow.FlowStudy</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/flow.FlowStudyResult.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">flow.FlowStudyResult</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/flow.Inlet.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">flow.Inlet</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/flow.Outlet.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">flow.Outlet</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/flow.Walls.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">flow.Walls</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/flow.HeatSource.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">flow.HeatSource</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/flow.HeldTemperature.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">flow.HeldTemperature</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/flow.region_mask.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">flow.region_mask</span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+          <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-52" role="navigation" aria-expanded="false">
+ <span class="menu-text">Energy equation</span></a>
+          <a class="sidebar-item-toggle text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-52" role="navigation" aria-expanded="false" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-52" class="collapse list-unstyled sidebar-section depth3 ">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/flow.EnergyConfig.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">flow.EnergyConfig</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/flow.solve_temperature.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">flow.solve_temperature</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/flow.conductivity.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">flow.conductivity</span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+          <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-53" role="navigation" aria-expanded="false">
+ <span class="menu-text">Objectives</span></a>
+          <a class="sidebar-item-toggle text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-53" role="navigation" aria-expanded="false" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-53" class="collapse list-unstyled sidebar-section depth3 ">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/flow.pressure_drop.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">flow.pressure_drop</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/flow.heat_transfer_proxy.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">flow.heat_transfer_proxy</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/flow.thermal_resistance.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">flow.thermal_resistance</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/flow.peak_temperature.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">flow.peak_temperature</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/flow.mean_temperature.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">flow.mean_temperature</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/flow.bulk_outlet_temperature.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">flow.bulk_outlet_temperature</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/flow.energy_imbalance.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">flow.energy_imbalance</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/flow.fields.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">flow.fields</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/flow.pressure.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">flow.pressure</span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+          <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-54" role="navigation" aria-expanded="false">
+ <span class="menu-text">Lattice</span></a>
+          <a class="sidebar-item-toggle text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-54" role="navigation" aria-expanded="false" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-54" class="collapse list-unstyled sidebar-section depth3 ">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/flow.equilibrium.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">flow.equilibrium</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/flow.macroscopic.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">flow.macroscopic</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/flow.stream.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">flow.stream</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/flow.step.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">flow.step</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/flow.step_for.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">flow.step_for</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/flow.initial_populations.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">flow.initial_populations</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/flow.bounce_back_mask.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">flow.bounce_back_mask</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/flow.duct_walls.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">flow.duct_walls</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/flow.omega_from_viscosity.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">flow.omega_from_viscosity</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/flow.viscosity_from_omega.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">flow.viscosity_from_omega</span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+      </ul>
+  </li>
+          <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-55" role="navigation" aria-expanded="false">
+ <span class="menu-text">Utilities</span></a>
+          <a class="sidebar-item-toggle text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-55" role="navigation" aria-expanded="false" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-55" class="collapse list-unstyled sidebar-section depth2 ">  
+          <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-56" role="navigation" aria-expanded="false">
+ <span class="menu-text">Compilation cache</span></a>
+          <a class="sidebar-item-toggle text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-56" role="navigation" aria-expanded="false" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-56" class="collapse list-unstyled sidebar-section depth3 ">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/cache.enable_compilation_cache.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">cache.enable_compilation_cache</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/cache.cache_directory.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">cache.cache_directory</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/cache.prune_compilation_cache.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">cache.prune_compilation_cache</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/cache.min_compile_seconds.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">cache.min_compile_seconds</span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+          <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-57" role="navigation" aria-expanded="false">
+ <span class="menu-text">Option sets</span></a>
+          <a class="sidebar-item-toggle text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-57" role="navigation" aria-expanded="false" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-57" class="collapse list-unstyled sidebar-section depth3 ">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/enums.Option.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">enums.Option</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/enums.MeshMethod.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">enums.MeshMethod</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/enums.TetMesher.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">enums.TetMesher</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/enums.StudyKind.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">enums.StudyKind</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/enums.BoundaryConditionType.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">enums.BoundaryConditionType</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/enums.Side.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">enums.Side</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/enums.ObjectiveMetric.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">enums.ObjectiveMetric</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/enums.OptimizerMethod.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">enums.OptimizerMethod</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/enums.OptimizationArgument.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">enums.OptimizationArgument</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/enums.GradientPath.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">enums.GradientPath</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/enums.Precision.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">enums.Precision</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/enums.ConstraintKind.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">enums.ConstraintKind</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/enums.ConstraintSolveMethod.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">enums.ConstraintSolveMethod</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/enums.ExportFormat.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">enums.ExportFormat</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/enums.FemBackend.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">enums.FemBackend</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/enums.PluginKind.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">enums.PluginKind</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/enums.PluginTransport.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">enums.PluginTransport</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/enums.values.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">enums.values</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/enums.listed.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">enums.listed</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/enums.either.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">enums.either</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/enums.parse.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">enums.parse</span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+          <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-58" role="navigation" aria-expanded="false">
+ <span class="menu-text">Tier availability</span></a>
+          <a class="sidebar-item-toggle text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-58" role="navigation" aria-expanded="false" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-58" class="collapse list-unstyled sidebar-section depth3 ">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/tier.status.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">tier.status</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/tier.available.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">tier.available</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/tier.require.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">tier.require</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/tier.component.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">tier.component</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/tier.message.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">tier.message</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/tier.report.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">tier.report</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/tier.absent.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">tier.absent</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/tier.TierUnavailable.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">tier.TierUnavailable</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/tier.TierStatus.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">tier.TierStatus</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/tier.KindStatus.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">tier.KindStatus</span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+      </ul>
+  </li>
+          <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-59" role="navigation" aria-expanded="false">
+ <span class="menu-text">Playground payload schema (internal)</span></a>
+          <a class="sidebar-item-toggle text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-59" role="navigation" aria-expanded="false" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-59" class="collapse list-unstyled sidebar-section depth2 ">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/viewer.schema.CompilePayload.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">viewer.schema.CompilePayload</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/viewer.schema.ConstructionNode.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">viewer.schema.ConstructionNode</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/viewer.schema.ConstructionElement.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">viewer.schema.ConstructionElement</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/viewer.schema.ConstructionArgument.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">viewer.schema.ConstructionArgument</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/viewer.schema.ConstructionFace.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">viewer.schema.ConstructionFace</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/viewer.schema.ConstructionPlane.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">viewer.schema.ConstructionPlane</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/viewer.schema.ConstructionVertex.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">viewer.schema.ConstructionVertex</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/viewer.schema.ConstructionConstraint.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">viewer.schema.ConstructionConstraint</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/viewer.schema.ConstructionRelation.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">viewer.schema.ConstructionRelation</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/viewer.schema.ConstructionOperator.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">viewer.schema.ConstructionOperator</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/viewer.schema.ConstructionTransform.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">viewer.schema.ConstructionTransform</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/viewer.schema.ConstraintSolverRun.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">viewer.schema.ConstraintSolverRun</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/viewer.schema.PlaneReference.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">viewer.schema.PlaneReference</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/viewer.schema.FaceOwner.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">viewer.schema.FaceOwner</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/viewer.schema.DomainEntry.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">viewer.schema.DomainEntry</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/viewer.schema.IdentityEntry.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">viewer.schema.IdentityEntry</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/viewer.schema.MaterialDefinition.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">viewer.schema.MaterialDefinition</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/viewer.schema.SimMeshPayload.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">viewer.schema.SimMeshPayload</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/viewer.schema.MeshEdgePayload.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">viewer.schema.MeshEdgePayload</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/viewer.schema.StudyPayload.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">viewer.schema.StudyPayload</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/viewer.schema.StudySelection.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">viewer.schema.StudySelection</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/viewer.schema.StudyBc.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">viewer.schema.StudyBc</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/viewer.schema.OptimizationPayload.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">viewer.schema.OptimizationPayload</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/viewer.schema.PatchAddress.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">viewer.schema.PatchAddress</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/viewer.schema.PatchRequest.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">viewer.schema.PatchRequest</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/viewer.schema.PatchResponse.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">viewer.schema.PatchResponse</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/viewer.schema.ExportRequest.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">viewer.schema.ExportRequest</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/viewer.schema.validate_patch_request.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">viewer.schema.validate_patch_request</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/viewer.schema.typescript_source.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">viewer.schema.typescript_source</span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+      </ul>
+  </li>
+    </ul>
+    </div>
+    <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">On this page</h2>
+   
+  <ul class="collapse">
+  <li><a href="#example" id="toc-example" class="nav-link active" data-scroll-target="#example">Example</a></li>
+  <li><a href="#parameters" id="toc-parameters" class="nav-link" data-scroll-target="#parameters">Parameters</a></li>
+  <li><a href="#sketch-planes" id="toc-sketch-planes" class="nav-link" data-scroll-target="#sketch-planes">Sketch planes</a></li>
+  <li><a href="#profiles" id="toc-profiles" class="nav-link" data-scroll-target="#profiles">Profiles</a></li>
+  <li><a href="#features" id="toc-features" class="nav-link" data-scroll-target="#features">Features</a></li>
+  <li><a href="#sdf-primitives" id="toc-sdf-primitives" class="nav-link" data-scroll-target="#sdf-primitives">SDF primitives</a></li>
+  <li><a href="#faces" id="toc-faces" class="nav-link" data-scroll-target="#faces">Faces</a></li>
+  <li><a href="#functionalize" id="toc-functionalize" class="nav-link" data-scroll-target="#functionalize">Functionalize</a></li>
+  <li><a href="#constraints" id="toc-constraints" class="nav-link" data-scroll-target="#constraints">Constraints</a></li>
+  <li><a href="#limitations" id="toc-limitations" class="nav-link" data-scroll-target="#limitations">Limitations</a></li>
+  <li><a href="#api" id="toc-api" class="nav-link" data-scroll-target="#api">API</a></li>
+  </ul>
+</nav>
+</nav>
+<div id="quarto-sidebar-glass" class="quarto-sidebar-collapse-item" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item"></div>
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar zindex-bottom">
+    </div>
+<!-- main -->
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title d-none d-lg-block">Modelling</h1>
+</div>
+
+<div>
+  <div class="description">
+    Parameters, sketches, features, SDF solids, faces and constraints.
+  </div>
+</div>
+
+
+<div class="quarto-title-meta">
+
+    
+  
+    
+  </div>
+  
+
+
+</header>
+
+
+<p>This guide covers building a parametric model: parameters, sketch planes and profiles, the features that turn profiles into solids, SDF primitives, face references and constraints. The result is an SDF tree that <code>functionalize</code> turns into a pure JAX function of its parameters.</p>
+<section id="example" class="level2">
+<h2 class="anchored" data-anchor-id="example">Example</h2>
+<pre class="python"><code>import jax
+import jax.numpy as jnp
+from cadjoint import apply_parameters, extract_parameters, functionalize
+from cadjoint.constraints import DistanceConstraint, FixedConstraint, solve_constraints
+from cadjoint.construction import PolygonProfile, SketchPlane, extrude
+
+profile = PolygonProfile(
+    [[0.1, -0.1], [1.9, 0.2], [1.0, 1.5]],
+    plane=SketchPlane(origin=[0.0, -0.5, 0.0], normal=[0.0, 0.0, 1.0]),
+    name="tri",
+)
+v0, v1, v2 = profile.vertices
+FixedConstraint(v0, [0.0, 0.0])
+FixedConstraint(v1, [2.0, 0.0])
+DistanceConstraint(v0, v2, 2.0)
+DistanceConstraint(v1, v2, 2.0)
+
+solved = solve_constraints(profile)     # {'tri_v0': ..., 'tri_v1': ..., 'tri_v2': [1, 1.732]}
+apply_parameters(profile, solved)
+
+solid = extrude(profile, depth=0.6)
+free, fixed, _ = extract_parameters(solid)
+sdf = functionalize(solid)(free, fixed)
+sdf(jnp.array([1.0, 0.0, 0.0]))         # negative: inside the triangle prism</code></pre>
+<p>Six vertex DOF and six constraint equations make the system exactly determined; the solution is an equilateral triangle with apex at (1, √3).</p>
+</section>
+<section id="parameters" class="level2">
+<h2 class="anchored" data-anchor-id="parameters">Parameters</h2>
+<p>Every number in a model is a parameter. A parameter carries a value, a <code>free</code> flag, an optional <code>name</code> and optional <code>bounds</code>.</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 33%">
+<col style="width: 33%">
+<col style="width: 33%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Type</th>
+<th>Value</th>
+<th>Use</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>Scalar</code></td>
+<td>float</td>
+<td>Depths, radii, angles, offsets.</td>
+</tr>
+<tr class="even">
+<td><code>Vector2</code></td>
+<td>2-vector</td>
+<td>Sketch vertices, in the coordinates of a sketch plane.</td>
+</tr>
+<tr class="odd">
+<td><code>Vector</code></td>
+<td>3-vector</td>
+<td>World positions and directions.</td>
+</tr>
+</tbody>
+</table>
+<p><code>free=True</code> marks a parameter as a design variable: it is differentiated, optimized and moved by the constraint solver. <code>free=False</code> (the default) makes it a fixed constant. Names key the parameter dicts that <code>extract_parameters</code> returns, so give every free parameter a unique name.</p>
+<pre class="python"><code>from cadjoint.geometry import Scalar, Vector, Vector2
+
+p = Vector(jnp.array([2.0, 0.0, 0.0]), free=True, name="p")
+depth = Scalar(0.8, free=True, name="depth", bounds=(0.2, 2.0))
+corner = Vector2([1.0, 0.0], free=True, name="corner")</code></pre>
+<p>Passing a plain number or array where a parameter is expected creates a fixed parameter. A <code>PolygonProfile</code> is the exception: its raw vertex arrays become free <code>Vector2</code> parameters named <code>&lt;name&gt;_v0</code>, <code>&lt;name&gt;_v1</code>, ….</p>
+</section>
+<section id="sketch-planes" class="level2">
+<h2 class="anchored" data-anchor-id="sketch-planes">Sketch planes</h2>
+<p>A <code>SketchPlane</code> is a work plane: an origin, a normal and an in-plane x axis. Profile coordinates are 2D coordinates in that frame. <code>SketchPlane()</code> is the world XY plane at the origin.</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 50%">
+<col style="width: 50%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Constructor</th>
+<th>Plane</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>SketchPlane(origin, normal, x_axis=None)</code></td>
+<td>Stated in world coordinates. <code>x_axis</code> pins the sketch’s horizontal; omit it for the derivation from the normal alone.</td>
+</tr>
+<tr class="even">
+<td><code>SketchPlane.on(face, x_axis=None, flip=False)</code></td>
+<td>The face’s own plane, inheriting the face’s x axis: the profile’s <code>u</code> for a cap, the swept edge direction for a side wall.</td>
+</tr>
+<tr class="odd">
+<td><code>SketchPlane.offset(face_or_plane, distance)</code></td>
+<td>Pushed along the normal. <code>distance</code> may be a <code>Scalar</code>, so the clearance is a design variable.</td>
+</tr>
+<tr class="even">
+<td><code>SketchPlane.tangent(solid, near, x_axis=None)</code></td>
+<td>Tangent to the field at the surface point nearest <code>near</code>. Horizontal defaults to the world axis most nearly in-plane.</td>
+</tr>
+<tr class="odd">
+<td><code>SketchPlane.midplane(face_a, face_b)</code></td>
+<td>Halfway between two faces.</td>
+</tr>
+</tbody>
+</table>
+<p>The face-based constructors are described under <a href="#faces">Faces</a>.</p>
+</section>
+<section id="profiles" class="level2">
+<h2 class="anchored" data-anchor-id="profiles">Profiles</h2>
+<p>A <code>PolygonProfile</code> is a closed polygon on a sketch plane. Its vertices are <code>Vector2</code> parameters, two DOF each.</p>
+<pre class="python"><code>from cadjoint.construction import PolygonProfile, SketchPlane
+
+tri = PolygonProfile(
+    [[0.1, -0.1], [1.9, 0.2], [1.0, 1.5]],
+    plane=SketchPlane(origin=[0.0, -0.5, 0.0], normal=[0.0, 0.0, 1.0]),
+    name="tri",
+)
+tri.vertices    # [Vector2(..., free=True, name='tri_v0'), ..., name='tri_v2']</code></pre>
+<p>Vertices may also be existing <code>Vector2</code> objects, so two profiles, or a profile and a constraint, can share them. <code>free=False</code> creates fixed vertices.</p>
+<p>A profile belongs to the construction tree, not to the SDF. It is never rendered as geometry; <code>render.draw_plane</code> and <code>render.draw_profile</code> project the plane outline, the profile edges and the vertex handles through a render camera onto a matplotlib axis as a wireframe overlay.</p>
+</section>
+<section id="features" class="level2">
+<h2 class="anchored" data-anchor-id="features">Features</h2>
+<p>A feature generates an SDF solid from one or two profiles. The solid holds references to the profile’s vertex parameters, not copies, so the construction tree and the SDF tree share one parameter set: solving constraints on the sketch or differentiating through the solid acts on the same values.</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 50%">
+<col style="width: 50%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Feature</th>
+<th>Solid</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>extrude(profile, depth, material=None, draft=0.0, twist=0.0)</code></td>
+<td>Prism spanning <code>±depth/2</code> around the sketch plane. <code>draft</code> (degrees) tapers the walls inward with increasing local z; the profile is exact at the bottom cap. <code>twist</code> (degrees over the full depth) rotates the section.</td>
+</tr>
+<tr class="even">
+<td><code>revolve(profile, offset=0.0, material=None)</code></td>
+<td>Solid of revolution about the sketch plane’s local Y axis. Profile coordinates are (radial, height); <code>offset</code> is added to the radius. Keep the profile at positive radius.</td>
+</tr>
+<tr class="odd">
+<td><code>loft(profile_a, profile_b, height, material=None)</code></td>
+<td>Ruled solid between two profiles with equal vertex counts. Placed on <code>profile_a</code>’s plane, A at <code>-height/2</code> and B at <code>+height/2</code>; vertex <code>i</code> of A connects to vertex <code>i</code> of B. Only <code>profile_b</code>’s 2D coordinates are used.</td>
+</tr>
+</tbody>
+</table>
+<p><code>depth</code>, <code>height</code>, <code>offset</code>, <code>draft</code> and <code>twist</code> accept a <code>Scalar</code>.</p>
+<pre class="python"><code>from cadjoint.construction import revolve
+
+washer = PolygonProfile([[0.9, -0.18], [1.35, -0.28], [1.35, 0.28], [0.9, 0.18]], name="washer")
+ring = revolve(washer)
+ring.axis       # the world axis the profile was swept around</code></pre>
+</section>
+<section id="sdf-primitives" class="level2">
+<h2 class="anchored" data-anchor-id="sdf-primitives">SDF primitives</h2>
+<p>Features produce SDF nodes; the same tree accepts standard primitives, booleans and transforms. Every node is differentiable in its parameters.</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 50%">
+<col style="width: 50%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Group</th>
+<th>Nodes</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Primitives</td>
+<td><code>Sphere</code>, <code>Box</code>, <code>RoundBox</code>, <code>Capsule</code>, <code>Cylinder</code>, <code>Torus</code>, <code>Plane</code></td>
+</tr>
+<tr class="even">
+<td>Booleans</td>
+<td><code>Union</code>, <code>Intersection</code>, <code>Difference</code>, <code>Xor</code>; operators <code>a \| b</code> (or <code>a + b</code>), <code>a &amp; b</code>, <code>a - b</code>, <code>a ^ b</code></td>
+</tr>
+<tr class="odd">
+<td>Transforms</td>
+<td><code>Translate</code>, <code>Rotate</code>, <code>Scale</code>, <code>Twist</code></td>
+</tr>
+<tr class="even">
+<td>Field transforms and patterns</td>
+<td><code>Shell</code>, <code>Offset</code>, <code>Mirror</code>, <code>LinearPattern</code>, <code>PolarPattern</code></td>
+</tr>
+<tr class="odd">
+<td>Measures</td>
+<td><code>volume</code>, <code>material_mass</code></td>
+</tr>
+</tbody>
+</table>
+<p>Booleans take a <code>smoothness</code> for a smooth blend (<code>smooth_min</code> / <code>smooth_max</code>). Each primitive takes an optional render <code>material</code>.</p>
+<pre class="python"><code>from cadjoint.sdf import Capsule, Rotate, Sphere, Translate, Twist, Union
+from cadjoint.sdf.primitives import Box
+
+sphere = Translate(Sphere(radius=0.6), offset=jnp.array([-1.0, 0.0, 0.0]))
+box = Translate(Box(size=[0.7, 0.7, 1.0]), offset=jnp.array([0.0, 0.0, 0.8]))
+capsule = Translate(Capsule(radius=0.3, height=1.3), offset=jnp.array([1.0, 0.0, 0.0]))
+scene = Union((sphere, box, capsule), smoothness=0.05)
+
+turned = Rotate(scene, angle=jnp.pi / 2, axis=jnp.array([0.0, 1.0, 0.0]))
+twisted = Twist(scene, strength=1.0, axis=jnp.array([0.0, 1.0, 0.0]))</code></pre>
+<p><code>Twist</code> is a deformation: its field is not 1-Lipschitz, so it is not an exact distance. <code>Solid.box</code>, <code>Solid.cylinder</code> and <code>Solid.sphere</code> build primitives that carry faces (next section).</p>
+</section>
+<section id="faces" class="level2">
+<h2 class="anchored" data-anchor-id="faces">Faces</h2>
+<p>cadjoint stores no boundary representation. The dual-contoured mesh is extracted from the field at one resolution, so a work plane based on it would depend on the extraction grid.</p>
+<p>The construction tree carries the faces instead. <code>extrude</code> spans <code>±depth/2</code> around its sketch plane, so it knows where its caps are and which plane each profile edge swept; a box knows its six faces; a revolve knows its axis. These are <code>Face</code> objects, and every generated solid carries them.</p>
+<pre class="python"><code>from cadjoint.construction import Solid
+
+depth = Scalar(0.8, free=True, name="depth")
+plate = PolygonProfile([[-1, -1], [1, -1], [1, 1], [-1, 1]], name="plate")
+body = extrude(plate, depth=depth)
+
+body.faces.keys()        # ['cap+', 'cap-', 'side0', 'side1', 'side2', 'side3']
+body.cap("+").origin     # [0, 0, 0.4]: depth/2 along the sketch normal
+body.side(0).normal      # [0, -1, 0]: the plane edge 0 swept
+
+Solid.box(size=[1, 1, 1], position=[0, 0, 0], name="block").face("+z")</code></pre>
+<p>A <code>Face</code> holds its plane (origin, normal and an in-plane x axis, so a sketch’s horizontal is defined rather than derived from the normal), the polygon that bounds it, and a <code>contains(point)</code> test for world points.</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 50%">
+<col style="width: 50%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Solid</th>
+<th>Faces</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>extrude</code></td>
+<td><code>cap+</code>, <code>cap-</code>, <code>side0</code> … <code>sideN-1</code></td>
+</tr>
+<tr class="even">
+<td><code>loft</code></td>
+<td><code>cap-</code> (profile A), <code>cap+</code> (profile B); ruled side walls are not declared</td>
+</tr>
+<tr class="odd">
+<td><code>revolve</code></td>
+<td>none; <code>solid.axis</code> is the reference</td>
+</tr>
+<tr class="even">
+<td><code>Solid.box</code></td>
+<td><code>+x</code>, <code>-x</code>, <code>+y</code>, <code>-y</code>, <code>+z</code>, <code>-z</code></td>
+</tr>
+<tr class="odd">
+<td>drafted or twisted <code>extrude</code></td>
+<td>none; only <code>SketchPlane.tangent</code> applies</td>
+</tr>
+</tbody>
+</table>
+<section id="work-planes-on-faces" class="level3">
+<h3 class="anchored" data-anchor-id="work-planes-on-faces">Work planes on faces</h3>
+<p><code>depth</code> above is a free <code>Scalar</code>, so <code>body.cap("+")</code> is not a stored plane at z = 0.4 but the expression <code>origin + (depth/2)·normal</code>. A sketch on it follows the depth:</p>
+<pre class="python"><code>boss = PolygonProfile(
+    [[-0.4, -0.4], [0.4, -0.4], [0.4, 0.4], [-0.4, 0.4]],
+    plane=SketchPlane.on(body.cap("+")),
+    name="boss",
+)</code></pre>
+<p>The chain is differentiable:</p>
+<pre class="python"><code>def stack(depth):
+    body = extrude(PolygonProfile([[-1, -1], [1, -1], [1, 1], [-1, 1]], name="p"), depth=depth)
+    top = PolygonProfile([[-0.4, -0.4], [0.4, -0.4], [0.4, 0.4], [-0.4, 0.4]],
+                         plane=SketchPlane.on(body.cap("+")), name="b")
+    return extrude(top, depth=0.5)
+
+probe = jnp.array([0.0, 0.0, 1.0])
+jax.grad(lambda d: stack(d)(probe))(1.0)   # -0.5, exactly</code></pre>
+<p>The cap sits at half the depth, so the boss on it moves at half the rate, and the distance at a probe above the boss falls at exactly that rate.</p>
+<p>In a B-rep CAD kernel a face is stored geometry that a rebuild replaces, and a downstream sketch is re-attached to it by a topological-naming heuristic, so reordering a feature can detach the sketch. Here the face is a function of the parent’s parameters: the reference cannot go stale, and it carries a derivative, so an optimizer moving <code>depth</code> moves everything referenced off it in the same step.</p>
+</section>
+<section id="tangent-planes" class="level3">
+<h3 class="anchored" data-anchor-id="tangent-planes">Tangent planes</h3>
+<p>Blends, fillets and revolved walls have no analytic face. A point projected onto the zero set gives a surface point, and the field gradient there is the normal:</p>
+<pre class="python"><code>dome = Sphere(radius=1.0)
+pad = SketchPlane.tangent(dome, near=[0.0, 0.0, 0.9])   # plane at the north pole</code></pre>
+<p>The projection is a Newton iteration in JAX (<code>cadjoint.fem.motion.project_points</code>, the one-surface case of <code>cadjoint.zeroset.project.project</code>), so a tangent plane is differentiable with respect to the scene’s parameters; the pad moves out as the sphere grows.</p>
+<p>Orientation is fixed when a solid is generated; <code>origin</code> is the differentiable part.</p>
+</section>
+</section>
+<section id="functionalize" class="level2">
+<h2 class="anchored" data-anchor-id="functionalize">Functionalize</h2>
+<p><code>extract_parameters(tree)</code> returns three things: the free parameters and the fixed parameters, each a dict keyed by name, and metadata that carries the constraint system. <code>functionalize(tree)(free, fixed)</code> returns the field as a pure JAX function of points, so <code>jit</code>, <code>grad</code> and <code>vmap</code> apply directly. <code>apply_parameters(tree, values)</code> is the inverse of <code>extract_parameters</code>: it writes a name-keyed dict back into the tree’s free parameters. A solid and its sketch share parameters, so applying to either updates both.</p>
+<pre class="python"><code>from cadjoint.sdf import Sphere, Translate
+
+p = Vector(jnp.array([2.0, 0.0, 0.0]), free=True, name="p")
+scene = Translate(Sphere(radius=0.3), offset=p)
+free, fixed, metadata = extract_parameters(scene)
+field = functionalize(scene)(free, fixed)
+field(jnp.zeros(3))     # 1.7</code></pre>
+<section id="compilation-cache" class="level3">
+<h3 class="anchored" data-anchor-id="compilation-cache">Compilation cache</h3>
+<p><code>functionalize(scene)(free, fixed)</code> closes over the parameter values, so <code>jax.jit</code> of it folds every value into the program as a literal: two designs that differ in one value compile twice. <code>functionalize_parametric</code> takes the parameter dicts as arguments, so the lowered program is identical for every value and one executable serves them all. With the persistent compilation cache, a re-dimensioned design compiles nothing, even in a fresh process.</p>
+<pre class="python"><code>from cadjoint.cache import enable_compilation_cache
+from cadjoint.functionalize import functionalize_parametric
+
+enable_compilation_cache()      # ~/.cache/cadjoint/jax, or $CADJOINT_CACHE_DIR
+evaluate = jax.jit(functionalize_parametric(scene))
+
+evaluate(free, fixed, jnp.zeros(3))                                 # compiles once
+evaluate({"p": jnp.array([1.0, 0.0, 0.0])}, fixed, jnp.zeros(3))    # reuses it</code></pre>
+<p>The playground’s compile worker enables the cache for every request; <code>CADJOINT_NO_COMPILATION_CACHE=1</code> opts out. The stored programs are structured rather than flattened (a sketch profile is one <code>(N, 2)</code> array, a pattern traces its child once, a shared subtree is emitted once), which keeps them small enough to compile in under a second; see <a href="../docs/meshing.html#program-size">program size</a> and the <a href="https://github.com/andrinr/cadjoint/blob/main/research/performance.md">performance notes</a>.</p>
+</section>
+</section>
+<section id="constraints" class="level2">
+<h2 class="anchored" data-anchor-id="constraints">Constraints</h2>
+<p>A constraint is a relation between parameters. Constructing one registers it on its parameters; nothing is solved until a solver is called on a tree that contains them.</p>
+<section id="constraint-types" class="level3">
+<h3 class="anchored" data-anchor-id="constraint-types">Constraint types</h3>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 33%">
+<col style="width: 33%">
+<col style="width: 33%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Constraint</th>
+<th>Arguments</th>
+<th>Equations</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>DistanceConstraint</code></td>
+<td><code>param1, param2, distance</code></td>
+<td>1</td>
+</tr>
+<tr class="even">
+<td><code>AngleConstraint</code></td>
+<td><code>vector1, vector2, angle</code></td>
+<td>1</td>
+</tr>
+<tr class="odd">
+<td><code>ParallelConstraint</code></td>
+<td><code>vector1, vector2</code></td>
+<td>2</td>
+</tr>
+<tr class="even">
+<td><code>PerpendicularConstraint</code></td>
+<td><code>vector1, vector2</code></td>
+<td>1</td>
+</tr>
+<tr class="odd">
+<td><code>FixedConstraint</code></td>
+<td><code>param, target</code></td>
+<td>one per component</td>
+</tr>
+<tr class="even">
+<td><code>CoincidentConstraint</code></td>
+<td><code>point1, point2</code> (<code>Vector2</code>)</td>
+<td>2</td>
+</tr>
+<tr class="odd">
+<td><code>HorizontalConstraint</code></td>
+<td><code>point1, point2</code> (<code>Vector2</code>)</td>
+<td>1</td>
+</tr>
+<tr class="even">
+<td><code>VerticalConstraint</code></td>
+<td><code>point1, point2</code> (<code>Vector2</code>)</td>
+<td>1</td>
+</tr>
+<tr class="odd">
+<td><code>PointOnLineConstraint</code></td>
+<td><code>point, line1, line2</code> (<code>Vector2</code>)</td>
+<td>1</td>
+</tr>
+<tr class="even">
+<td><code>EqualLengthConstraint</code></td>
+<td><code>a1, a2, b1, b2</code> (<code>Vector2</code> edges)</td>
+<td>1</td>
+</tr>
+<tr class="odd">
+<td><code>ParallelEdgesConstraint</code></td>
+<td><code>a1, a2, b1, b2</code> (<code>Vector2</code> edges)</td>
+<td>1</td>
+</tr>
+<tr class="even">
+<td><code>PerpendicularEdgesConstraint</code></td>
+<td><code>a1, a2, b1, b2</code> (<code>Vector2</code> edges)</td>
+<td>1</td>
+</tr>
+</tbody>
+</table>
+<p><code>distance</code> and <code>angle</code> accept a <code>Scalar</code>. Every constraint takes a keyword <code>weight</code> (default 1.0).</p>
+</section>
+<section id="degrees-of-freedom" class="level3">
+<h3 class="anchored" data-anchor-id="degrees-of-freedom">Degrees of freedom</h3>
+<p>A free parameter contributes one DOF per component: 1 for a <code>Scalar</code>, 2 for a <code>Vector2</code>, 3 for a <code>Vector</code>. Each constraint equation removes one. A system is exactly determined when the two counts match.</p>
+<p>Trilateration: one free 3D point <code>p</code> (3 DOF) and three fixed anchors. One distance constraint leaves 2 DOF, and <code>solve_constraints</code> refuses it:</p>
+<pre class="python"><code>anchor_a = Vector(jnp.array([0.0, 0.0, 0.0]), free=False, name="anchor_a")
+anchor_b = Vector(jnp.array([4.0, 0.0, 0.0]), free=False, name="anchor_b")
+anchor_c = Vector(jnp.array([2.0, 3.0, 0.0]), free=False, name="anchor_c")
+true_p = jnp.array([2.0, 1.0, 0.0])
+
+p = Vector(jnp.array([0.5, 0.5, 0.0]), free=True, name="p")     # wrong initial guess
+scene = Translate(Sphere(radius=0.5), offset=p)
+
+DistanceConstraint(p, anchor_a, float(jnp.linalg.norm(true_p - anchor_a.value)))
+try:
+    solve_constraints(scene)
+except ValueError as e:
+    print(e)    # Under-constrained: 2 DOF remaining. (3 parameter DOF, 1 constraint equations)</code></pre>
+<p>Each distance constraint is a sphere around its anchor; three of them meet at <code>true_p</code>. Adding the other two determines the system:</p>
+<pre class="python"><code>DistanceConstraint(p, anchor_b, float(jnp.linalg.norm(true_p - anchor_b.value)))
+DistanceConstraint(p, anchor_c, float(jnp.linalg.norm(true_p - anchor_c.value)))
+
+solved = solve_constraints(scene, max_steps=10)
+solved["p"]     # [2.0, 1.0, 0.0], from the guess (0.5, 0.5, 0)
+
+_, fixed, _ = extract_parameters(scene)
+sdf = functionalize(scene)(solved, fixed)
+sdf(true_p)     # -0.5: the solved sphere is centred on the true point</code></pre>
+</section>
+<section id="solving" class="level3">
+<h3 class="anchored" data-anchor-id="solving">Solving</h3>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 25%">
+<col style="width: 25%">
+<col style="width: 25%">
+<col style="width: 25%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Function</th>
+<th>Systems</th>
+<th>Method</th>
+<th>Writes back</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>solve_constraints(tree, tol=1e-6, max_steps=256)</code></td>
+<td>Exactly determined only; raises <code>ValueError</code> otherwise</td>
+<td>Levenberg–Marquardt (Optimistix)</td>
+<td>No; returns the free-parameter dict, apply it with <code>apply_parameters</code></td>
+</tr>
+<tr class="even">
+<td><code>satisfy_constraints(tree, steps=8, method="newton")</code></td>
+<td>Any, including under-determined</td>
+<td><code>"newton"</code>: minimum-norm projection onto the constraint manifold; <code>"adam"</code> / <code>"sgd"</code>: Optax residual minimization</td>
+<td>Yes, in place, and returns the dict</td>
+</tr>
+</tbody>
+</table>
+<p><code>satisfy_constraints</code> suits a sketch that keeps design freedom: unconstrained DOF stay near their current values.</p>
+<pre class="python"><code>from cadjoint.constraints import satisfy_constraints
+
+q = Vector(jnp.array([2.0, 0.0, 0.0]), free=True, name="q")
+origin = Vector(jnp.array([0.0, 0.0, 0.0]), free=False, name="origin")
+DistanceConstraint(q, origin, 3.0)       # q must lie on a sphere of radius 3
+
+satisfy_constraints(Translate(Sphere(radius=0.3), offset=q), steps=8)
+float(jnp.linalg.norm(q.value))          # 3.0</code></pre>
+</section>
+<section id="constraints-during-optimization" class="level3">
+<h3 class="anchored" data-anchor-id="constraints-during-optimization">Constraints during optimization</h3>
+<p>The metadata from <code>extract_parameters</code> carries the constraint system. <code>project_to_manifold(params, metadata, steps)</code> projects a parameter dict back onto it, so a descent can step and project. The <a href="../docs/optimization.html">optimizer</a> does this automatically.</p>
+<p>A quad with one anchored vertex and one pinned edge length (3 equations on 8 DOF), extruded and optimized toward a target volume:</p>
+<pre class="python"><code>from cadjoint.constraints import project_to_manifold
+from cadjoint.sdf import volume
+
+quad = PolygonProfile([[0.0, 0.0], [2.0, 0.0], [2.0, 1.0], [0.0, 1.0]], name="quad")
+q0, q1, q2, q3 = quad.vertices
+FixedConstraint(q0, [0.0, 0.0])
+DistanceConstraint(q0, q1, 2.0)
+
+quad_solid = extrude(quad, depth=1.5)
+free, fixed, meta = extract_parameters(quad_solid)
+fn = functionalize(quad_solid)
+target = 6.0
+
+def loss(params):
+    vol = volume(fn(params, fixed), bounds=(-1, -1, -1), size=(4, 4, 2), resolution=32)
+    return (vol - target) ** 2
+
+params = dict(free)
+for _ in range(40):
+    grads = jax.grad(loss)(params)
+    params = {k: v - 0.05 * grads[k] for k, v in params.items()}
+    params = project_to_manifold(params, meta, steps=2)
+
+apply_parameters(quad, params)
+float(jnp.linalg.norm(params["quad_v1"] - params["quad_v0"]))   # 2.0: still pinned</code></pre>
+<p>After 40 steps the volume, measured at resolution 64, is 6.28 against the target 6.0, and the pinned edge is still 2.0.</p>
+</section>
+</section>
+<section id="limitations" class="level2">
+<h2 class="anchored" data-anchor-id="limitations">Limitations</h2>
+<ul>
+<li>Profiles are closed polygons. There are no arc or spline profile entities.</li>
+<li>A drafted or twisted extrusion declares no analytic faces; a revolve declares none and exposes only its axis; a loft’s side walls are not declared.</li>
+<li><code>Twist</code> and a twisted <code>extrude</code> produce fields that are not 1-Lipschitz.</li>
+<li><code>solve_constraints</code> accepts only exactly determined systems.</li>
+</ul>
+</section>
+<section id="api" class="level2">
+<h2 class="anchored" data-anchor-id="api">API</h2>
+<ul>
+<li>Parameters: <a href="../reference/geometry.Scalar.html"><code>geometry.Scalar</code></a>, <a href="../reference/geometry.Vector.html"><code>geometry.Vector</code></a>, <a href="../reference/geometry.Vector2.html"><code>geometry.Vector2</code></a>, <a href="../reference/extract_parameters.html"><code>extract_parameters</code></a>, <a href="../reference/apply_parameters.html"><code>apply_parameters</code></a>, <a href="../reference/functionalize.html"><code>functionalize</code></a>, <a href="../reference/functionalize.functionalize_parametric.html"><code>functionalize.functionalize_parametric</code></a>, <a href="../reference/cache.enable_compilation_cache.html"><code>cache.enable_compilation_cache</code></a></li>
+<li>Sketches and features: <a href="../reference/construction.SketchPlane.html"><code>construction.SketchPlane</code></a>, <a href="../reference/construction.PolygonProfile.html"><code>construction.PolygonProfile</code></a>, <a href="../reference/construction.extrude.html"><code>construction.extrude</code></a>, <a href="../reference/construction.revolve.html"><code>construction.revolve</code></a>, <a href="../reference/construction.loft.html"><code>construction.loft</code></a>, <a href="../reference/construction.Solid.html"><code>construction.Solid</code></a></li>
+<li>Faces: <a href="../reference/construction.Face.html"><code>construction.Face</code></a>, <a href="../reference/construction.FaceSet.html"><code>construction.FaceSet</code></a>, <a href="../reference/construction.Axis.html"><code>construction.Axis</code></a></li>
+<li>SDF nodes: <a href="../reference/index.html#solids">Solids</a>, <a href="../reference/sdf.Union.html"><code>sdf.Union</code></a>, <a href="../reference/sdf.Twist.html"><code>sdf.Twist</code></a>, <a href="../reference/sdf.volume.html"><code>sdf.volume</code></a></li>
+<li>Constraints: <a href="../reference/index.html#constraints">Constraints</a>, <a href="../reference/solve_constraints.html"><code>solve_constraints</code></a>, <a href="../reference/constraints.satisfy_constraints.html"><code>constraints.satisfy_constraints</code></a>, <a href="../reference/constraints.project_to_manifold.html"><code>constraints.project_to_manifold</code></a></li>
+<li>Overlays: <a href="../reference/render.draw_plane.html"><code>render.draw_plane</code></a>, <a href="../reference/render.draw_profile.html"><code>render.draw_profile</code></a></li>
+</ul>
+
+
+</section>
+
+</main> <!-- /main -->
+<script>
+// One navigation panel. The page outline moves under the current page's
+// entry in the sidebar and takes the same collapse toggle as a sidebar
+// section. Moving the outline element keeps its id, so Quarto's scroll
+// highlighting still works.
+document.addEventListener("DOMContentLoaded", () => {
+  const sidebar = document.querySelector("#quarto-sidebar");
+  if (!sidebar) return;
+
+  // quartodoc lists the reference index inside the section whose header
+  // already links to it; drop the repeat.
+  sidebar.querySelectorAll(".sidebar-item-section").forEach((section) => {
+    const head = section.querySelector(":scope > .sidebar-item-container > a.sidebar-link[href]");
+    if (!head) return;
+    section.querySelectorAll(":scope > ul > li > .sidebar-item-container > a.sidebar-link").forEach((a) => {
+      if (a.getAttribute("href") === head.getAttribute("href")) a.closest("li").remove();
+    });
+  });
+
+  const toc = document.querySelector("nav#TOC");
+  const list = toc && toc.querySelector(":scope > ul");
+  const active = sidebar.querySelector(".sidebar-link.active");
+  if (!toc || !list || !active) return;
+  document.body.classList.add("toc-in-sidebar");
+
+  // No outline on a section's landing page (Guides, API reference), whose
+  // contents the sidebar already lists, or where it would be one entry (a
+  // reference object page outlines only its own name).
+  if (active.closest(".sidebar-item-section > .sidebar-item-container") ||
+      list.querySelectorAll("a").length < 2) {
+    toc.remove();
+    return;
+  }
+
+  const toggle = document.createElement("a");
+  toggle.className = "sidebar-item-toggle text-start";
+  toggle.setAttribute("data-bs-toggle", "collapse");
+  toggle.setAttribute("data-bs-target", "#page-outline");
+  toggle.setAttribute("aria-expanded", "true");
+  toggle.setAttribute("aria-label", "Toggle page outline");
+  toggle.innerHTML = '<i class="bi bi-chevron-right ms-2"></i>';
+
+  const wrap = document.createElement("div");
+  wrap.id = "page-outline";
+  wrap.className = "collapse show";
+  list.classList.remove("collapse");
+  wrap.appendChild(list);
+
+  toc.replaceChildren(wrap);
+  toc.classList.add("in-sidebar");
+  active.closest(".sidebar-item").appendChild(toc);
+  active.closest(".sidebar-item-container").appendChild(toggle);
+});
+</script>
+<script id="quarto-html-after-body" type="application/javascript">
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) => {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {                     
+          return true;
+        }
+      }
+      return false;
+    }
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Copied!");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Copied!");
+        tooltip = new bootstrap.Tooltip(button, 
+          { trigger: "manual", 
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();    
+      }
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
+    }
+    const getTextToCopy = function(trigger) {
+      const outerScaffold = trigger.parentElement.cloneNode(true);
+      const codeEl = outerScaffold.querySelector('code');
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
+    });
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
+    }
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp("https:\/\/andrinr\.github\.io\/cadjoint\/");
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+      }
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
+          }
+        }
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
+        }
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
+      } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
+      }
+    }
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
+          }
+        } else {
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.querySelector('main.content');
+            if (note !== null) {
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      }, function(instance) {
+      });
+    }
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length > 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length > 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null && height !== null && parent !== null) {
+              // cook up a div (if necessary) and position it 
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script>
+</div> <!-- /content -->
+<footer class="footer">
+  <div class="nav-footer">
+    <div class="nav-footer-left">
+<p>cadjoint</p>
+</div>   
+    <div class="nav-footer-center">
+      &nbsp;
+    </div>
+    <div class="nav-footer-right">
+      <ul class="footer-items list-unstyled">
+    <li class="nav-item">
+    <a class="nav-link" href="https://github.com/andrinr/cadjoint/tree/main/research">
+<p>Research notes (GitHub)</p>
+</a>
+  </li>  
+</ul>
+    </div>
+  </div>
+</footer>
+
+
+
+
+</body></html>
