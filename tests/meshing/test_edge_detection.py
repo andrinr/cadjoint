@@ -232,10 +232,19 @@ class TestTransformationsAndReuse:
         def loss(radius):
             return jnp.sum(points_of(radius) ** 2)
 
-        gradient = jax.jit(jax.grad(loss))(jnp.float32(1.0))
-        assert np.isfinite(float(gradient))
-        # Loss is edge_count * radius^2 on a sphere, so d/dr at 1 is 2 * count.
-        np.testing.assert_allclose(float(gradient), 2.0 * edges.count, rtol=1e-4)
+        gradient = float(jax.jit(jax.grad(loss))(jnp.float32(1.0)))
+        assert np.isfinite(gradient)
+        # Per point, d|p|^2/dr = 2 p . dp/dr, which is 2 for a point that rides
+        # the sphere.  The sum must equal the per-point terms, and nearly every
+        # point must contribute exactly 2.  A handful may not: a crossing that
+        # sits on a lattice vertex can clamp, and which ones do depends on the
+        # float32 rounding of the CPU the program was compiled for (8 of 1830
+        # on one GitHub runner, none locally).
+        tangents = np.asarray(jax.jit(jax.jacfwd(points_of))(jnp.float32(1.0)))
+        per_point = 2.0 * np.sum(jitted * tangents, axis=1)
+        np.testing.assert_allclose(gradient, per_point.sum(), rtol=1e-4)
+        riding = np.isclose(per_point, 2.0, rtol=1e-3)
+        assert riding.mean() > 0.99, f"{(~riding).sum()} of {edges.count} points off the sphere"
 
     def test_frozen_edge_reuse_at_perturbed_radius(self):
         grid = sphere_grid()
