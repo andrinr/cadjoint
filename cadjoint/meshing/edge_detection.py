@@ -246,6 +246,17 @@ def edge_hermite_data(
     parameter perturbations, which is what an optimization loop needs between
     re-extractions.
 
+    No decision rests on the sign of a value at float-noise level (within a
+    few ulps of the grid's coordinate magnitude), which is what a face
+    coplanar with a lattice plane produces everywhere on it.  An edge lying
+    in such a face takes its midpoint with zero derivative; bisection on an
+    edge that runs along a face and leaves it finds where it leaves; a root
+    already at noise level takes no Newton step but keeps the implicit
+    derivative; and a dead or noise gradient is replaced by a central
+    difference.  So the result does not move when rounding does — under
+    ``jit``, across JAX versions, or under a nudge that leaves the geometry
+    alone.
+
     Args:
         sdf: JAX-traceable scalar field ``(point[3]) -> scalar``.
         grid: The grid the edges were detected on.
@@ -279,10 +290,21 @@ def edge_hermite_data(
     origin64 = np.asarray(grid.origin, dtype=np.float64)
     spacing64 = np.asarray(grid.spacing, dtype=np.float64)
     index64 = np.asarray(edges.index, dtype=np.float64)
-    one_hot = np.eye(3, dtype=np.float64)[np.asarray(edges.axis, dtype=np.int32)]
+    axis = np.asarray(edges.axis, dtype=np.int32)
+    one_hot = np.eye(3, dtype=np.float64)[axis]
     starts = jnp.asarray(origin64 + index64 * spacing64)
     ends = jnp.asarray(origin64 + (index64 + one_hot) * spacing64)
-    offsets = ends - starts
+    dtype = starts.dtype
+
+    # Central-difference probes: a hundredth of a cell along each lattice
+    # axis, both ways (see the end of `refine`).
+    reach = jnp.asarray(1e-2 * spacing64, dtype=dtype)
+    probe_offsets = jnp.concatenate([jnp.diag(reach), -jnp.diag(reach)])
+    # Float noise on a surface-coincident lattice plane is a few ulps of the
+    # coordinate magnitude (measured <= 1e-7 on the starter at float32); a
+    # transversal crossing puts at least ~|grad f| h / 2 on one endpoint.
+    scale = float(np.max(np.abs([origin64, origin64 + spacing64 * np.asarray(grid.cells)])))
+    tolerance = 16.0 * float(jnp.finfo(dtype).eps) * max(scale, 1.0)
 
     # Compiled once, then mapped: the bisection below walks the field
     # sixteen times, and an uncompiled `vmap` over a bare SDF node is
@@ -294,78 +316,156 @@ def edge_hermite_data(
     # this for us: it does not know how many times its field is about to be
     # mapped, and jitting a field that is used once is a pessimisation.
     mapped = jax.jit(jax.vmap(sdf))
+    mapped_with_gradient = jax.jit(jax.vmap(jax.value_and_grad(sdf)))
 
-    def field(points: Array) -> Array:
-        return mapped(points) - level
+    def refine(starts, ends, start_inside):
+        offsets = ends - starts
+        edge_count = starts.shape[0]
 
-    def frozen_field(points: Array) -> Array:
-        return jax.lax.stop_gradient(field(points))
+        def field(points: Array) -> Array:
+            return mapped(points) - level
 
-    def at(t: Array) -> Array:
-        return starts + t[:, None] * offsets
+        def frozen_field(points: Array) -> Array:
+            return jax.lax.stop_gradient(field(points))
 
-    edge_count = edges.count
-    lo = jnp.zeros((edge_count,), dtype=starts.dtype)
-    hi = jnp.ones((edge_count,), dtype=starts.dtype)
-    f_lo = frozen_field(starts)
-    f_hi = frozen_field(ends)
-    # Bisect against the frozen detection-time orientation, not the live sign
-    # of f_lo: when a lattice vertex sits exactly on the surface, its
-    # re-evaluated sign is float noise and would break the bracket invariant.
-    start_inside = jnp.asarray(edges.start_inside, dtype=bool)
+        def at(t: Array) -> Array:
+            return starts + t[:, None] * offsets
 
-    def halve(_iteration, state):
-        lo, hi, f_lo, f_hi = state
-        mid = 0.5 * (lo + hi)
-        f_mid = frozen_field(at(mid))
-        start_side = jnp.signbit(f_mid) == start_inside
-        lo = jnp.where(start_side, mid, lo)
-        f_lo = jnp.where(start_side, f_mid, f_lo)
-        hi = jnp.where(start_side, hi, mid)
-        f_hi = jnp.where(start_side, f_hi, f_mid)
-        return lo, hi, f_lo, f_hi
+        # One walk for both bracket ends and the midpoint.
+        half = jnp.full((edge_count,), 0.5, dtype)
+        f_lo, f_hi, f_mid = jnp.split(frozen_field(jnp.concatenate([starts, ends, at(half)])), 3)
 
-    lo, hi, f_lo, f_hi = jax.lax.fori_loop(0, bisection_iterations, halve, (lo, hi, f_lo, f_hi))
-
-    # One secant step inside the final bracket removes most bisection bias.
-    denominator = f_lo - f_hi
-    bracketed = jnp.abs(denominator) > 1e-30
-    fraction = jnp.where(bracketed, f_lo / jnp.where(bracketed, denominator, 1.0), 0.5)
-    t = lo + jnp.clip(fraction, 0.0, 1.0) * (hi - lo)
-
-    gradient = jax.vmap(jax.grad(sdf))
-    for _step in range(newton_steps):
-        t0 = jax.lax.stop_gradient(t)
-        points = at(t0)
-        residuals = field(points)
-        slopes = jnp.sum(gradient(points) * offsets, axis=-1)
-        usable = jnp.abs(jax.lax.stop_gradient(slopes)) > 1e-12
-        safe_slopes = jnp.where(usable, slopes, 1.0)
-        # A degenerate slope (edge nearly tangent to the surface) must not
-        # fling the root off the edge; one edge length is the trust region.
-        correction = jnp.clip(jnp.where(usable, residuals / safe_slopes, 0.0), -1.0, 1.0)
-        proposed = t0 - correction
-        # On a tangency-degenerate edge the slope is float noise and the
-        # linearization is meaningless; keep a step only if it does not
-        # worsen the frozen residual, else stay at the bisection point.
-        improved = jnp.abs(frozen_field(at(jax.lax.stop_gradient(proposed)))) <= jnp.abs(
-            jax.lax.stop_gradient(residuals)
+        # An edge lying inside a face — both ends and its midpoint on the
+        # surface to float noise — has every point a root and no slope along
+        # it.  Bisection and Newton there follow the sign of ~1e-8 residuals,
+        # so any change in rounding (a compiled program, a JAX upgrade, a
+        # parameter nudge) moves its crossing by up to a whole edge and the
+        # dual vertex with it.  Such an edge takes its midpoint, as a
+        # constant: the midpoint is the centre of the root set, independent
+        # of which endpoint the noise calls inside, and keeps the point on
+        # the face both incident cells share.  Any point of the edge gives
+        # the QEF the same plane; only the mass point and the feature
+        # classification see which, and both want the symmetric choice.  Its
+        # derivative is zero: dt/dθ = -(∂f/∂θ) / (∂f/∂t) has ∂f/∂t = 0, and
+        # the tangential motion it leaves free is taken as none.
+        on_surface = (
+            jnp.maximum(jnp.maximum(jnp.abs(f_lo), jnp.abs(f_hi)), jnp.abs(f_mid)) <= tolerance
         )
-        t = jnp.where(improved, proposed, t0)
 
-    points = at(t)
-    gradients = gradient(points)
-    # A root can land bit-exactly on a surface plane whose SDF has a dead
-    # subgradient there (epsilon-smoothed norms, |x| at 0, polygon
-    # boundaries): the secant is exact on piecewise-linear walls, so this is
-    # common, not exotic.  Re-evaluate degenerate gradients a fraction of an
-    # edge toward the inside endpoint — the same smooth branch, off the
-    # measure-zero point.
-    inward = jnp.where(jnp.asarray(edges.start_inside, dtype=bool), -1e-3, 1e-3)
-    fallback = gradient(at(jax.lax.stop_gradient(t) + inward))
-    degenerate = jnp.sum(jax.lax.stop_gradient(gradients) ** 2, axis=-1) < 1e-12
-    gradients = jnp.where(degenerate[:, None], fallback, gradients)
-    return HermiteData(points=points, gradients=gradients, t=t, values=field(points))
+        # The same noise decides bisection on an edge that runs along a face
+        # and then leaves it: one endpoint on the surface, the other clearly
+        # off, and a whole segment of roots in between.  A sample within the
+        # tolerance counts as the quiet endpoint's side, so bisection finds
+        # where the edge leaves the surface — on a lattice-aligned wall, the
+        # crease — whatever the noise signs along the way.  Edges with
+        # neither endpoint quiet bisect on the sign, as before.
+        lo_quiet = jnp.abs(f_lo) <= tolerance
+        hi_quiet = jnp.abs(f_hi) <= tolerance
+
+        lo = jnp.zeros((edge_count,), dtype=dtype)
+        hi = jnp.ones((edge_count,), dtype=dtype)
+        # Bisect against the frozen detection-time orientation, not the live
+        # sign of f_lo: when a lattice vertex sits exactly on the surface,
+        # its re-evaluated sign is float noise and would break the bracket
+        # invariant.
+
+        def halve(_iteration, state):
+            lo, hi, f_lo, f_hi = state
+            mid = 0.5 * (lo + hi)
+            f_mid = frozen_field(at(mid))
+            quiet = jnp.abs(f_mid) <= tolerance
+            start_side = jnp.where(
+                quiet & (lo_quiet | hi_quiet), lo_quiet, jnp.signbit(f_mid) == start_inside
+            )
+            lo = jnp.where(start_side, mid, lo)
+            f_lo = jnp.where(start_side, f_mid, f_lo)
+            hi = jnp.where(start_side, hi, mid)
+            f_hi = jnp.where(start_side, f_hi, f_mid)
+            return lo, hi, f_lo, f_hi
+
+        lo, hi, f_lo, f_hi = jax.lax.fori_loop(0, bisection_iterations, halve, (lo, hi, f_lo, f_hi))
+
+        # One secant step inside the final bracket removes most bisection bias.
+        denominator = f_lo - f_hi
+        bracketed = jnp.abs(denominator) > 1e-30
+        fraction = jnp.where(bracketed, f_lo / jnp.where(bracketed, denominator, 1.0), 0.5)
+        t = lo + jnp.clip(fraction, 0.0, 1.0) * (hi - lo)
+        t = jnp.where(on_surface, half, t)
+
+        for _step in range(newton_steps):
+            t0 = jax.lax.stop_gradient(t)
+            residuals, gradients = mapped_with_gradient(at(t0))
+            residuals = residuals - level
+            slopes = jnp.sum(gradients * offsets, axis=-1)
+            usable = (jnp.abs(jax.lax.stop_gradient(slopes)) > 1e-12) & ~on_surface
+            safe_slopes = jnp.where(usable, slopes, 1.0)
+            # A degenerate slope (edge nearly tangent to the surface) must
+            # not fling the root off the edge; one edge length is the trust
+            # region.
+            step = jnp.clip(jnp.where(usable, residuals / safe_slopes, 0.0), -1.0, 1.0)
+            # A root already at noise level whose slope is noise too (a dead
+            # subgradient on a face coplanar with a lattice plane: under a
+            # hundredth of unit length along the edge, the test the normals
+            # use below) has nothing to correct, and its step would be a
+            # coin toss across a whole edge.  It moves by nothing and keeps
+            # the implicit derivative.  A healthy slope still takes its step:
+            # on curved walls it buys the last digits the overlay's chords
+            # are sensitive to.
+            stalled = (jnp.abs(jax.lax.stop_gradient(residuals)) <= tolerance) & (
+                jnp.abs(jax.lax.stop_gradient(slopes)) < 1e-2 * jnp.linalg.norm(offsets, axis=-1)
+            )
+            correction = jnp.where(stalled, step - jax.lax.stop_gradient(step), step)
+            proposed = t0 - correction
+            # On a tangency-degenerate edge the slope is float noise and the
+            # linearization is meaningless; keep a step only if it does not
+            # worsen the residual, else stay at the bisection point.  Both
+            # sides of the comparison come from one walk, so they are the
+            # same arithmetic; a step that rounds to nothing is always kept,
+            # since rejecting it would only drop the implicit derivative.
+            stepped = jax.lax.stop_gradient(proposed)
+            before, after = jnp.split(frozen_field(jnp.concatenate([at(t0), at(stepped)])), 2)
+            improved = (jnp.abs(after) <= jnp.abs(before)) | (stepped == t0)
+            t = jnp.where(improved, proposed, t0)
+
+        points = at(t)
+        values, gradients = mapped_with_gradient(points)
+        values = values - level
+        # A root can land bit-exactly on a surface plane whose SDF has a dead
+        # subgradient there (epsilon-smoothed norms, |x| at 0, polygon
+        # boundaries): the secant is exact on piecewise-linear walls, and a
+        # wall coplanar with a lattice plane puts every crossing on it, so
+        # this is common, not exotic.  The autodiff gradient there is zero,
+        # float noise (measured 1e-8, which normalizes to a unit vector in an
+        # arbitrary direction), or a sliver of an epsilon-smoothed norm
+        # (measured 5e-4, pointing along the wall).  Such a crossing, and
+        # every in-plane edge, takes a central difference across all three
+        # lattice axes
+        # instead: exact for a plane through the point at any tilt, the
+        # symmetric bisector on a crease line, and a difference of values
+        # rather than a branch on their sign.  Stepping along the edge alone
+        # (the earlier fallback) stays on the wall when the edge lies in it.
+        probes = points[:, None, :] + probe_offsets[None, :, :]
+        f_probe = field(probes.reshape((-1, 3))).reshape((edge_count, 2, 3))
+        differenced = (f_probe[:, 0] - f_probe[:, 1]) / (2.0 * reach)
+        # Dead is: no length at all (the old test), or under a hundredth of
+        # the unit length a distance field has off such points *and* pointing
+        # away from the difference.  A short gradient that points the right
+        # way (float64 polygon walls: |g| ~ 1e-3 on half the starter tet
+        # mesh's crossings) is kept with its magnitude and its derivative;
+        # replacing it moves the mesh off the fin-tip kink that
+        # `tests/fem/test_starter_tet.py` pins.
+        frozen = jax.lax.stop_gradient(gradients)
+        squared = jnp.sum(frozen**2, axis=-1)
+        difference = jax.lax.stop_gradient(differenced)
+        agrees = jnp.sum(frozen * difference, axis=-1) > 0.9 * jnp.sqrt(
+            squared * jnp.sum(difference**2, axis=-1)
+        )
+        degenerate = (squared < 1e-12) | ((squared < 1e-4) & ~agrees)
+        gradients = jnp.where((degenerate | on_surface)[:, None], differenced, gradients)
+        return HermiteData(points=points, gradients=gradients, t=t, values=values)
+
+    start_inside = jnp.asarray(edges.start_inside, dtype=bool)
+    return refine(starts, ends, start_inside)
 
 
 def detect_edges(
