@@ -67,6 +67,8 @@ quartodoc:
     style: floating
     collapse-level: 1
     contents:
+      - text: Overview
+        href: index.qmd
       - docs/getting-started.qmd
       - section: Guides
         href: docs/guides.qmd
