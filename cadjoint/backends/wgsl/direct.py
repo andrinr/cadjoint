@@ -197,10 +197,11 @@ _PROFILE_FROM_BUFFER = """fn profile_vertex(i: u32) -> vec2<f32> {
 _PROFILE_DISTANCE = """fn profile_distance(p: vec2<f32>, offset: u32, count: u32) -> f32 {
     var d = dot(p - profile_vertex(offset), p - profile_vertex(offset));
     var s = 1.0;
+    // The previous vertex is carried rather than re-read: one buffer load per
+    // edge instead of two, and no modulo. Edge for edge the same arithmetic.
+    var vj = profile_vertex(offset + count - 1u);
     for (var i: u32 = 0u; i < count; i = i + 1u) {
-        let j = (i + count - 1u) % count;
         let vi = profile_vertex(offset + i);
-        let vj = profile_vertex(offset + j);
         let e = vj - vi;
         let w = p - vi;
         let t = clamp(dot(w, e) / dot(e, e), 0.0, 1.0);
@@ -210,6 +211,7 @@ _PROFILE_DISTANCE = """fn profile_distance(p: vec2<f32>, offset: u32, count: u32
         let c2 = p.y < vj.y;
         let c3 = (e.x * w.y) > (e.y * w.x);
         if ((c1 == c2) && (c2 == c3)) { s = -s; }
+        vj = vi;
     }
     return s * sqrt(d);
 }"""
@@ -243,10 +245,11 @@ _PROFILE_DISTANCE_REVOLVED = """fn on_axis(x: f32, axis: f32) -> bool {
 fn profile_distance_revolved(p: vec2<f32>, offset: u32, count: u32, axis: f32) -> f32 {
     var d = 1e30;
     var s = 1.0;
+    // The previous vertex is carried rather than re-read: one buffer load per
+    // edge instead of two, and no modulo. Edge for edge the same arithmetic.
+    var vj = profile_vertex(offset + count - 1u);
     for (var i: u32 = 0u; i < count; i = i + 1u) {
-        let j = (i + count - 1u) % count;
         let vi = profile_vertex(offset + i);
-        let vj = profile_vertex(offset + j);
         let e = vj - vi;
         let w = p - vi;
         if (!(on_axis(vi.x, axis) && on_axis(vj.x, axis))) {
@@ -258,6 +261,7 @@ fn profile_distance_revolved(p: vec2<f32>, offset: u32, count: u32, axis: f32) -
         let c2 = p.y < vj.y;
         let c3 = (e.x * w.y) > (e.y * w.x);
         if ((c1 == c2) && (c2 == c3)) { s = -s; }
+        vj = vi;
     }
     return s * sqrt(d);
 }"""
@@ -290,10 +294,9 @@ _PROFILE_LERPED = """fn profile_distance_lerped(
     let first = mix(profile_vertex(a), profile_vertex(b), t);
     var d = dot(p - first, p - first);
     var s = 1.0;
+    var vj = mix(profile_vertex(a + count - 1u), profile_vertex(b + count - 1u), t);
     for (var i: u32 = 0u; i < count; i = i + 1u) {
-        let j = (i + count - 1u) % count;
         let vi = mix(profile_vertex(a + i), profile_vertex(b + i), t);
-        let vj = mix(profile_vertex(a + j), profile_vertex(b + j), t);
         let e = vj - vi;
         let w = p - vi;
         let u = clamp(dot(w, e) / dot(e, e), 0.0, 1.0);
@@ -303,6 +306,7 @@ _PROFILE_LERPED = """fn profile_distance_lerped(
         let c2 = p.y < vj.y;
         let c3 = (e.x * w.y) > (e.y * w.x);
         if ((c1 == c2) && (c2 == c3)) { s = -s; }
+        vj = vi;
     }
     return s * sqrt(d);
 }"""
