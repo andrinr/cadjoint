@@ -228,6 +228,20 @@ describe("packConstructionOverlay shapes handles", () => {
   const shapes = (handles: number[]) =>
     Array.from({ length: handles.length / floats }, (_, index) => handles[index * floats + floats - 1]);
 
+  it("draws no handles on a derived node, only its skeleton", () => {
+    const derived = {
+      ...node([
+        { free: true, binding: null },
+        { free: false, binding: null },
+      ]),
+      editable: false,
+      edges: [[[0, 0, 0], [1, 0, 0]]],
+    } as unknown as ConstructionNode;
+    const { edges, handles } = packConstructionOverlay([derived], null, null);
+    expect(handles).toHaveLength(0);
+    expect(edges.length).toBeGreaterThan(0);
+  });
+
   it("draws free vertices hollow and held ones square", () => {
     const profile = node(
       [

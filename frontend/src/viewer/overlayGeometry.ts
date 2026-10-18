@@ -140,26 +140,28 @@ export function packConstructionOverlay(
     for (const [start, end] of node.edges) {
       edges.push(start[0], start[1], start[2], end[0], end[1], end[2], ...edgeColor);
     }
+    // A handle is drawn only where it can be taken: a derived (read-only)
+    // node shows its skeleton and no handles, which on a scene built mostly
+    // from derived geometry was a scatter of squares over the part.
+    if (!node.editable) continue;
     for (let index = 0; index < node.vertices.length; index++) {
       const isSelected = selection?.nodeId === node.id && selection.vertexIndex === index;
       const isHovered = hover?.nodeId === node.id && hover.vertexIndex === index;
       const held = vertexHeld(node, index);
       const shape =
-        isSelected && node.editable
+        isSelected
           ? HANDLE_SHAPE.selected
           : held
             ? HANDLE_SHAPE.held
             : HANDLE_SHAPE.free;
       // A free handle keeps its hue on hover and gains weight via the emphasis flag.
-      const handleColor = !node.editable
-        ? tones.handleLocked
-        : isSelected
-          ? tones.handleSelected
-          : !held
-            ? HANDLE_FREE
-            : isHovered
-              ? tones.handleHover
-              : tones.held;
+      const handleColor = isSelected
+        ? tones.handleSelected
+        : !held
+          ? HANDLE_FREE
+          : isHovered
+            ? tones.handleHover
+            : tones.held;
       const position = node.vertices[index].world;
       handles.push(
         position[0],

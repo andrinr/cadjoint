@@ -20,7 +20,9 @@ export const viewport: SectionDef = {
         dashed and faint. A free vertex is a hollow <code>param</code> ring, a held one a filled{" "}
         <code>construction</code> square, the selected one a filled <code>ink</code> circle, each in a sheet casing. A
         dimension label is <code>ink</code> on an opaque tab; a violated one is <code>danger</code> and says by how much.
-        The gizmo and the triad are the only other hues. The skeleton has its own switch in the viewport bar, beside
+        A handle is drawn only where it can be taken: a derived (read-only) node shows its skeleton and no handles. An
+        x-rayed part is outlined in <code>ink</code> where it turns away from the eye, so it stands off the ground by
+        an outline, not by lightness alone. The gizmo and the triad are the only other hues. The skeleton has its own switch in the viewport bar, beside
         projection (<code>⇧C</code>).
       </Rule>
       <Rule

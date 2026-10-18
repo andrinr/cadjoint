@@ -292,15 +292,17 @@ export function ViewportSpecimen(props: { field?: boolean }) {
         <Dimension from={[196, 110]} to={[232, 110]} offset={14} text="0.30 ≠ 0.32" violated />
         <Dimension from={[408, 110]} to={[444, 110]} offset={14} text="0.30" />
         <For each={COMB}>
-          {(point, index) => (
-            <Handle
-              at={point}
-              held={HELD.has(index())}
-              selected={index() === SELECTED_VERTEX}
-              locked={index() === LOCKED_VERTEX}
-              field={props.field}
-            />
-          )}
+          {(point, index) =>
+            // The derived vertex has no handle (V1): only its skeleton shows.
+            index() === LOCKED_VERTEX ? null : (
+              <Handle
+                at={point}
+                held={HELD.has(index())}
+                selected={index() === SELECTED_VERTEX}
+                field={props.field}
+              />
+            )
+          }
         </For>
         {props.field ? null : <Gizmo at={COMB[SELECTED_VERTEX]} />}
         </g>

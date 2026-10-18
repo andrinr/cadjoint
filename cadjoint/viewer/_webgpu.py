@@ -803,6 +803,12 @@ fn trace_pixel(frag_xy: vec2<f32>) -> TraceResult {
         result.color,
         mix(1.0, alpha, xray),
       );
+      // A contour where the surface turns away from the eye, in ink: the
+      // ghost is then separated from the ground by an outline, not by a
+      // fifth of lightness alone, and the skeleton drawn over it is the only
+      // colour on it.
+      let contour = smoothstep(0.82, 0.97, facing);
+      result.color = mix(result.color, vec3<f32>(0.110, 0.094, 0.078), contour * 0.6 * xray);
       // An x-rayed solid still *is* somewhere, and it still writes its depth.
       //
       // This used to clear `occludes`, which made the depth buffer say the ray
