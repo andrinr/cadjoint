@@ -323,10 +323,25 @@ def _selected(
 
 
 #: Compiled :func:`project_table` programs, newest last.  Small: an entry
-#: pins its model alive (see :func:`_table_program`), and a scene edit
+#: pins its model alive through the program's closure, and a scene edit
 #: lowers a new one, so this is a working set and not a registry.
-_TABLE_PROGRAMS: OrderedDict[tuple, tuple[Any, Any]] = OrderedDict()
+_TABLE_PROGRAMS: OrderedDict[tuple, Any] = OrderedDict()
 _TABLE_PROGRAMS_LIMIT = 8
+
+
+def _table_fingerprint(model: Any) -> str:
+    """A digest of everything a table program bakes in: the nodes and the root.
+
+    θ is an argument of the program, not part of it, so it is left out;
+    the parameter names never reach the walker.  Hashing the starter's
+    1 213 nodes costs 0.3 ms and the shield's 12 392 costs 3.5 ms, against
+    seconds of XLA for a miss.
+    """
+    import hashlib
+    import json
+
+    text = json.dumps([model.nodes, model.root], separators=(",", ":"))
+    return hashlib.sha256(text.encode()).hexdigest()
 
 
 def _table_program(
@@ -369,6 +384,14 @@ def _table_program(
     inside an optimizer, and what lets the four fixed-point passes in
     :func:`~cadjoint.fem.hexmesh.with_table` share one compile.
 
+    *Structure* means the table's content (:func:`_table_fingerprint`), not
+    the :class:`~cadjoint.zeroset.table.Model` object.  Every
+    ``SimMesh.build`` lowers its scene afresh, so an ``id()`` key missed on
+    every rebuild of an unchanged scene and recompiled the same programs —
+    identical HLO, ~1.3 MB and up to 5 s of XLA each on the starter — once
+    per build.  Two models with equal nodes and root lower to the same
+    program, so sharing it cannot change a bit of the result.
+
     Args:
         model: A :class:`~cadjoint.zeroset.table.Model`.
         groups: ``((surface ids, point rows), ...)``, non-empty keys only.
@@ -386,13 +409,16 @@ def _table_program(
     for ids, _rows in groups:
         if not 1 <= len(ids) <= 3:
             raise ValueError(f"a point lies on one to three surfaces, not {len(ids)}")
-    key = (id(model), tuple((ids, rows.tobytes()) for ids, rows in groups), steps, max_step)
+    key = (
+        _table_fingerprint(model),
+        tuple((ids, rows.tobytes()) for ids, rows in groups),
+        steps,
+        max_step,
+    )
     cached = _TABLE_PROGRAMS.get(key)
-    # The model is held in the entry, so its id cannot have been recycled
-    # under us; the identity check is the belt to that braces.
-    if cached is not None and cached[0] is model:
+    if cached is not None:
         _TABLE_PROGRAMS.move_to_end(key)
-        return cached[1]
+        return cached
 
     def one_class(count: int, rows: Any, columns: Any, wanted: list[int]):
         values = gathered(model, wanted)
@@ -415,7 +441,7 @@ def _table_program(
             points = run(theta, points)
         return points
 
-    _TABLE_PROGRAMS[key] = (model, program)
+    _TABLE_PROGRAMS[key] = program
     while len(_TABLE_PROGRAMS) > _TABLE_PROGRAMS_LIMIT:
         _TABLE_PROGRAMS.popitem(last=False)
     return program
