@@ -7,7 +7,7 @@
     "build": "tsc --noEmit && vite build"
   },
   "dependencies": {
-    "@jax-js/jax": "0.1.26"
+    "@jax-js/jax": "0.1.27"
   },
   "devDependencies": {
     "tsx": "^4.19.2",
