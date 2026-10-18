@@ -126,6 +126,15 @@ def _iterate(
     program holds one body instead of ``steps`` copies of it; a static
     count lowers to a ``scan``, which differentiates in both modes.
 
+    The transversality test reads the Gram matrix of the *first sweep*
+    rather than one evaluated before the loop.  At iteration 0 the sweep's
+    point is ``start``, so it is the same matrix, and the program carries
+    one copy of ``system`` — for :func:`project_table` a whole walk of the
+    table and its reverse pass — instead of two.  That halves the starter's
+    table programs (1.39 MB → 0.71 MB of HLO, 3.3 s → 1.4 s of XLA for the
+    one-surface class); ``research/performance.md`` §19 has the numbers and
+    what it moves (a few float64 ulps at a handful of nodes, nothing above).
+
     Args:
         system: ``x -> (values, jacobian, gram)``, from :func:`_system`.
         start: Starting positions, ``(N, 3)``.
@@ -142,18 +151,23 @@ def _iterate(
     import jax.numpy as jnp
 
     eye = jnp.eye(count, dtype=start.dtype)
-    _, _, gram0 = system(start)
-    trace0 = jnp.trace(gram0, axis1=-2, axis2=-1)
-    if count == 1:
-        transversal = gram0[:, 0, 0] > _MIN_GRADIENT_SQUARED
-    else:
-        transversal = jnp.linalg.eigvalsh(jax.lax.stop_gradient(gram0))[..., 0] > (
-            transversality * trace0 / count
+
+    def is_transversal(gram, trace):
+        if count == 1:
+            return gram[:, 0, 0] > _MIN_GRADIENT_SQUARED
+        return jnp.linalg.eigvalsh(jax.lax.stop_gradient(gram))[..., 0] > (
+            transversality * trace / count
         )
 
-    def sweep(_iteration, x):
+    def sweep(iteration, carry):
+        x, transversal = carry
         residual, jacobian, gram = system(x)
         trace = jnp.trace(gram, axis1=-2, axis2=-1)
+        # A conditional, not a select: the eigen-solve runs on the first
+        # sweep only.
+        transversal = jax.lax.cond(
+            iteration == 0, is_transversal, lambda _g, _t: transversal, gram, trace
+        )
         # Relative regularisation: a unit-gradient Gram entry is O(1), and
         # the same epsilon has to be meaningful in float32 and float64.
         regularised = gram + (1e-4 * trace + 1e-12)[..., None, None] * eye
@@ -172,9 +186,11 @@ def _iterate(
                 jnp.maximum(jnp.sum(displacement * displacement, axis=-1, keepdims=True), 1e-24)
             )
             x = start + displacement * jnp.minimum(1.0, max_step / length)
-        return x
+        return x, transversal
 
-    x = jax.lax.fori_loop(0, steps, sweep, start)
+    x, transversal = jax.lax.fori_loop(
+        0, steps, sweep, (start, jnp.zeros(start.shape[:1], dtype=bool))
+    )
     return jnp.where(transversal[:, None], x, start)
 
 
