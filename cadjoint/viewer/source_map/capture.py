@@ -62,3 +62,56 @@ def capture_profiles(filename: str = PLAYGROUND_FILENAME):
     finally:
         for cls, original in originals.items():
             cls.__init__ = original
+
+
+@contextmanager
+def capture_scene_graph(filename: str = PLAYGROUND_FILENAME):
+    """Record what the scene tree needs to name the SDF graph the program builds.
+
+    Two things the SDF objects do not carry themselves: the playground line
+    each boolean was constructed on (so it can be paired with the boolean
+    *element* the source map found there), and which placed SDF each
+    ``Solid.box``/``sphere``/``cylinder`` returned (so the graph node can be
+    paired with its construction node).  A sketch needs neither: its features
+    already record the solid they generated.
+
+    Yields:
+        A dict with ``booleans``, a list of ``(boolean, line)`` pairs in
+        construction order (``line`` None unless the program called the
+        boolean's class itself), and ``primitives``, a list of
+        ``(primitive, placed_sdf)`` pairs.  Both hold the objects themselves,
+        so their ``id()`` stays valid while the dict is alive.
+    """
+    from cadjoint.construction.solid import ConstructionPrimitive
+    from cadjoint.sdf.boolean import Difference, Intersection, Union, Xor
+
+    graph: dict[str, list] = {"booleans": [], "primitives": []}
+    initialisers = {cls: cls.__init__ for cls in (Union, Difference, Intersection, Xor)}
+    original_sdf = ConstructionPrimitive.sdf
+
+    def wrap(cls, original):
+        def patched_init(self, *args, **kwargs):
+            original(self, *args, **kwargs)
+            # Only a boolean the program *called* has a call in the source to
+            # pair with: one built by ``a | b`` or inside the library is
+            # constructed from a cadjoint frame, and gets no line.
+            caller = sys._getframe(1)
+            line = caller.f_lineno if caller.f_code.co_filename == filename else None
+            graph["booleans"].append((self, line))
+
+        cls.__init__ = patched_init
+
+    def patched_sdf(self):
+        placed = original_sdf(self)
+        graph["primitives"].append((self, placed))
+        return placed
+
+    for cls, original in initialisers.items():
+        wrap(cls, original)
+    ConstructionPrimitive.sdf = patched_sdf
+    try:
+        yield graph
+    finally:
+        for cls, original in initialisers.items():
+            cls.__init__ = original
+        ConstructionPrimitive.sdf = original_sdf

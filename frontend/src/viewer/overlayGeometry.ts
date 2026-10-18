@@ -110,6 +110,8 @@ export function packConstructionOverlay(
   selection: Selection | null,
   hover: Selection | null,
   overField = false,
+  /** Nodes drawn as selected because a boolean over them is (the object tree's focus). */
+  group: ReadonlySet<string> = new Set(),
 ): { edges: number[]; handles: number[] } {
   const edges: number[] = [];
   const handles: number[] = [];
@@ -127,7 +129,7 @@ export function packConstructionOverlay(
       };
 
   for (const node of profiles) {
-    const selected = selection?.nodeId === node.id;
+    const selected = selection?.nodeId === node.id || group.has(node.id);
     // Whole-object hover previews the pick before it is committed.
     const hovered = hover?.nodeId === node.id && hover.vertexIndex === null;
     const edgeColor = selected
