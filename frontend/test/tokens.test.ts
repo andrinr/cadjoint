@@ -41,6 +41,7 @@ import {
   TEXT_TONES,
   TRACKING,
   GRATICULE_TONES,
+  OVERLAY_TONES,
   VIEWPORT_TONES,
   TYPE_SCALE,
   WEIGHTS,
@@ -298,11 +299,46 @@ describe("chrome legibility", () => {
   });
 });
 
+describe("the construction skeleton", () => {
+  // The part is grey on paper, so the skeleton drawn over it is told apart
+  // by hue: every state of it but `selected` (which is ink, C4) is chromatic,
+  // and none of it shares a family with `param`, which marks a free handle
+  // on the same overlay.
+  it("is drawn in the construction hue, opaque, in every unselected state", () => {
+    for (const name of ["edge", "edgeHover", "edgeLocked", "handle", "handleHover", "handleLocked"]) {
+      const tone = OVERLAY_TONES[name];
+      expect(tone.token, name).toMatch(/^construction/);
+      expect(tone.alpha, name).toBe(1);
+      const [r, g, b] = hexToRgb(CHROME[tone.token]);
+      expect(Math.max(r, g, b) - Math.min(r, g, b), `${name} chroma`).toBeGreaterThan(0.3);
+    }
+    expect(OVERLAY_TONES.edgeSelected.token).toBe("ink");
+    expect(OVERLAY_TONES.handleSelected.token).toBe("ink");
+  });
+
+  it("keeps its states apart from each other and from param", () => {
+    expect(chromeContrast("construction", "construction-strong")).toBeGreaterThan(1.5);
+    expect(chromeContrast("construction", "construction-locked")).toBeGreaterThan(1.3);
+    for (const tone of ["construction", "construction-strong", "construction-locked"] as const) {
+      expect(distance(hexToRgb(CHROME[tone]), hexToRgb(CHROME.param)), tone).toBeGreaterThan(0.4);
+    }
+  });
+});
+
 const distance = (a: Rgb, b: Rgb): number =>
   Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
 
 describe("chrome stays clear of the data palette", () => {
-  const chromeAccents: ChromeToken[] = ["accent", "danger", "param", "ok", "warn"];
+  const chromeAccents: ChromeToken[] = [
+    "accent",
+    "danger",
+    "param",
+    "ok",
+    "warn",
+    "construction",
+    "construction-strong",
+    "construction-locked",
+  ];
 
   it("puts no chrome accent on either ramp's reserved high end", () => {
     for (const name of chromeAccents) {
