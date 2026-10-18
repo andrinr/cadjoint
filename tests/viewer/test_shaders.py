@@ -1191,3 +1191,116 @@ def test_the_section_leaves_the_data_path_on_the_true_field():
         assert "traced_field" in body(name), f"{name} misses the section"
     # And the section itself is exactly an intersection with a half-space.
     assert re.search(r"return max\(field, section_halfspace\(p\)\);", source)
+
+
+UPSCALE_WGSL = Path(__file__).resolve().parents[2] / "frontend/src/viewer/upscale.wgsl"
+
+
+@pytest.mark.skipif(not UPSCALE_WGSL.is_file(), reason="frontend sources not present")
+def test_the_gesture_upscale_covers_the_framebuffer_with_colour_and_depth():
+    """A 2x2 preview stretched over 8x8: each quadrant takes its texel's depth.
+
+    The pass stands in for the full-size preview draw while a gesture is in
+    flight, so it has to write *every* pixel's depth — the grid and the
+    overlays test against it — and depth is the nearest texel's, never a blend.
+    """
+    import numpy as np
+
+    adapter = wgpu.gpu.request_adapter_sync(power_preference="high-performance")
+    device = adapter.request_device_sync()
+    module = device.create_shader_module(code=UPSCALE_WGSL.read_text())
+    pipeline = device.create_render_pipeline(
+        layout="auto",
+        vertex={"module": module, "entry_point": "vs_upscale"},
+        fragment={
+            "module": module,
+            "entry_point": "fs_upscale",
+            "targets": [{"format": "rgba8unorm"}],
+        },
+        primitive={"topology": "triangle-list"},
+        depth_stencil={
+            "format": "depth32float",
+            "depth_write_enabled": True,
+            "depth_compare": "always",
+        },
+    )
+    usage = wgpu.TextureUsage
+    small_color = device.create_texture(
+        size=(2, 2, 1),
+        format="rgba8unorm",
+        usage=usage.TEXTURE_BINDING | usage.COPY_DST,
+    )
+    grey = np.full((2, 2, 4), 128, dtype=np.uint8)
+    device.queue.write_texture(
+        {"texture": small_color}, grey.tobytes(), {"bytes_per_row": 8}, (2, 2, 1)
+    )
+    # Depth can only be written by drawing, so clear the small depth to one
+    # value per pass: 0.25 everywhere is enough to see it carried across.
+    small_depth = device.create_texture(
+        size=(2, 2, 1),
+        format="depth32float",
+        usage=usage.TEXTURE_BINDING | usage.RENDER_ATTACHMENT,
+    )
+    big_color = device.create_texture(
+        size=(8, 8, 1), format="rgba8unorm", usage=usage.RENDER_ATTACHMENT | usage.COPY_SRC
+    )
+    big_depth = device.create_texture(
+        size=(8, 8, 1), format="depth32float", usage=usage.RENDER_ATTACHMENT | usage.COPY_SRC
+    )
+    bind_group = device.create_bind_group(
+        layout=pipeline.get_bind_group_layout(0),
+        entries=[
+            {"binding": 0, "resource": small_color.create_view()},
+            {"binding": 1, "resource": small_depth.create_view()},
+            {"binding": 2, "resource": device.create_sampler(mag_filter="linear")},
+        ],
+    )
+    encoder = device.create_command_encoder()
+    clear = encoder.begin_render_pass(
+        color_attachments=[],
+        depth_stencil_attachment={
+            "view": small_depth.create_view(),
+            "depth_clear_value": 0.25,
+            "depth_load_op": "clear",
+            "depth_store_op": "store",
+        },
+    )
+    clear.end()
+    draw = encoder.begin_render_pass(
+        color_attachments=[
+            {
+                "view": big_color.create_view(),
+                "clear_value": (0, 0, 0, 0),
+                "load_op": "clear",
+                "store_op": "store",
+            }
+        ],
+        depth_stencil_attachment={
+            "view": big_depth.create_view(),
+            "depth_clear_value": 1.0,
+            "depth_load_op": "clear",
+            "depth_store_op": "store",
+        },
+    )
+    draw.set_pipeline(pipeline)
+    draw.set_bind_group(0, bind_group)
+    draw.draw(3)
+    draw.end()
+    device.queue.submit([encoder.finish()])
+
+    colour = (
+        np.frombuffer(
+            device.queue.read_texture({"texture": big_color}, {"bytes_per_row": 256}, (8, 8, 1)),
+            dtype=np.uint8,
+        )
+        .reshape(8, 256)[:, :32]
+        .reshape(8, 8, 4)
+    )
+    depth = np.frombuffer(
+        device.queue.read_texture(
+            {"texture": big_depth, "aspect": "depth-only"}, {"bytes_per_row": 256}, (8, 8, 1)
+        ),
+        dtype=np.float32,
+    ).reshape(8, 64)[:, :8]
+    assert np.all(colour == 128), "every pixel covered with the preview's colour"
+    np.testing.assert_allclose(depth, 0.25)
