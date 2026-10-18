@@ -14,6 +14,7 @@
  */
 import { grad, jit, numpy as np } from "@jax-js/jax";
 import type { Field, Pts } from "./sdf";
+import { chunked } from "./chunk";
 
 export type Lattice = {
   origin: [number, number, number];
@@ -25,10 +26,6 @@ export type Lattice = {
 export type Mesh = { vertices: Float32Array; triangles: Uint32Array; skippedBoundary: number };
 
 type Edges = { axis: Int8Array; index: Int32Array; startInside: Uint8Array; count: number };
-
-const columns = (xs: Float32Array, ys: Float32Array, zs: Float32Array): Pts => ({
-  x: np.array(xs), y: np.array(ys), z: np.array(zs),
-});
 
 /** find_crossing_edges: every lattice edge whose ends straddle zero, by axis then index. */
 function crossingEdges(l: Lattice): Edges {
@@ -74,11 +71,13 @@ function hermite(field: Field, l: Lattice, e: Edges, bisections = 16, newtonStep
     for (let m = 0; m < n; m++) { xs[m] = sx[m] + t[m] * dx[m]; ys[m] = sy[m] + t[m] * dy[m]; zs[m] = sz[m] + t[m] * dz[m]; }
     return [xs, ys, zs] as const;
   };
-  const f = (t: Float64Array) => evalField(columns(...pointsAt(t))).dataSync() as Float32Array;
-  const g = (t: Float64Array) => {
-    const r = evalGrad(columns(...pointsAt(t)));
-    return [r.x.dataSync(), r.y.dataSync(), r.z.dataSync()] as Float32Array[];
-  };
+  const f = (t: Float64Array) =>
+    chunked(...pointsAt(t), (p) => [evalField(p).dataSync() as Float32Array])[0];
+  const g = (t: Float64Array) =>
+    chunked(...pointsAt(t), (p) => {
+      const r = evalGrad(p);
+      return [r.x.dataSync(), r.y.dataSync(), r.z.dataSync()] as Float32Array[];
+    });
 
   const lo = new Float64Array(n), hi = new Float64Array(n).fill(1);
   let fLo = Float64Array.from(f(lo)), fHi = Float64Array.from(f(hi));

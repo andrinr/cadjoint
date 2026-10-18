@@ -8,8 +8,9 @@
 import { init, defaultDevice, numpy as np, grad } from "@jax-js/jax";
 import { field, fieldPerNode, sceneRoot, totalOverFree, totalOverFreePerNode, unsupported, type SceneGraph } from "./src/runtime.ts";
 import { dualContour } from "./src/dc.ts";
+import { sample } from "./src/chunk.ts";
 import { badEdges, badEdgesAfterWeld, stl, volume } from "./src/mesh.ts";
-import { readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 
 function columns(flat: Float32Array) {
   const n = flat.length / 3;
@@ -62,7 +63,7 @@ for (const name of names.length ? names : ["node", "clevis"]) {
   if (doMesh) {
     const { origin: o, spacing: s, cells } = refMesh;
     let t = performance.now();
-    const grid = f(columns(lattice(o, s, cells))).dataSync() as Float32Array;
+    const grid = sample(f, lattice(o, s, cells));
     r.sample_ms = Math.round(performance.now() - t);
     t = performance.now();
     const mesh = dualContour(f, { origin: o, spacing: s, cells, values: grid });
@@ -72,6 +73,22 @@ for (const name of names.length ? names : ["node", "clevis"]) {
     r.python_mesh = { vertices: refMesh.vertices, triangles: refMesh.triangles, bad_edges: refMesh.bad_edges,
                       volume: Math.round(refMesh.volume * 10) / 10 };
     r.cells = cells;
+    // Vertex by vertex against extract_mesh (same order when the counts match).
+    const bin = `${name}.mesh_vertices.bin`;
+    if (existsSync(bin)) {
+      const py = new Float32Array(readFileSync(bin).buffer.slice(0));
+      if (py.length === mesh.vertices.length) {
+        let worst = 0, off = 0;
+        for (let v = 0; v < py.length / 3; v++) {
+          const d = Math.hypot(py[3 * v] - mesh.vertices[3 * v], py[3 * v + 1] - mesh.vertices[3 * v + 1], py[3 * v + 2] - mesh.vertices[3 * v + 2]);
+          worst = Math.max(worst, d);
+          if (d > 1e-3 * s && off++ < 8)
+            ((r.off_vertices ??= []) as number[][][]).push([Array.from(py.subarray(3 * v, 3 * v + 3)), Array.from(mesh.vertices.subarray(3 * v, 3 * v + 3))]);
+        }
+        r.vertex_max_diff_cells = worst / s;
+        r.vertices_off_by_1e3_cell = off;
+      }
+    }
     if (process.argv.includes("--stl"))
       writeFileSync(`${name}.jaxjs.stl`, Buffer.from(await stl(mesh).arrayBuffer()));
   }
