@@ -65,15 +65,29 @@ jobs:
       # cancelled at the timeout or by a newer push, so the cache was never
       # written and every run started cold ("Cache not found", #53). The save
       # below runs whatever the outcome, so even a failing run warms the next.
+      # XLA compiles CPU executables for the host it runs on, and the
+      # persistent cache key does not record which CPU that was. GitHub's
+      # runners are not one model, so an entry written on one and read on
+      # another can compute differently: a run restoring cec2472's cache
+      # failed two knife-edge tests that cec2472 itself passed, with the
+      # same code and the same packages, twice in a row. The CPU model is in
+      # the key, so a run only ever reads executables built for its own CPU.
+      - name: Identify the runner CPU
+        id: cpu
+        run: |
+          model=$(grep -m1 'model name' /proc/cpuinfo | cut -d: -f2- | sed 's/^ *//')
+          echo "CPU: $model"
+          echo "id=$(echo "$model" | sha256sum | cut -c1-12)" >> "$GITHUB_OUTPUT"
+
       - name: Restore the JAX compilation cache
         id: jax-cache
         uses: actions/cache/restore@v4
         with:
           path: ~/.cache/cadjoint/jax
-          key: cadjoint-jax-${{ runner.os }}-py312-${{ hashFiles('pyproject.toml') }}-${{ github.run_id }}
+          key: cadjoint-jax-${{ runner.os }}-${{ steps.cpu.outputs.id }}-py312-${{ hashFiles('pyproject.toml') }}-${{ github.run_id }}
           restore-keys: |
-            cadjoint-jax-${{ runner.os }}-py312-${{ hashFiles('pyproject.toml') }}-
-            cadjoint-jax-${{ runner.os }}-py312-
+            cadjoint-jax-${{ runner.os }}-${{ steps.cpu.outputs.id }}-py312-${{ hashFiles('pyproject.toml') }}-
+            cadjoint-jax-${{ runner.os }}-${{ steps.cpu.outputs.id }}-py312-
 
       # The fast loop only. The `slow` marker is on the tests that take
       # minutes each because they extract a real mesh, run a real solve or a

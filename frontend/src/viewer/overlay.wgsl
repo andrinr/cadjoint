@@ -14,10 +14,18 @@ struct Overlay {
   camera_pos : vec4<f32>,
   // width, height, line width (px), handle radius (px)
   viewport   : vec4<f32>,
-  // depth nudge fraction, unused, unused, unused
+  // depth nudge fraction, casing (px per side; 0 = none), unused, unused
   params     : vec4<f32>,
 };
 @group(0) @binding(0) var<uniform> o: Overlay;
+
+// How opaque a stroke's sheet casing is: enough to part a stroke from a dark
+// facet, short of a solid white band.
+const CASING_ALPHA = 0.75;
+// Hidden skeleton: a 5 px dash in an 8 px period, at 45 % strength.
+const HIDDEN_DASH_PERIOD = 8.0;
+const HIDDEN_DASH_ON = 0.625;
+const HIDDEN_ALPHA = 0.45;
 
 fn half_viewport() -> vec2<f32> {
   return max(o.viewport.xy * 0.5, vec2<f32>(1.0));
@@ -40,7 +48,15 @@ struct EdgeVertex {
   @builtin(position) position : vec4<f32>,
   @location(0) side           : f32,
   @location(1) color          : vec4<f32>,
+  // Screen pixels from the segment's start, for the hidden pass's dashes.
+  // Linear, not perspective-correct: a dash is a screen-space pattern.
+  @location(2) @interpolate(linear) along : f32,
 };
+
+// Half the drawn width of a line in pixels: the stroke, plus its casing.
+fn edge_half_width() -> f32 {
+  return o.viewport.z * 0.5 + max(o.params.y, 0.0);
+}
 
 @vertex
 fn vs_edge(
@@ -68,20 +84,48 @@ fn vs_edge(
   let normal = vec2<f32>(-direction.y, direction.x);
 
   let base = select(clip_start, clip_end, corner.x > 0.5);
-  let offset = normal * (o.viewport.z * 0.5) * corner.y / half_size;
+  let offset = normal * edge_half_width() * corner.y / half_size;
 
   var out: EdgeVertex;
   out.position = vec4<f32>(base.xy + offset * base.w, base.z, base.w);
   out.side = corner.y;
   out.color = color;
+  out.along = corner.x * span;
   return out;
 }
 
 @fragment
 fn fs_edge(input: EdgeVertex) -> @location(0) vec4<f32> {
-  // Feather the outer pixel so lines do not alias into stair steps.
-  let coverage = smoothstep(1.0, 0.55, abs(input.side));
-  return vec4<f32>(input.color.rgb, input.color.a * coverage);
+  let side = abs(input.side);
+  if (o.params.y <= 0.0) {
+    // No casing (mesh edges): feather the outer pixel so lines do not alias
+    // into stair steps.
+    let coverage = smoothstep(1.0, 0.55, side);
+    return vec4<f32>(input.color.rgb, input.color.a * coverage);
+  }
+  // The stroke, cased in sheet. A hue alone separates the skeleton from a
+  // grey part only where the two differ in value as well; the casing is a
+  // pale keyline either side, so the stroke has a light edge over a dark
+  // facet and the same light edge over a light one.
+  let half_width = edge_half_width();
+  let feather = 0.55 / half_width;
+  let core = (o.viewport.z * 0.5) / half_width;
+  let outer = smoothstep(1.0, 1.0 - feather, side);
+  let stroke = smoothstep(core + feather * 0.5, core - feather * 0.5, side);
+  let shade = mix(SHEET, input.color.rgb, stroke);
+  return vec4<f32>(shade, mix(CASING_ALPHA, input.color.a, stroke) * outer);
+}
+
+// The skeleton where the part hides it (x-ray only): the stroke without its
+// casing, dashed, and at a fraction of its strength, so what is behind the
+// solid never carries the weight of what is in front of it.
+@fragment
+fn fs_edge_hidden(input: EdgeVertex) -> @location(0) vec4<f32> {
+  let half_width = edge_half_width();
+  let core = (o.viewport.z * 0.5) / half_width;
+  let coverage = smoothstep(core, core - 0.55 / half_width, abs(input.side));
+  let dash = step(fract(input.along / HIDDEN_DASH_PERIOD), HIDDEN_DASH_ON);
+  return vec4<f32>(input.color.rgb, input.color.a * coverage * dash * HIDDEN_ALPHA);
 }
 
 // Translation axes get their own screen-space shape instead of being assembled
@@ -283,17 +327,22 @@ fn vs_handle(
   return out;
 }
 
-@fragment
-fn fs_handle(input: HandleVertex) -> @location(0) vec4<f32> {
+// One handle's colour and coverage at a point of its quad. Every shape has
+// a sheet casing round it, for the same reason a stroke does: a filled
+// square in the construction hue over a facet of the same value would be a
+// smudge, and a pale rim makes it a mark over any shade.
+fn handle_shade(input: HandleVertex) -> vec4<f32> {
   if (input.shape > 0.5 && input.shape < 1.5) {
     // Held: a filled square, a little inside the circle's radius so the two
-    // shapes carry the same visual weight (7 px square against an 8 px disc).
+    // shapes carry the same visual weight.
     let d = max(abs(input.local.x), abs(input.local.y)) / 0.86;
     if (d > 1.0) {
       discard;
     }
     let edge = smoothstep(1.0, 0.86, d);
-    return vec4<f32>(input.color.rgb, input.color.a * edge);
+    let body = smoothstep(0.80, 0.72, d);
+    let shade = mix(SHEET, input.color.rgb, body);
+    return vec4<f32>(shade, mix(CASING_ALPHA, input.color.a, body) * edge);
   }
   let radius = length(input.local);
   if (radius > 1.0) {
@@ -301,15 +350,31 @@ fn fs_handle(input: HandleVertex) -> @location(0) vec4<f32> {
   }
   let edge = smoothstep(1.0, 0.82, radius);
   if (input.shape > 1.5) {
-    // Selected: a filled disc in the handle's colour (ink).
-    return vec4<f32>(input.color.rgb, input.color.a * edge);
+    // Selected: a filled disc in the handle's colour (ink), cased.
+    let body = smoothstep(0.80, 0.70, radius);
+    let shade = mix(SHEET, input.color.rgb, body);
+    return vec4<f32>(shade, mix(CASING_ALPHA, input.color.a, body) * edge);
   }
   // Free: a ring in the handle's colour around an opaque sheet middle, so the
-  // hollow reads as hollow over a dark solid as well as over paper. The band
-  // is wide enough (~0.35 of the radius) to survive at handle size.
-  let ring = smoothstep(0.56, 0.68, radius);
+  // hollow reads as hollow over a dark solid as well as over paper, inside the
+  // same sheet casing as the filled shapes. The band is wide enough (~0.3 of
+  // the radius) to survive at handle size.
+  let ring = smoothstep(0.46, 0.56, radius) * smoothstep(0.86, 0.78, radius);
   let shade = mix(SHEET, input.color.rgb, ring);
   return vec4<f32>(shade, input.color.a * edge);
+}
+
+@fragment
+fn fs_handle(input: HandleVertex) -> @location(0) vec4<f32> {
+  return handle_shade(input);
+}
+
+// A handle the part hides (x-ray only): the same shape at a fraction of its
+// strength, like the hidden skeleton it sits on.
+@fragment
+fn fs_handle_hidden(input: HandleVertex) -> @location(0) vec4<f32> {
+  let shade = handle_shade(input);
+  return vec4<f32>(shade.rgb, shade.a * HIDDEN_ALPHA);
 }
 
 // ── face highlight ──────────────────────────────────────────────────────────

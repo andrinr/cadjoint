@@ -150,6 +150,32 @@ export const CHROME = {
   "axis-y": "#17742a",
   "axis-z": "#1f5fd2",
 
+  // ── construction ────────────────────────────────────────────────────────
+  // The skeleton the part is built from — sketch edges, axes, construction
+  // circles — and its vertex handles, drawn by the GPU over the solid. This
+  // used to be the ink ladder (`ink-3` at rest), and on paper the part is
+  // grey too: a 2px dark-grey line through a mid-grey solid, and a pale grey
+  // square on a pale grey facet, were the same reading as the shading. A
+  // drawing is two things at once, the part and how it was made, and the
+  // only channel the part does not already use is hue. So the skeleton takes
+  // one, and it takes it alone.
+  //
+  // Magenta, because every other family is spoken for: blue is `param`
+  // (free) and the Z axis, red and green the X and Y axes, amber the accent,
+  // teal the proposal, and the BC hues fill the violets and the reds either
+  // side. 4.9:1 on paper, and separated from the grey part by hue rather
+  // than value, so it reads over a light facet and a dark one alike. Held to
+  // ≥0.2 from every ramp end and BC hue by test/tokens.test.ts.
+  //
+  //   construction         the skeleton and a held handle, at rest
+  //   construction-strong  the same under the pointer
+  //   construction-locked  a node the source does not let you edit: the hue
+  //                        lifted and softened, still ≥3:1 — greyed instead,
+  //                        it went back to reading as the part
+  construction: "#b4138f",
+  "construction-strong": "#7a0a61",
+  "construction-locked": "#b0559c",
+
   // ── viewport ink ────────────────────────────────────────────────────────
   // Everything drawn *inside* the viewport rectangle by the DOM: dimension
   // labels, the hint bar, the mode cue on the viewport border. They stay a
@@ -210,6 +236,9 @@ export const GRATICULE_TONES: ChromeToken[] = ["graticule-line", "graticule-axis
  */
 export const MEANINGFUL_NON_TEXT: ChromeToken[] = [
   "accent-press",
+  "construction",
+  "construction-strong",
+  "construction-locked",
   "warn",
   "rule-strong",
   "rule-heavy",
@@ -462,6 +491,13 @@ export const COLOR_ROLES: ColorRole[] = [
     zones: ["chrome"],
   },
   {
+    role: "construction",
+    token: "construction",
+    means: "how the part is made: sketch edges, axes, construction circles, and a held vertex",
+    carrier: "a line or a filled square, cased in sheet; dashed where the part hides it",
+    zones: ["viewport"],
+  },
+  {
     role: "direction x",
     token: "axis-x",
     means: "world X",
@@ -485,15 +521,30 @@ export const COLOR_ROLES: ColorRole[] = [
 ];
 
 /**
- * Overlay tones the renderer draws inside the viewport, as the guide
- * proposes them: the ink ladder for state, shape for free versus held.
+ * The construction overlay's state ladder (V1): the construction hue at
+ * rest, its darker step under the pointer, `ink` once selected — the one
+ * tone that reads over any field value (C4) — and the greyed hue when the
+ * source locks the node. Free versus held is shape (and `param`), not this.
  */
 export const VIEWPORT_STATES = {
+  rest: "construction",
+  hover: "construction-strong",
+  selected: "ink",
+  locked: "construction-locked",
+} as const satisfies Record<string, ChromeToken>;
+
+/**
+ * The same ladder while a solved field is on screen (V2, C7): the ink steps
+ * the skeleton used before it had a hue. Over a field the field is the only
+ * colour, and the construction magenta sits beside magma's middle — over the
+ * quality view it would read as a value.
+ */
+export const FIELD_VIEWPORT_STATES = {
   rest: "ink-3",
   hover: "ink-2",
   selected: "ink",
-  locked: "rule",
-} as const satisfies Record<string, ChromeToken>;
+  locked: "rule-strong",
+} as const satisfies Record<keyof typeof VIEWPORT_STATES, ChromeToken>;
 
 
 // ── data palettes ─────────────────────────────────────────────────────────
@@ -570,19 +621,21 @@ export type Rgba = [number, number, number, number];
 /**
  * Every overlay tone the renderer draws, as a role token and an alpha.
  *
- * The ink ladder carries state (V1): rest `ink-3`, hover `ink-2`, selected
- * `ink`, locked `rule`. Free versus held is carried by the handle's shape,
- * not a hue, so nothing in this table is chromatic except the axes.
+ * The construction ladder carries the skeleton's state (V1, VIEWPORT_STATES):
+ * rest `construction`, hover `construction-strong`, selected `ink`, locked
+ * `construction-locked`. All four are opaque — an alpha would mix the hue
+ * with whatever grey facet is under it and hand back a grey. Mesh edges,
+ * face highlights and planes are not the skeleton and stay on the ink ladder.
  */
 export const OVERLAY_TONES: Record<string, { token: ChromeToken; alpha: number }> = {
-  edge: { token: "ink-3", alpha: 0.95 },
-  edgeHover: { token: "ink-2", alpha: 1 },
-  edgeSelected: { token: "ink", alpha: 1 },
-  edgeLocked: { token: "rule-strong", alpha: 0.7 },
-  handle: { token: "ink-2", alpha: 1 },
-  handleHover: { token: "ink", alpha: 1 },
-  handleSelected: { token: "ink", alpha: 1 },
-  handleLocked: { token: "rule", alpha: 0.9 },
+  edge: { token: VIEWPORT_STATES.rest, alpha: 1 },
+  edgeHover: { token: VIEWPORT_STATES.hover, alpha: 1 },
+  edgeSelected: { token: VIEWPORT_STATES.selected, alpha: 1 },
+  edgeLocked: { token: VIEWPORT_STATES.locked, alpha: 1 },
+  handle: { token: VIEWPORT_STATES.rest, alpha: 1 },
+  handleHover: { token: VIEWPORT_STATES.hover, alpha: 1 },
+  handleSelected: { token: VIEWPORT_STATES.selected, alpha: 1 },
+  handleLocked: { token: VIEWPORT_STATES.locked, alpha: 1 },
   meshWire: { token: "ink-3", alpha: 0.3 },
   meshSharp: { token: "ink", alpha: 0.95 },
   faceOutline: { token: "ink", alpha: 0.9 },

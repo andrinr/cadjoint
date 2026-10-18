@@ -98,6 +98,14 @@ export async function compileModule(
 export interface DepthPair {
   tested: GPURenderPipeline;
   seen: GPURenderPipeline;
+  /**
+   * Only where the scene is nearer (`depthCompare: "greater"`), with the
+   * overlay's hidden-line fragment: the skeleton behind an x-rayed solid,
+   * dashed and dimmed. Drawn before `tested`, so the two partition the
+   * screen — in front at full weight, behind as a hidden line. Absent for
+   * overlays that have no hidden style.
+   */
+  hidden?: GPURenderPipeline;
 }
 
 export interface OverlayPipelines {
@@ -135,6 +143,11 @@ export function createOverlayPipelines(
     depthWriteEnabled: false,
     depthCompare: "always",
   };
+  const hiddenDepth: GPUDepthStencilState = {
+    format: DEPTH_FORMAT,
+    depthWriteEnabled: false,
+    depthCompare: "greater",
+  };
 
   /**
    * Build one overlay twice: depth-tested, and always visible.
@@ -148,6 +161,7 @@ export function createOverlayPipelines(
   const depthPair = (
     descriptor: Omit<GPURenderPipelineDescriptor, "depthStencil">,
     tested: GPUDepthStencilState,
+    hiddenEntryPoint?: string,
   ): DepthPair => ({
     tested: device.createRenderPipeline({ ...descriptor, depthStencil: tested }),
     seen: device.createRenderPipeline({
@@ -155,6 +169,15 @@ export function createOverlayPipelines(
       label: `${descriptor.label} (through the solid)`,
       depthStencil: alwaysVisibleDepth,
     }),
+    hidden:
+      hiddenEntryPoint && descriptor.fragment
+        ? device.createRenderPipeline({
+            ...descriptor,
+            label: `${descriptor.label} (hidden by the solid)`,
+            fragment: { ...descriptor.fragment, entryPoint: hiddenEntryPoint },
+            depthStencil: hiddenDepth,
+          })
+        : undefined,
   });
 
   const edgePipeline = depthPair(
@@ -180,6 +203,7 @@ export function createOverlayPipelines(
       primitive: { topology: "triangle-list" },
     },
     depthStencil,
+    "fs_edge_hidden",
   );
 
   // The face highlight is the one overlay that is a surface. It must not
@@ -234,6 +258,7 @@ export function createOverlayPipelines(
       primitive: { topology: "triangle-list" },
     },
     depthStencil,
+    "fs_handle_hidden",
   );
 
   const gizmoEdgePipeline = device.createRenderPipeline({

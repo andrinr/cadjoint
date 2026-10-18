@@ -4,7 +4,7 @@ import { Plate, Rule, type SectionDef } from "../kit";
 export const viewport: SectionDef = {
   id: "viewport",
   title: "Viewport",
-  intro: "An instrument face (A1): overlays are achromatic unless they are data or direction (C7).",
+  intro: "An instrument face (A1): overlays are achromatic unless they are data, direction or the skeleton (C7, C10).",
   body: () => (
     <>
       <Rule
@@ -16,10 +16,14 @@ export const viewport: SectionDef = {
           </Plate>
         }
       >
-        Edges take C4's inks, the selected one at 2px. A free vertex is a hollow <code>param</code> ring, a held one a
-        filled square, the selected one a filled <code>ink</code> circle. A dimension label is <code>ink</code> on an
-        opaque tab; a violated one is <code>danger</code> and says by how much. The gizmo and the triad are the only
-        other hues.
+        Edges take C10's construction ladder, the selected one <code>ink</code> at 2px; behind an x-rayed part they are
+        dashed and faint. A free vertex is a hollow <code>param</code> ring, a held one a filled{" "}
+        <code>construction</code> square, the selected one a filled <code>ink</code> circle, each in a sheet casing. A
+        dimension label is <code>ink</code> on an opaque tab; a violated one is <code>danger</code> and says by how much.
+        A handle is drawn only where it can be taken: a derived (read-only) node shows its skeleton and no handles. An
+        x-rayed part is outlined in <code>ink</code> where it turns away from the eye, so it stands off the ground by
+        an outline, not by lightness alone. The gizmo and the triad are the only other hues. The skeleton has its own switch in the viewport bar, beside
+        projection (<code>⇧C</code>).
       </Rule>
       <Rule
         id="V2"
@@ -31,7 +35,7 @@ export const viewport: SectionDef = {
         }
       >
         Over a solved field the field is the only colour: hover and selection are outlines, the legend opaque and
-        labelled at both ends (C7).
+        labelled at both ends (C7), and the skeleton steps back to the ink ladder (<code>ink-3</code> at rest).
       </Rule>
       <Rule id="V3" why="A spacing on an unnamed plane is not a measurement; a value on a perspective view is not to scale.">
         The graticule is furniture (1.4–2.8:1) on the world plane the camera most nearly faces, its spacing stated on a

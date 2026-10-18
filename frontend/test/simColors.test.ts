@@ -189,6 +189,15 @@ describe("WGSL colours come from tokens.ts and nowhere else", () => {
     }
   });
 
+  it("hides the skeleton behind the part as a dashed, dimmed line", () => {
+    const overlay = read("overlay.wgsl");
+    expect(overlay).toMatch(/fn fs_edge_hidden\(/);
+    expect(overlay).toMatch(/fn fs_handle_hidden\(/);
+    expect(overlay).toMatch(/HIDDEN_DASH_PERIOD/);
+    const pipelines = read("pipelines.ts");
+    expect(pipelines).toMatch(/depthCompare: "greater"/);
+  });
+
   it("the overlay keyline and the free handle use INK and SHEET", () => {
     const overlay = read("overlay.wgsl");
     expect(overlay).toMatch(/mix\(input\.color\.rgb, INK,/);

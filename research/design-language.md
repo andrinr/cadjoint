@@ -18,6 +18,13 @@ measurements are printed on: paper, ink, and rules. Every hue on screen therefor
 means a number, and the single accent is the one deliberate exception — and it is
 never a mark, only a ground.
 
+The second exception, added 2026-10 (§3.8): the **construction skeleton** —
+sketch edges, axes, construction circles, held vertices — is drawn in one hue,
+`construction` magenta. In ink it was a grey line through a grey part on grey
+paper, and a reader could not tell how the part was made from the part itself.
+It drops back to the ink ladder whenever a field is on screen, so the sentence
+above still holds wherever a reading is being taken.
+
 Everything below is a consequence of that.
 
 ---
@@ -179,7 +186,7 @@ grid is invisible. `graticule-line` `#adadb3` · `graticule-axis` `#9c9ca2` ·
 
 1. **Chrome hue lives outside the viewport rectangle.** Inside it, the only
    fills are the field ramp, the quality ramp, the four BC hues and proposal
-   cyan.
+   cyan — and, while no field is shown, the construction skeleton (§3.8).
 2. **The panel is docked, not floating over the field.** This is the same
    decision as the zoning rule, not a separate one. A panel floating inside the
    rectangle must be achromatic to stay clean, which is the old problem
@@ -195,6 +202,37 @@ grid is invisible. `graticule-line` `#adadb3` · `graticule-axis` `#9c9ca2` ·
    decoration; delete it.
 5. **Selection inside the viewport is achromatic and high-contrast**, never the
    accent. It must read over any field value.
+
+### 3.8 The construction skeleton
+
+The part is a grey surface on grey paper, and the skeleton it is built from used
+to be the ink ladder drawn over it: `ink-3` hairlines through mid-grey facets,
+`rule`-grey squares on light-grey ones. Andrin's verdict on `cylinder_block` was
+"hard to impossible" to tell the object from its skeleton. Value cannot separate
+them — the part's shading already spans the whole ink range — so the skeleton
+takes the one channel the part does not use, a hue:
+
+| token | value | on paper | job |
+| --- | --- | --- | --- |
+| `construction` | `#b4138f` | 4.9:1 | the skeleton and a held handle, at rest |
+| `construction-strong` | `#7a0a61` | 8.3:1 | the same under the pointer |
+| `construction-locked` | `#b0559c` | 3.7:1 | a node the source does not let you edit |
+
+Selected stays `ink` (rule 5). Magenta because every other family is spoken for:
+blue is `param` and Z, red and green X and Y, amber the accent, teal the
+proposal, and the BC hues fill the violets and reds either side; each tone is
+≥0.2 from every BC hue and both ramps' high ends (`test/tokens.test.ts`).
+
+- **Casing.** Every skeleton stroke and handle has a 0.8px `surface-float`
+  keyline at 75 %, so it has a light edge over a dark facet and over a light one.
+- **Hidden lines.** Through an x-rayed solid the skeleton is drawn twice: where
+  the part hides it, uncased, dashed (5 on, 3 off) and at 45 %; in front, at full
+  weight. Handles behind the part are drawn at 45 %.
+- **Over a field it is ink again.** Magenta sits next to magma(0.5), so while the
+  FEM surface is shown the skeleton is `ink-3` / `ink-2` / `ink` / `rule-strong`
+  and the field is the only colour (rule 1).
+- **One click away.** The viewport bar carries a skeleton switch beside
+  projection — the same switch as View › Show › Construction, `⇧C`.
 
 ---
 
@@ -531,8 +569,9 @@ dark-on-paper with measured contrast.
    not the one accent block, it is achromatic.
 2. **The accent is never ink.** 7.02:1 as a ground, 2.26:1 as ink: a filled block
    with near-black type, or nothing.
-3. **No colour inside the viewport rectangle that is not data.** Selection and
-   hover are achromatic; a chrome accent never enters the field.
+3. **No colour inside the viewport rectangle that is not data** — the one
+   exception being the construction skeleton while no field is shown (§3.8).
+   Selection and hover are achromatic; a chrome accent never enters the field.
 4. **No opacity-faded text.** There are three ink levels; use one.
 5. **No new surface.** Two steps above paper. If a proposed surface is under
    3 ΔOKLab from an existing one, it *is* that surface.

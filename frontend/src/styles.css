@@ -627,8 +627,8 @@ input[type="checkbox"] {
   display: none;
 }
 
-/* How the picture is drawn: projection and render settings, a pair over the
-   view cube in the top-right corner. */
+/* How the picture is drawn: the skeleton, projection and render settings, a
+   row over the view cube in the top-right corner. */
 .view-controls {
   position: absolute;
   top: var(--section);

@@ -709,6 +709,22 @@ test("the projection toggle sits in the viewport bar beside render settings", as
   expect(overlaps, "the toggle is outside the cube's square").toBe(false);
 });
 
+test("the skeleton toggle hides and shows the construction overlay in one click", async ({ page }) => {
+  // The same switch as View › Show › Construction (⇧C), in the viewport bar
+  // beside projection so it does not take a trip into render settings.
+  const bar = page.getByTestId("view-controls");
+  const toggle = bar.getByTestId("skeleton-toggle");
+  await expect(toggle).toBeVisible();
+  await expect(toggle).toHaveAttribute("aria-pressed", "true");
+  await toggle.click();
+  await expect(toggle).toHaveAttribute("aria-pressed", "false");
+  await page.keyboard.press("Shift+C");
+  await expect(toggle).toHaveAttribute("aria-pressed", "true");
+  const skeleton = (await toggle.boundingBox())!;
+  const projection = (await page.getByTestId("projection-toggle").boundingBox())!;
+  expect(Math.abs(skeleton.y - projection.y)).toBeLessThanOrEqual(1);
+});
+
 /** The union of the client rects of every element a selector matches. */
 const inkBox = (page: Page, selector: string) =>
   page.locator(selector).evaluateAll((nodes) => {

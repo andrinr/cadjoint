@@ -29,7 +29,7 @@ import { createSimulateController } from "./components/simulate/controller";
 import { SketchPanel } from "./components/SketchPanel";
 import { ToolRail } from "./components/ToolRail";
 import { Toolbar } from "./components/Toolbar";
-import { ProjectionToggle, ViewCube } from "./components/ViewCube";
+import { ProjectionToggle, SkeletonToggle, ViewCube } from "./components/ViewCube";
 import { LayoutGrid } from "./shell/layoutGrid";
 import { removalLabel } from "./shell/removal";
 import "./shell/layoutGrid.css";
@@ -356,8 +356,12 @@ export function App() {
                   onRevolve={ops.revolveSelection}
                   onFix={() => fixSelectedPoint(ops.addConstraint)}
                 />
-                {/* Projection and render settings, over the view cube. */}
+                {/* Skeleton, projection and render settings, over the view cube. */}
                 <div class="view-controls" data-testid="view-controls">
+                  <SkeletonToggle
+                    shown={render.display().showOverlays}
+                    onToggle={(showOverlays) => render.applyDisplay({ showOverlays })}
+                  />
                   <ProjectionToggle
                     projection={render.display().projection}
                     onProjection={(projection) => render.applyDisplay({ projection })}
