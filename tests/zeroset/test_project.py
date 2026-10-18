@@ -133,3 +133,32 @@ def test_the_table_solve_is_compiled_once_and_reused():
     assert len(project_module._TABLE_PROGRAMS) == 1, "a new design must reuse the program"
     np.testing.assert_allclose(nominal[0][0], 0.5, atol=1e-9)
     np.testing.assert_allclose(moved[0][0], 0.55, atol=1e-9)
+
+
+def test_a_relowered_scene_reuses_the_table_program():
+    """Equal tables share a program, whichever ``Model`` object carries them.
+
+    Every ``SimMesh.build`` lowers its scene afresh, so a cache keyed on the
+    model's ``id()`` recompiled identical programs on every rebuild of an
+    unchanged scene.  A table that differs anywhere still gets its own.
+    """
+    from cadjoint.zeroset import project as project_module
+
+    def scene(size):
+        return Box(size=Vector(size, free=True, name="s"))
+
+    seeds = np.array([[0.7, 0.1, 0.0], [0.6, 0.5, 0.1]])
+    first, again = lower(scene([0.5, 0.4, 0.3])), lower(scene([0.5, 0.4, 0.3]))
+    assert first is not again
+    faces = [i for i, (kind, _f) in enumerate(surfaces(first)) if kind == "patch"]
+    incidence = [[faces[0]], [faces[0], faces[2]]]
+
+    project_module._TABLE_PROGRAMS.clear()
+    a = np.asarray(project_table(first, jnp.asarray(first.theta), seeds, incidence))
+    b = np.asarray(project_table(again, jnp.asarray(again.theta), seeds, incidence))
+    assert len(project_module._TABLE_PROGRAMS) == 1, "an equal table must reuse the program"
+    np.testing.assert_array_equal(a, b)
+
+    other = lower(Box(size=Vector([0.5, 0.4, 0.3])))  # literals in the table, not θ
+    project_table(other, jnp.asarray(other.theta), seeds, incidence)
+    assert len(project_module._TABLE_PROGRAMS) == 2, "a different table gets its own"

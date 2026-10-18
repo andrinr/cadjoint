@@ -151,19 +151,24 @@ def _cases() -> list:
     ]
 
 
-def _shipped_scenes() -> list:
-    """Every scene the playground ships, executed the way the worker does."""
+#: The scenes the playground ships, by stem.  Names only: executing a scene
+#: compiles its construction op by op, so a parametrisation must not do it
+#: at collection — that cost every xdist worker all seven scenes, twice,
+#: before a single test ran, for a parametrisation the fast loop deselects.
+SHIPPED = sorted(path.stem for path in SCENES.glob("*.py"))
+
+
+def _shipped_scene(stem: str):
+    """One shipped scene, executed the way the worker does."""
     from cadjoint.fem.simmesh import capture_sim_meshes
     from cadjoint.optimize import capture_optimizations
     from cadjoint.studies import capture_studies
 
-    found = []
-    for path in sorted(SCENES.glob("*.py")):
-        namespace: dict = {"__builtins__": __builtins__, "__name__": "__cadjoint_playground__"}
-        with capture_sim_meshes(), capture_studies(), capture_optimizations():
-            exec(compile(path.read_text(), str(path), "exec"), namespace, namespace)
-        found.append((path.stem, namespace["scene"]))
-    return found
+    path = SCENES / f"{stem}.py"
+    namespace: dict = {"__builtins__": __builtins__, "__name__": "__cadjoint_playground__"}
+    with capture_sim_meshes(), capture_studies(), capture_optimizations():
+        exec(compile(path.read_text(), str(path), "exec"), namespace, namespace)
+    return namespace["scene"]
 
 
 def _sample(scene, count: int, seed: int) -> np.ndarray:
@@ -208,9 +213,10 @@ def test_culling_reproduces_the_flat_field(name, scene):
 # bound that stops being a lower bound is still caught on every push. What
 # moves to the nightly is the confirmation on the seven real shipped scenes.
 @pytest.mark.slow
-@pytest.mark.parametrize("name,scene", _shipped_scenes(), ids=[n for n, _ in _shipped_scenes()])
-def test_culling_reproduces_the_flat_field_in_shipped_scenes(name, scene):
+@pytest.mark.parametrize("name", SHIPPED)
+def test_culling_reproduces_the_flat_field_in_shipped_scenes(name):
     """The real scenes, at the 100k points the brief asks for."""
+    scene = _shipped_scene(name)
     assert _deviation(scene, _sample(scene, 100_000, seed=11)) <= TOLERANCE
 
 
@@ -295,7 +301,7 @@ def test_both_switch_positions_agree_on_a_shipped_scene(stem):
     from cadjoint.backends.wgsl._culling import CULL_MARGIN
     from cadjoint.backends.wgsl.codegen import CULL_DISABLED_MARGIN
 
-    scene = dict(_shipped_scenes())[stem]
+    scene = _shipped_scene(stem)
     free, fixed, _ = extract_parameters(scene)
     points = _sample(scene, 100_000, seed=19)
     with scalar_lowering():
@@ -317,14 +323,20 @@ def test_the_margin_reaches_every_skip_test():
     """
     from cadjoint.backends.wgsl.codegen import CULL_DISABLED_MARGIN
 
-    scene = dict(_shipped_scenes())["end_cap"]
+    scene = _shipped_scene("end_cap")
     free, fixed, _ = extract_parameters(scene)
     points = _sample(scene, 40_000, seed=23)
+    # Mapped, not jitted.  The property lives in how the tree is traced, and a
+    # `vmap` traces it exactly as a `jit` does — the point is a tracer either
+    # way, so the outlined node functions run their jitted form and every
+    # threshold reads the margin when the field is evaluated.  What the jit
+    # added was XLA compiling end_cap's whole field twice: 19 of this test's
+    # 21 s in the cold per-push run, against 5 s for the two eager maps.
     with scalar_lowering():
-        flat = jax.jit(jax.vmap(functionalize_scene(scene)(free, fixed)[0]))(points)
-        off = jax.jit(
-            jax.vmap(culled_scene_sdf(scene)(free, fixed, jnp.float32(CULL_DISABLED_MARGIN)))
-        )(points)
+        flat = jax.vmap(functionalize_scene(scene)(free, fixed)[0])(points)
+        off = jax.vmap(culled_scene_sdf(scene)(free, fixed, jnp.float32(CULL_DISABLED_MARGIN)))(
+            points
+        )
     assert float(np.max(np.abs(np.asarray(flat) - np.asarray(off)))) <= TOLERANCE
 
 

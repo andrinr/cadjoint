@@ -58,8 +58,9 @@ def project(
         The projected points as a JAX array, ``(N, 3)``; a refused point is
         returned where it started.
     """
-    import jax
     import jax.numpy as jnp
+
+    from cadjoint._compiled import call_jit
 
     if not 1 <= len(fields) <= 3:
         raise ValueError(f"a point lies on one to three surfaces, not {len(fields)}")
@@ -76,8 +77,10 @@ def project(
     # calls — a cached program would hold the first as a dead tracer and
     # bake the second in as a stale constant.  `project_table`, the caller
     # that runs this in a loop, takes the design as an *argument* and so
-    # can and does cache its program (:func:`_table_program`).
-    return jax.jit(run)(jnp.asarray(points))
+    # can and does cache its program (:func:`_table_program`).  A call
+    # whose program is byte for byte one already compiled reuses that
+    # executable (:func:`cadjoint._compiled.call_jit`).
+    return call_jit(run, jnp.asarray(points))
 
 
 def _system(fields: Sequence[Callable[[Any], Any]]) -> Callable[[Any], Any]:
@@ -126,6 +129,15 @@ def _iterate(
     program holds one body instead of ``steps`` copies of it; a static
     count lowers to a ``scan``, which differentiates in both modes.
 
+    The transversality test reads the Gram matrix of the *first sweep*
+    rather than one evaluated before the loop.  At iteration 0 the sweep's
+    point is ``start``, so it is the same matrix, and the program carries
+    one copy of ``system`` — for :func:`project_table` a whole walk of the
+    table and its reverse pass — instead of two.  That halves the starter's
+    table programs (1.39 MB → 0.71 MB of HLO, 3.3 s → 1.4 s of XLA for the
+    one-surface class); ``research/performance.md`` §19 has the numbers and
+    what it moves (a few float64 ulps at a handful of nodes, nothing above).
+
     Args:
         system: ``x -> (values, jacobian, gram)``, from :func:`_system`.
         start: Starting positions, ``(N, 3)``.
@@ -142,18 +154,23 @@ def _iterate(
     import jax.numpy as jnp
 
     eye = jnp.eye(count, dtype=start.dtype)
-    _, _, gram0 = system(start)
-    trace0 = jnp.trace(gram0, axis1=-2, axis2=-1)
-    if count == 1:
-        transversal = gram0[:, 0, 0] > _MIN_GRADIENT_SQUARED
-    else:
-        transversal = jnp.linalg.eigvalsh(jax.lax.stop_gradient(gram0))[..., 0] > (
-            transversality * trace0 / count
+
+    def is_transversal(gram, trace):
+        if count == 1:
+            return gram[:, 0, 0] > _MIN_GRADIENT_SQUARED
+        return jnp.linalg.eigvalsh(jax.lax.stop_gradient(gram))[..., 0] > (
+            transversality * trace / count
         )
 
-    def sweep(_iteration, x):
+    def sweep(iteration, carry):
+        x, transversal = carry
         residual, jacobian, gram = system(x)
         trace = jnp.trace(gram, axis1=-2, axis2=-1)
+        # A conditional, not a select: the eigen-solve runs on the first
+        # sweep only.
+        transversal = jax.lax.cond(
+            iteration == 0, is_transversal, lambda _g, _t: transversal, gram, trace
+        )
         # Relative regularisation: a unit-gradient Gram entry is O(1), and
         # the same epsilon has to be meaningful in float32 and float64.
         regularised = gram + (1e-4 * trace + 1e-12)[..., None, None] * eye
@@ -172,9 +189,11 @@ def _iterate(
                 jnp.maximum(jnp.sum(displacement * displacement, axis=-1, keepdims=True), 1e-24)
             )
             x = start + displacement * jnp.minimum(1.0, max_step / length)
-        return x
+        return x, transversal
 
-    x = jax.lax.fori_loop(0, steps, sweep, start)
+    x, transversal = jax.lax.fori_loop(
+        0, steps, sweep, (start, jnp.zeros(start.shape[:1], dtype=bool))
+    )
     return jnp.where(transversal[:, None], x, start)
 
 
@@ -323,10 +342,25 @@ def _selected(
 
 
 #: Compiled :func:`project_table` programs, newest last.  Small: an entry
-#: pins its model alive (see :func:`_table_program`), and a scene edit
+#: pins its model alive through the program's closure, and a scene edit
 #: lowers a new one, so this is a working set and not a registry.
-_TABLE_PROGRAMS: OrderedDict[tuple, tuple[Any, Any]] = OrderedDict()
+_TABLE_PROGRAMS: OrderedDict[tuple, Any] = OrderedDict()
 _TABLE_PROGRAMS_LIMIT = 8
+
+
+def _table_fingerprint(model: Any) -> str:
+    """A digest of everything a table program bakes in: the nodes and the root.
+
+    θ is an argument of the program, not part of it, so it is left out;
+    the parameter names never reach the walker.  Hashing the starter's
+    1 213 nodes costs 0.3 ms and the shield's 12 392 costs 3.5 ms, against
+    seconds of XLA for a miss.
+    """
+    import hashlib
+    import json
+
+    text = json.dumps([model.nodes, model.root], separators=(",", ":"))
+    return hashlib.sha256(text.encode()).hexdigest()
 
 
 def _table_program(
@@ -369,6 +403,14 @@ def _table_program(
     inside an optimizer, and what lets the four fixed-point passes in
     :func:`~cadjoint.fem.hexmesh.with_table` share one compile.
 
+    *Structure* means the table's content (:func:`_table_fingerprint`), not
+    the :class:`~cadjoint.zeroset.table.Model` object.  Every
+    ``SimMesh.build`` lowers its scene afresh, so an ``id()`` key missed on
+    every rebuild of an unchanged scene and recompiled the same programs —
+    identical HLO, ~1.3 MB and up to 5 s of XLA each on the starter — once
+    per build.  Two models with equal nodes and root lower to the same
+    program, so sharing it cannot change a bit of the result.
+
     Args:
         model: A :class:`~cadjoint.zeroset.table.Model`.
         groups: ``((surface ids, point rows), ...)``, non-empty keys only.
@@ -386,13 +428,16 @@ def _table_program(
     for ids, _rows in groups:
         if not 1 <= len(ids) <= 3:
             raise ValueError(f"a point lies on one to three surfaces, not {len(ids)}")
-    key = (id(model), tuple((ids, rows.tobytes()) for ids, rows in groups), steps, max_step)
+    key = (
+        _table_fingerprint(model),
+        tuple((ids, rows.tobytes()) for ids, rows in groups),
+        steps,
+        max_step,
+    )
     cached = _TABLE_PROGRAMS.get(key)
-    # The model is held in the entry, so its id cannot have been recycled
-    # under us; the identity check is the belt to that braces.
-    if cached is not None and cached[0] is model:
+    if cached is not None:
         _TABLE_PROGRAMS.move_to_end(key)
-        return cached[1]
+        return cached
 
     def one_class(count: int, rows: Any, columns: Any, wanted: list[int]):
         values = gathered(model, wanted)
@@ -415,7 +460,7 @@ def _table_program(
             points = run(theta, points)
         return points
 
-    _TABLE_PROGRAMS[key] = (model, program)
+    _TABLE_PROGRAMS[key] = program
     while len(_TABLE_PROGRAMS) > _TABLE_PROGRAMS_LIMIT:
         _TABLE_PROGRAMS.popitem(last=False)
     return program

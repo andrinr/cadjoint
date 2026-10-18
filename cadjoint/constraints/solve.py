@@ -12,6 +12,7 @@ import optax
 import optimistix as optx
 from jax import Array
 
+from cadjoint._compiled import call_jit
 from cadjoint.constraints.residual import (
     _collect_constraints,
     build_residual_fn,
@@ -97,6 +98,9 @@ def _newton_scan(flat_fn, values: Array, steps: int) -> tuple[Array, Array]:
     ``flat_fn`` is closed over rather than passed as a static argument so the
     jit cache dies with this call; ``build_residual_fn`` hands out a fresh
     closure per solve, so a module-level cache keyed on it would only grow.
+    A solve whose program is byte for byte one already compiled reuses that
+    executable (:func:`cadjoint._compiled.call_jit`) — re-solving a sketch
+    at the same values is common, and each solve used to recompile.
     """
 
     def step(x: Array, _) -> tuple[Array, Array]:
@@ -105,12 +109,11 @@ def _newton_scan(flat_fn, values: Array, steps: int) -> tuple[Array, Array]:
         correction = jnp.linalg.lstsq(jacobian @ jacobian.T, residual)[0]
         return x - jacobian.T @ correction, jnp.mean(jnp.square(residual))
 
-    @jax.jit
     def run(start: Array) -> tuple[Array, Array]:
         final, history = jax.lax.scan(step, start, None, length=steps)
         return final, jnp.concatenate([history, _loss(flat_fn, final)[None]])
 
-    return run(values)
+    return call_jit(run, values)
 
 
 def _gradient_projection(
@@ -135,12 +138,11 @@ def _gradient_projection(
         updates, state = optimizer.update(gradient, state, x)
         return (optax.apply_updates(x, updates), state), loss
 
-    @jax.jit
     def run(start: Array) -> tuple[Array, Array]:
         (final, _), history = jax.lax.scan(step, (start, optimizer.init(start)), None, length=steps)
         return final, jnp.concatenate([history, _loss(flat_fn, final)[None]])
 
-    x, losses = run(values)
+    x, losses = call_jit(run, values)
     return x, _history(losses)
 
 

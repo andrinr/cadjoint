@@ -18,3 +18,14 @@ sharp-corner placement error against scikit-image marching cubes on the same vol
 the wall time of one reverse-mode mesh-loss gradient. Run with:
 
     python benchmarks/dual_contouring_bench.py --resolutions 16 32 64 [--repeats 3] [--json out.json]
+
+`suite_compile_probe.py` is a pytest plugin and its report: every XLA compile the
+suite triggers, with its program, seconds, HLO size, module digest and the
+repository frames that asked for it, one JSON line per compile per process. The
+report separates what a cache-off run pays, the in-worker repeats a persistent
+cache would serve from disk, and the globally unique programs that only changing
+the code can make cheaper (`research/performance.md` §19). Run with:
+
+    PYTHONPATH=.:benchmarks CADJOINT_NO_COMPILATION_CACHE=1 COMPILE_PROBE_DIR=/tmp/probe \
+        pytest tests -m "not slow" -n 4 -p suite_compile_probe -p no:cacheprovider
+    python benchmarks/suite_compile_probe.py /tmp/probe

@@ -2972,3 +2972,247 @@ holds the cache.
 Check `uptime` first, and interleave the arms — every number in §18.4 was
 taken at load average 8–9 with three other pytest sessions on the machine,
 and the ratios are fair only because the two arms are adjacent in time.
+
+---
+
+# 19. Compile time, measured where it is paid (2026-10-18)
+
+The question: most of the per-push CI time and the viewer's cold latency is
+XLA compilation rather than numerics, so grind it down — without changing a
+result. Measured on the same machine as §15 (Apple Silicon, jax 0.8.2,
+CPython 3.14.5), with three other sessions running alongside: load averages
+4–10 throughout and higher in places, so every A/B below was taken arm
+against arm, back to back, each arm with its own cache directory.
+
+## 19.1 The instrument
+
+`benchmarks/suite_compile_probe.py` is a pytest plugin that logs every
+`compile_or_get_cached` the suite makes — program, seconds, HLO bytes, a
+digest of the module, and the repository frames that asked for it — and a
+report that splits the seconds three ways, because they answer different
+questions:
+
+* **all compiles**: what `CADJOINT_NO_COMPILATION_CACHE=1` pays;
+* **in-worker identical repeats**: a module the same process had already
+  compiled. A persistent cache serves these from disk; nothing else does;
+* **globally unique programs**: what a cold CI runner with an empty shared
+  cache pays, the floor that only changing the programs can lower.
+
+The split matters because a fix for the second kind is invisible to a user
+whose cache is on, and a fix for the third is the only one a cold runner
+sees. A first pass that identified programs by name and HLO *size* badly
+undercounted distinct programs: shapes barely change bytecode size, so a
+one-op `multiply` at 5741 rows and at 5782 rows look alike. The digest is
+the identity that holds.
+
+## 19.2 Where the seconds were
+
+The per-push suite (`pytest tests -m "not slow" -n 4`, cold, cache off), three
+baseline runs at `e87e83a`: **456 / 506 / 469 s** wall, 2528–2749 CPU-s.
+
+| | XLA CPU-s |
+|---|---:|
+| all compiles (49 021) | 922 |
+| one-op eager programs (< 3 KB HLO, 45 074) | 589 |
+| in-worker identical repeats | 274 |
+| globally unique programs (30 054) | 552 |
+
+By site, the large programs were concentrated: `project_table`'s per-class
+solves 92 s (131 of 207 compiles identical repeats), `project`'s fresh jit
+57 s (212 of 435), the constraint solver's `_newton_scan` 19 s (318 of 393),
+and one test, `test_the_margin_reaches_every_skip_test`, 19 s for two
+programs. Everything else is §15's eager storm: a field walked op by op, each
+primitive at each shape its own ~12 ms program. Collection alone compiled
+316 programs per worker (§19.4, item 3).
+
+The viewer's cold requests split the same way. On `starter` the single
+largest program in `simulate` and `optimize` was `project_table`'s
+one-surface class (3.3–3.7 s of XLA); on `end_cap` there is no large program
+at all — a cold `simulate` was 1 949 compiles, 562 of them one walk of the
+field at the cut-cell quadrature's 46 452 points.
+
+## 19.3 Why "just jit it" changes results
+
+The obvious fix for an eager storm is a `jit`, and §17.5 already found that
+compiling the Hermite gradient moves QEF vertices by up to 3.8e-2. The
+mechanism is narrow and worth knowing: **XLA's CPU backend contracts a fused
+multiply and add into an FMA**, which an eager program — one op per program —
+cannot do. `a * b + c` on 100 000 random float32 triples differs between eager
+and jitted in 23 448 elements, `sqrt(a*a + b*b)` in 8 113; `exp`, a division
+and a scaled division differ in none.
+
+No flag turns it off. `xla_cpu_enable_fast_math=false` (the default),
+`xla_cpu_strict_dot_conv_math`, `xla_cpu_enable_fast_min_max=false`,
+`xla_cpu_use_fusion_emitters=false` and `xla_llvm_disable_expensive_passes`
+leave the count unchanged; `fp-contract` is not an accepted
+`xla_backend_extra_options` entry. `xla_backend_optimization_level=0` does
+stop the contraction in the two-op case — and still is not bit-identical to
+eager on any shipped scene (67 to 2 191 differing words of value and
+gradient over 5 000 points), because HLO-level rewrites differ too.
+
+So every change below falls in one of two classes, and they are committed
+separately so the second can be dropped:
+
+* **bit-identical by construction** — the same module is compiled fewer
+  times, or a test stops paying for something it never used;
+* **float round-off, measured** — the program changes, so XLA fuses
+  differently; each such commit says in its message, in capitals, what moved
+  and by how much, and that no discrete decision changed.
+
+## 19.4 What changed
+
+| # | commit | class | what |
+|---|---|---|---|
+| 1 | `project_table` keyed on content | identical | `_TABLE_PROGRAMS` was keyed on `id(model)`; every `SimMesh.build` lowers a new model, so an unchanged scene recompiled identical programs per build. Now a SHA-256 of nodes and root (0.3 ms starter, 3.5 ms shield). |
+| 2 | transversality from the first sweep | round-off | `_iterate` walked `system(start)` before the loop only for the transversality test, so every table program held two copies of the table walk and its reverse pass. It now reads sweep 0's Gram in a `lax.cond`. |
+| 3 | no scene exec at collection | identical (test-only) | `test_wgsl_culling.py` executed all seven scenes twice at import for a slow-marked parametrisation. |
+| 4 | `call_jit` | identical | `project()` and the solver's scanned runs jit a fresh function per call on purpose; `cadjoint._compiled.call_jit` lowers, then reuses an executable whose debug-stripped bytecode — JAX's own persistent-cache identity — matches. Plain `jit` inside any trace. |
+| 5 | margin test mapped eagerly | identical (test-only) | the property lives in how the tree is traced, which a `vmap` does exactly as a `jit`; 19 s of XLA for two programs the test never needed. |
+| 6 | cut-cell quadrature compiled | round-off | `solve_thermal` runs eagerly, so `quadrature` walked the field op by op at 46 452 points; `classify` already jits the same field. |
+
+What the round-off commits move, against `main`:
+
+| | what moved | discrete decisions |
+|---|---|---|
+| #2, starter | 8 of 5 741 nodes by ≤ 5.7e-14; temperature max rel 8.3e-16 | cells identical |
+| #2, bracket | 2 of 1 428 nodes by ≤ 4.3e-14; displacement max rel 2.4e-10 | cells identical |
+| #2, starter optimize | nothing: history and parameters equal to every digit | — |
+| #2, viewer payloads | nothing: `mesh --public` starter and end_cap (overlay included), `mesh` starter, `simulate` end_cap | — |
+| #2, `test_projection` adjoint | 118.58440779833472 in both arms | — |
+| #6, end_cap | dofs max rel 1.3e-14; temperature 2.4e-15; volume mean 1.9e-16; payload identical | the cut structure is classified before the quadrature and cannot move |
+
+The baseline itself is bit-deterministic run to run, so these are the
+changes' and not noise.
+
+## 19.5 The numbers
+
+Viewer requests, `benchmarks/jax_compile_profile.py`, own empty cache per arm
+(cold), the same directory in a fresh process (warm), arms interleaved, two
+rounds; `mesh` with `--public`. Best of the two rounds, since every
+disturbance here is additive load from other sessions:
+
+| request | cold before | cold after | warm before | warm after | XLA cold before → after |
+|---|---:|---:|---:|---:|---:|
+| starter compile | 1.07 s | 1.13 s | 0.51 s | 0.51 s | 0.54 → 0.59 s |
+| starter mesh | 5.18 s | 5.40 s | 2.30 s | 2.17 s | 3.27 → 3.42 s |
+| starter simulate | 12.98 s | **9.64 s** | 3.73 s | **2.94 s** | 9.72 → 7.05 s |
+| starter optimize (2 steps) | 26.55 s | **24.80 s** | 10.80 s | **9.81 s** | 16.64 → 15.63 s |
+| end_cap compile | 1.24 s | 1.23 s | 0.60 s | 0.58 s | 0.66 → 0.67 s |
+| end_cap mesh | 18.04 s | 17.82 s | 7.30 s | 7.25 s | 11.22 → 11.08 s |
+| end_cap simulate | 31.91 s | **19.37 s** | 9.71 s | **6.74 s** | 22.34 → 12.86 s |
+
+`compile` and `mesh` were not touched and do not move (the differences are
+inside the round-to-round spread). `end_cap` declares no optimization.
+
+The per-push suite, `pytest tests -m "not slow" -n 4`, cold, cache off. Base
+is four runs at `e87e83a` across the session; the branch row "checkpoint" is
+after commits 1–4, "final" after all six, taken back to back with the last
+base run (load 10–21 during the final arm, 7–9 during that base arm):
+
+| | wall | CPU (user) | XLA CPU-s | in-worker repeats | globally unique | compiles |
+|---|---:|---:|---:|---:|---:|---:|
+| base | 456 / 506 / 469 / 459 s | 2495–2749 s | 891–922 | 267–274 | 533–552 | 48 973 |
+| checkpoint (1–4) | 391 s | 1999 s | 692 | 163 | 447 | — |
+| final (1–6) | 412 s | 2072 s | 710 | 179 | 451 | 46 566 |
+
+About **−13 to −17 % wall and −20 to −25 % of XLA CPU**, with the same pass/fail
+set throughout (five failures, all pre-existing on `main`:
+`test_bracket_demo::test_declared_mesh_and_study_are_wired`,
+`test_crease_motion` §16.8, `test_tet_refinement::…_counts_are_unchanged`,
+`test_projection::…off_the_kink` §16.4, and `test_cache::…round_trips_through_disk`,
+which fails only because `CADJOINT_NO_COMPILATION_CACHE=1` reaches the
+subprocess it spawns, and passes with the cache on).
+The XLA column inflates with load — the final arm's 710 against the
+checkpoint's 692 is the machine, not the last two commits, which each
+remove compiles. Most of what remains is the one-op eager tier (516 of 710 s),
+which §19.3 explains and §19.7 itemises.
+
+## 19.6 Tried and not taken
+
+* **A shape-stable `project_table`.** A parameter edit recompiles the
+  starter's one-surface program on a warm cache (1.55–1.64 s of a 2.2–5.0 s
+  XLA bill per edit), because the incidence rows are baked in. Passing rows
+  and columns as arguments, padded onto `fem/rungs.py`'s ladder, would let an
+  edit reuse it. Built and measured: it is *slower* to compile (one-surface
+  class 1.39 → 2.64 s; its reverse program 3.3 → 7.4 s — runtime column
+  indices turn the gather's transpose into a general scatter) and not
+  bit-identical. Reverted.
+* **Padding eager batches onto a common rung**, so the field's one-op
+  programs are shared between calls: the end_cap storm sits at two batch
+  sizes, 46 452 and 2 288, twenty times apart. Nothing to merge.
+* **Lower optimisation level for one-op programs.** §19.3: not bit-identical,
+  and JAX offers no per-primitive compile options.
+* **Jitting `flow/steady.py`'s top-level `while_loop`** (5 s of repeats): an
+  eager `while_loop` passes its body's constants as runtime operands, and a
+  jit around it would inline them as constants, which can move bits.
+
+## 19.7 What is left
+
+* **The Hermite path, and why it is blocked on a meshing fix rather than on
+  numerics.** Compiling the whole of `edge_hermite_data` as one program
+  (bisection, Newton, normals and fallback, with the duplicate field walks
+  merged) was built and measured: starter `mesh --public` cold 5.4 → 3.8 s,
+  end_cap `mesh --public` 18.7 → 13.7 s, end_cap `simulate` roughly halved.
+  It changes no topology (the wire layer is identical on both scenes) but it
+  moves 76 starter overlay vertices by more than 1e-3, up to 0.081 — most of a
+  cell — and the sharp layer goes 396 → 448 chords with a spurious crease
+  across the fins' mid-height in the side view. Reverted.
+
+  The cause is not FMA as such. Every edge whose crossing moved has *both*
+  lattice endpoints on the surface to ~1e-8: the edge lies inside a planar
+  face. There the Newton slope is ~0, the correction clips to a whole edge,
+  and its direction is the sign of a ~1e-8 residual — float noise. Eager and
+  compiled arms both roll dice on those edges (10 of 1 526 on the starter
+  overlay, t differing by exactly 1.0); the eager arm's happen to draw the
+  clean picture, and any change to rounding — fusion, a JAX upgrade, a
+  parameter nudge — rerolls them. Blocking contraction on the crossing
+  arithmetic with `optimization_barrier` changes nothing, which is how the
+  first explanation (FMA moving a crossing off a plane) was ruled out.
+
+  The fix belongs in the refinement: an edge with both endpoint values below
+  a tolerance is on the surface along its length and should not be
+  Newton-stepped. With that, the compiled form should be safe to take, and is
+  the largest remaining cold-time lever in `mesh` and in the cut-cell
+  `simulate`. One more trap found on the way: the Newton trust check
+  compares two field evaluations, so both must come from the same program
+  — mixing the compiled `mapped` walk with a bare `vmap` under a top-level
+  `grad` flipped `<=` on 24 sphere edges and zeroed their derivative.
+* **jax-fem's problem construction** (`fem/jaxfem.py:312/357/916`,
+  `<string>:10/12`): ~35 s of in-worker repeats across the suite, inside a
+  third-party package (§18.6).
+* **Eager scene construction**: polygon orientation, sketch frames and
+  constraint residuals compile 73–236 programs per scene exec (1.6 s cold on
+  end_cap, 2.3 s on the shield), paid by every viewer request.
+* **Top-level `grad`/`vmap` around `project`**: `call_jit` steps aside under
+  any trace, and a top-level JVP or batch trace still compiles a fresh
+  program per call (36 of 57 identical in the suite).
+* **The shield's two slow `SimMesh` tests were not verified.**
+  `tests/scenes/test_motor_shield.py -m slow` passed 12 GB of RSS within
+  190 s on this branch and within 160 s on `e87e83a`, and both runs were
+  stopped there; 3eaf699's memory blowup is still present on `main` and is
+  not made worse here. Every other slow test the changes reach — `tests/zeroset`,
+  the two-Tesseract descent, `test_cylinder_block`, `test_patch_properties`,
+  the culling sweep on duct_sink, bracket, starter and end_cap and the end_cap
+  switch test — passes (35 of 35).
+* **The margin test's sensitivity.** A mutant that makes three of the four
+  skip tests read the build-time margin passes it, jitted or not: culling is
+  exact on end_cap's sampled points, so a stale margin changes no value
+  there. A scene where a skip is *approximate* would make the test bite.
+
+## 19.8 Reproducing
+
+    S=/tmp/c19; mkdir -p $S
+    # the suite, cold, with the split of §19.1
+    PYTHONPATH=.:benchmarks CADJOINT_NO_COMPILATION_CACHE=1 COMPILE_PROBE_DIR=$S/probe \
+        pytest tests -m "not slow" -n 4 -p suite_compile_probe -p no:cacheprovider
+    python benchmarks/suite_compile_probe.py $S/probe
+    # one viewer request, cold then warm, against its own cache
+    rm -rf $S/cache
+    CADJOINT_CACHE_DIR=$S/cache python benchmarks/jax_compile_profile.py \
+        --scene scenes/end_cap.py --mode simulate
+    CADJOINT_CACHE_DIR=$S/cache python benchmarks/jax_compile_profile.py \
+        --scene scenes/end_cap.py --mode simulate
+
+For a before/after, keep a second worktree at the base commit and alternate
+the arms; the round-to-round spread at load 5–8 was up to 50 % on a single
+cold request, the arm-to-arm ratio within a round far less.
