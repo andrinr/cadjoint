@@ -66,7 +66,7 @@ import { VIEW_PRESETS, sameView } from "../viewer/display";
 import type { Projection } from "../viewer/math";
 import { VIEW_KEYS, typingTarget } from "../shortcuts";
 import { PITCH_LIMIT } from "./viewer/camera";
-import { OrthographicIcon, PerspectiveIcon } from "./icons";
+import { OrthographicIcon, SkeletonIcon, PerspectiveIcon } from "./icons";
 
 /** SVG units per cube unit. The cube's half-edge is 1. */
 const SCALE = 34;
@@ -379,6 +379,29 @@ export function ViewCube(props: ViewCubeProps) {
         </For>
       </svg>
     </>
+  );
+}
+
+/**
+ * The skeleton toggle, in the viewport bar beside projection: the same
+ * switch as View › Show › Construction (⇧C), one click from the picture
+ * instead of inside the render settings.
+ */
+export function SkeletonToggle(props: { shown: boolean; onToggle: (shown: boolean) => void }) {
+  return (
+    <button
+      type="button"
+      class="viewport-bar-button"
+      classList={{ active: props.shown }}
+      onClick={() => props.onToggle(!props.shown)}
+      title={props.shown ? "Skeleton shown — click to hide  (⇧C)" : "Skeleton hidden — click to show  (⇧C)"}
+      aria-label="Toggle construction skeleton"
+      aria-pressed={props.shown}
+      data-testid="skeleton-toggle"
+    >
+      <SkeletonIcon size={16} />
+      <span class="rail-word">Skeleton</span>
+    </button>
   );
 }
 

@@ -31,6 +31,7 @@ export interface CompilePayload {
   construction: ConstructionNode[];
   identities: IdentityEntry[];
   elements?: ConstructionElement[];
+  scene_tree?: SceneTree | null;
   relations: ConstructionRelation[];
   materials: MaterialDefinition[];
   studies: StudyPayload[];
@@ -792,6 +793,30 @@ export type ExportFormat = "obj" | "stl" | "step" | "vtk";
  */
 export type OptimizationArgument = "steps" | "learning_rate";
 
+/** The evaluated composition of ``scene``: its root ids and every reachable item. */
+export interface SceneTree {
+  roots: string[];
+  items: SceneTreeItem[];
+}
+
+/**
+ * One node of the SDF graph ``scene`` evaluates to (see :mod:`cadjoint.viewer.source_map.tree`).
+ *
+ * ``node`` is the construction node a generated solid belongs to, and
+ * ``element`` the boolean element a boolean was written as, when known.
+ * ``operands`` are item ids, in argument order; an item two booleans both
+ * consume is listed once and referenced twice.
+ */
+export interface SceneTreeItem {
+  id: string;
+  kind: "node" | "boolean" | "transform" | "sdf";
+  call: string;
+  name: string | null;
+  node: string | null;
+  element: string | null;
+  operands: string[];
+}
+
 /**
  * One design parameter's slot in the shader's uniform buffer.
  *
@@ -806,6 +831,7 @@ export interface ShaderParameter {
   components: number;
   value: (number | null)[];
   free: boolean;
+  depends?: string[];
 }
 
 /**

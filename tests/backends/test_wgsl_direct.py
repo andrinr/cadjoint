@@ -91,7 +91,7 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
 
 
 def _evaluate_on_device(
-    wgsl, points: np.ndarray, harness: str = _HARNESS, uniform_values=None
+    wgsl, points: np.ndarray, harness: str = _HARNESS, uniform_values=None, cull_margin=1e-4
 ) -> np.ndarray:
     """Run `fn sdf(p) -> f32` from *wgsl* at every point, on the GPU.
 
@@ -148,15 +148,17 @@ def _evaluate_on_device(
         packed = np.zeros((len(uniform_values) + 2, 4), dtype=np.float32)
         for index, (_name, components, values) in enumerate(uniform_values):
             packed[index, :components] = values[:components]
+        # The second reserved slot: the margin a culled module's box tests add.
+        packed[len(uniform_values) + 1, 0] = cull_margin
         uniform_buffer = device.create_buffer_with_data(
-            data=packed.tobytes(), usage=wgpu.BufferUsage.UNIFORM
+            data=packed.tobytes(), usage=wgpu.BufferUsage.STORAGE
         )
         uniform_layout = device.create_bind_group_layout(
             entries=[
                 {
                     "binding": 0,
                     "visibility": wgpu.ShaderStage.COMPUTE,
-                    "buffer": {"type": wgpu.BufferBindingType.uniform},
+                    "buffer": {"type": wgpu.BufferBindingType.read_only_storage},
                 }
             ]
         )
@@ -706,3 +708,98 @@ def test_the_module_and_its_parameter_names_are_the_same_from_one_compile_to_the
     assert [name for name, _, _ in first.parameters] == [name for name, _, _ in second.parameters]
     assert first.wgsl == second.wgsl
     assert any(name.startswith("sketch") for name, _, _ in first.parameters)
+
+
+class TestCulling:
+    """Bounding-box skips: the field must not move, only get cheaper.
+
+    The same exact tests :mod:`cadjoint.backends.wgsl._culling` gives the
+    traced form — an operand is skipped only where its box shows it cannot
+    change the union, the difference or the pattern — so the culled field is
+    the flat one up to the rounding of a reordered expression.
+    """
+
+    @staticmethod
+    def _both(scene, points, margin=1e-4):
+        flat = compile_sdf_direct(scene, uniforms=True)
+        culled = compile_sdf_direct(scene, uniforms=True, culling=True)
+        return (
+            _evaluate_on_device(flat, points, uniform_values=flat.parameters),
+            _evaluate_on_device(
+                culled, points, uniform_values=culled.parameters, cull_margin=margin
+            ),
+            culled,
+        )
+
+    @pytest.mark.parametrize(("label", "scene"), _parity_cases())
+    def test_the_culled_field_is_the_flat_one(self, label, scene):
+        flat, culled, _program = self._both(scene, _POINTS)
+        np.testing.assert_allclose(culled, flat, rtol=1e-6, atol=1e-6)
+
+    @pytest.mark.sweep
+    @pytest.mark.parametrize("stem", (*_SHIPPED, "motor_shield"))
+    def test_a_shipped_scene_culls_without_moving(self, stem):
+        from pathlib import Path
+
+        from cadjoint.viewer.worker.scene import _execute_scene
+
+        root = Path(__file__).resolve().parents[2]
+        scene = _execute_scene((root / "scenes" / f"{stem}.py").read_text())["scene"]
+        rng = np.random.default_rng(7)
+        # Scene-scaled: these parts span about a metre around the origin.
+        points = np.concatenate(
+            [rng.uniform(-1.5, 1.5, (8192, 3)), rng.normal(0.0, 0.3, (8192, 3))]
+        ).astype(np.float32)
+        flat, culled, program = self._both(scene, points)
+        assert program.derived, "a shipped scene has operands worth boxing"
+        np.testing.assert_allclose(culled, flat, rtol=1e-5, atol=1e-6)
+
+    def test_an_infinite_margin_switches_every_test_off(self):
+        """What the viewer writes while a drag has made the boxes stale."""
+        scene = _scenes()[-1][1]
+        culled = compile_sdf_direct(scene, uniforms=True, culling=True)
+        # Boxes deliberately wrong: with the margin at infinity none is read.
+        stale = [
+            (name, components, [1e3] * components) if name in culled.derived else slot
+            for slot in culled.parameters
+            for name, components, _v in [slot]
+        ]
+        flat = compile_sdf_direct(scene, uniforms=True)
+        off = _evaluate_on_device(culled, _POINTS, uniform_values=stale, cull_margin=float("inf"))
+        reference = _evaluate_on_device(flat, _POINTS, uniform_values=flat.parameters)
+        np.testing.assert_allclose(off, reference, rtol=1e-6, atol=1e-6)
+
+    def test_the_boxes_are_slots_so_an_edit_is_still_a_write(self):
+        """A box moves with its operand; the module must not."""
+
+        def scene(radius: float, offset: float):
+            # The free sphere second, so it is the operand that gets a box.
+            return Union(
+                Box(size=Vector([0.5, 0.5, 0.5])),
+                Translate(
+                    Sphere(radius=Scalar(radius, free=True, name="r")),
+                    Vector([offset, 0.0, 0.0], free=True, name="shift"),
+                ),
+                smoothness=0.1,
+            )
+
+        a = compile_sdf_direct(scene(0.8, 0.3), uniforms=True, culling=True)
+        b = compile_sdf_direct(scene(0.45, -1.2), uniforms=True, culling=True)
+        assert a.wgsl == b.wgsl
+        assert a.derived == b.derived and a.derived
+        boxes = lambda program: [v for n, _c, v in program.parameters if n in program.derived]  # noqa: E731
+        assert boxes(a) != boxes(b)
+
+    def test_the_viewer_never_offers_a_box_as_a_parameter(self):
+        """Derived slots are not design variables: no handle, no optimizer."""
+        from pathlib import Path
+
+        from cadjoint.viewer.worker.main import _direct_shader
+        from cadjoint.viewer.worker.scene import _execute_scene
+
+        root = Path(__file__).resolve().parents[2]
+        scene = _execute_scene((root / "scenes" / "end_cap.py").read_text())["scene"]
+        _source, program = _direct_shader(scene)
+        boxes = [slot for slot in program["parameters"] if slot["name"].startswith("__cull")]
+        assert boxes
+        assert not any(slot["free"] for slot in boxes)

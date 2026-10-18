@@ -47,6 +47,7 @@ import {
   setConsoleText,
   setDirty,
   setElements,
+  setSceneTree,
   setMaterials,
   setMeshEdges,
   setNodes,
@@ -261,6 +262,7 @@ export function createCompileCycle(options: CompileCycleOptions): CompileCycle {
     setConsoleText(result.output ?? "");
     setNodes(result.construction ?? []);
     setElements(result.elements ?? []);
+    setSceneTree(result.scene_tree ?? null);
     setRelations(result.relations ?? []);
     setSolverRuns(result.solver_runs ?? []);
     setMaterials(result.materials ?? []);

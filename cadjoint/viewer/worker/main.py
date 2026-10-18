@@ -53,7 +53,9 @@ from cadjoint.viewer.source_map import (
     capture_profiles,
     describe_identities,
 )
+from cadjoint.viewer.source_map.capture import capture_scene_graph
 from cadjoint.viewer.source_map.elements import build_element_payload
+from cadjoint.viewer.source_map.tree import build_scene_tree
 from cadjoint.viewer.worker.declarations import (
     _mesh_entries,
     _optimization_entries,
@@ -169,8 +171,9 @@ def _direct_shader(scene) -> tuple[str, dict | None] | None:
     )
     from cadjoint.backends.wgsl.direct import UnsupportedNode, compile_sdf_direct
 
+    _uniforms, culling, _scope = _shader_options()
     try:
-        program = compile_sdf_direct(scene, uniforms=True)
+        program = compile_sdf_direct(scene, uniforms=True, culling=culling)
     except UnsupportedNode as reason:
         print(f"note: the direct shader backend cannot emit this scene ({reason}); tracing it.")
         return None
@@ -181,19 +184,23 @@ def _direct_shader(scene) -> tuple[str, dict | None] | None:
             "@group(1) @binding(0) var<storage, read> profile_vertices: array<vec2<f32>>;",
             f"const profile_vertices = array<vec2<f32>, {len(program.vertices)}>({literals});",
         )
+    derived = set(program.derived)
     slots = tuple(
         ShaderParameter(
             name=name,
             offset=index * PARAMETER_SLOT_BYTES,
             components=components,
             value=tuple(values),
-            free=True,
+            # A culling box is derived from the parameters, not one of them:
+            # nothing may bind a handle to it or hand it to the optimizer.
+            free=name not in derived,
+            depends=program.depends.get(name, ()),
         )
         for index, (name, components, values) in enumerate(program.parameters)
     )
-    # The two reserved slots are declared and written but never read: this
-    # form spells no NaN constant and does no bounds culling. Keeping them
-    # means the frontend writes one buffer layout, not two.
+    # The two reserved slots: this form spells no NaN constant, so the first
+    # is never read; the second is the cull margin its box tests add. Keeping
+    # both means the frontend writes one buffer layout, not two.
     contract = ShaderProgram(
         wgsl=source,
         parameters=slots,
@@ -234,6 +241,7 @@ def _compile_source(source: str) -> dict[str, Any]:
             capture=(
                 ("__solver_reports__", capture_constraint_solves),
                 ("__profiles__", lambda: capture_profiles(PLAYGROUND_FILENAME)),
+                ("__scene_graph__", lambda: capture_scene_graph(PLAYGROUND_FILENAME)),
             ),
         )
         solver_reports = namespace["__solver_reports__"]
@@ -249,6 +257,10 @@ def _compile_source(source: str) -> dict[str, Any]:
         ).hexdigest()
         table_hash = _table_hash(namespace["scene"])
         construction = build_construction_payload(profiles, source)
+        elements = build_element_payload(source)
+        scene_tree = build_scene_tree(
+            namespace["scene"], profiles, namespace["__scene_graph__"], elements, namespace
+        )
         relations = build_construction_relations(profiles)
         materials = build_material_payload(namespace, source)
         # Declaration only: studies, meshes, and optimizations are serialized
@@ -287,7 +299,8 @@ def _compile_source(source: str) -> dict[str, Any]:
             # Every stable id the text declares, so the viewer can name anything
             # the payload reports only by line.
             "identities": describe_identities(source),
-            "elements": build_element_payload(source),
+            "elements": elements,
+            "scene_tree": scene_tree,
             "relations": relations,
             "materials": materials,
             "studies": studies_payload,

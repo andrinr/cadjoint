@@ -627,8 +627,8 @@ input[type="checkbox"] {
   display: none;
 }
 
-/* How the picture is drawn: projection and render settings, a pair over the
-   view cube in the top-right corner. */
+/* How the picture is drawn: the skeleton, projection and render settings, a
+   row over the view cube in the top-right corner. */
 .view-controls {
   position: absolute;
   top: var(--section);
@@ -2811,6 +2811,29 @@ button.icon {
 
 .object-tree-row.boolean .tree-label {
   color: var(--ink-2);
+}
+
+/* A second occurrence of a shared object is a pointer to the first, not a
+   second object: it steps back to the label ink and draws no children. */
+.object-tree-row.reference .tree-label {
+  color: var(--ink-3);
+}
+
+/* "Not in scene" heads a group the way a kicker heads a list. */
+.object-tree-row.heading .tree-label {
+  color: var(--ink-3);
+  font: var(--text-caps);
+  letter-spacing: var(--track-caps);
+  text-transform: var(--case-caps);
+}
+
+.tree-badge + .tree-badge {
+  margin-left: 0;
+}
+
+/* On the accent fill every label is its ink, whatever tone it rests at. */
+.object-tree-row.active .tree-label {
+  color: var(--block-current-ink);
 }
 
 /* Sketch-plane name tags: DOM text at the frame's +u,+v corner, in viewport

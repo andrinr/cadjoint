@@ -1,11 +1,13 @@
 /**
  * Object tree: a purely visual scene-composition view.
  *
- * READ-ONLY by design — every row is derived from the construction payload the
- * compiler already reports (`nodes()` in state), and the panel never writes
- * back: clicking a row only selects (`setSelection`) and hovering only
- * highlights (`setHover`), exactly the signals the viewport uses. All editing
- * still happens through the source or the viewport tools.
+ * READ-ONLY by design — every row is derived from what the compiler reports
+ * (`nodes()`, `elements()` and the evaluated `sceneTree()` in state), and the
+ * panel never writes back: clicking a row only selects (`setSelection`,
+ * `setInspected`, and for a boolean `setTreeFocus`, which lights its solids
+ * in the viewport) and hovering only highlights (`setHover`), exactly the
+ * signals the viewport uses. All editing still happens through the source or
+ * the viewport tools.
  */
 
 import { Dynamic } from "solid-js/web";
@@ -15,11 +17,14 @@ import {
   hover,
   inspected,
   nodes,
+  sceneTree,
   selection,
   setHover,
   setInspected,
   setSelection,
+  setTreeFocus,
   sceneName,
+  treeFocus,
 } from "../state";
 import { buildSceneTree, visibleRows, type SceneTreeRow } from "../objectTree";
 import {
@@ -39,11 +44,16 @@ const KIND_ICONS: Record<SceneTreeRow["kind"], Component | null> = {
   cylinder: CylinderIcon,
   operator: null,
   boolean: ObjectSelectIcon,
+  transform: null,
+  sdf: null,
+  group: null,
 };
 
 export function ObjectTree() {
   const [collapsed, setCollapsed] = createSignal<ReadonlySet<string>>(new Set());
-  const rows = createMemo(() => buildSceneTree(nodes(), elements(), sceneName() ?? "scene.py"));
+  const rows = createMemo(() =>
+    buildSceneTree(nodes(), elements(), sceneName() ?? "scene.py", sceneTree()),
+  );
   const shown = createMemo(() => visibleRows(rows(), collapsed()));
 
   const toggleGroup = (key: string) => {
@@ -61,12 +71,27 @@ export function ObjectTree() {
       setSelection({ nodeId: row.nodeId, vertexIndex: null });
       return;
     }
-    // An operator or a boolean has no geometry to select; it points the
+    // A boolean or a pattern has no outline of its own: it points the
+    // properties window at its element, and lights every solid under it.
+    if ((row.kind === "boolean" || row.kind === "transform") && row.itemId !== null) {
+      setSelection(null);
+      setInspected(row.elementId);
+      setTreeFocus(row.itemId);
+      return;
+    }
+    // An operator has no geometry to select either; it points the
     // properties window at its element instead.
     if (row.elementId !== null) {
       setSelection(null);
       setInspected(row.elementId);
     }
+  };
+
+  const isActive = (row: SceneTreeRow) => {
+    if (row.nodeId !== null) return selection()?.nodeId === row.nodeId;
+    const focus = treeFocus();
+    if (focus !== null) return row.itemId === focus;
+    return row.elementId !== null && inspected() === row.elementId;
   };
 
   /** Roving arrow-key navigation over the visible rows. */
@@ -101,16 +126,16 @@ export function ObjectTree() {
               <div
                 class="object-tree-row"
                 classList={{
-                  active:
-                    (row.nodeId !== null && selection()?.nodeId === row.nodeId) ||
-                    (row.elementId !== null && inspected() === row.elementId),
+                  active: isActive(row),
                   hovered: row.nodeId !== null && hover()?.nodeId === row.nodeId,
                   operator: row.kind === "operator",
-                  boolean: row.kind === "boolean",
+                  boolean: row.kind === "boolean" || row.kind === "transform",
+                  reference: row.reference,
+                  heading: row.kind === "group",
                 }}
                 role="treeitem"
                 aria-level={row.depth + 1}
-                aria-selected={row.nodeId !== null && selection()?.nodeId === row.nodeId}
+                aria-selected={isActive(row)}
                 aria-expanded={row.group ? !collapsed().has(row.key) : undefined}
                 tabIndex={index() === 0 ? 0 : -1}
                 style={{ "padding-left": `calc(var(--inset) + var(--unit) * ${4 * row.depth})` }}
@@ -128,7 +153,8 @@ export function ObjectTree() {
                   setHover({ nodeId: row.nodeId, vertexIndex: null })
                 }
                 onMouseLeave={() => row.nodeId !== null && setHover(null)}
-                data-testid={`tree-row-${row.key}`}
+                data-testid={`tree-row-${row.testKey}`}
+                data-item={row.itemId ?? undefined}
               >
                 <Show when={row.group} fallback={<i class="tree-caret-space" />}>
                   <button
@@ -154,6 +180,15 @@ export function ObjectTree() {
                 <span class="tree-label">{row.label}</span>
                 <Show when={row.detail}>
                   <small class="tree-detail">{row.detail}</small>
+                </Show>
+                <Show when={row.uses > 1}>
+                  <b
+                    class="tree-badge tree-uses"
+                    title={`Shared: read by ${row.uses} operands — one object, not ${row.uses}`}
+                    data-testid={`tree-uses-${row.testKey}`}
+                  >
+                    ×{row.uses}
+                  </b>
                 </Show>
                 <Show when={row.constraintCount > 0}>
                   <b

@@ -287,6 +287,31 @@ class ConstructionElement(Strict):
     arguments: list[ConstructionArgument]
 
 
+class SceneTreeItem(Strict):
+    """One node of the SDF graph ``scene`` evaluates to (see :mod:`cadjoint.viewer.source_map.tree`).
+
+    ``node`` is the construction node a generated solid belongs to, and
+    ``element`` the boolean element a boolean was written as, when known.
+    ``operands`` are item ids, in argument order; an item two booleans both
+    consume is listed once and referenced twice.
+    """
+
+    id: str
+    kind: Literal["node", "boolean", "transform", "sdf"]
+    call: str
+    name: str | None
+    node: str | None
+    element: str | None
+    operands: list[str]
+
+
+class SceneTree(Strict):
+    """The evaluated composition of ``scene``: its root ids and every reachable item."""
+
+    roots: list[str]
+    items: list[SceneTreeItem]
+
+
 class ConstraintSolverRun(Strict):
     """Diagnostics captured from one source-level constraint solve."""
 
@@ -485,6 +510,12 @@ class ShaderParameter(Strict):
     # buffer; see ``ShaderParameter.as_dict`` in the WGSL backend.
     value: list[float | None]
     free: bool
+    # For a slot derived from parameters rather than one of them — a culling
+    # box, ``__cull<n>.center`` / ``.half`` — the parameter slots it was
+    # computed from.  While a drag overrides any of them the box no longer
+    # holds its operand, so the client opens it (half extents to a huge
+    # value) until the compile that ends the drag brings a box that does.
+    depends: list[str] = []
 
 
 class ShaderProgram(Strict):
@@ -552,6 +583,9 @@ class CompilePayload(Strict):
     # Every construction call with its written arguments, for the properties
     # window; absent from an older worker, so it defaults to nothing.
     elements: list[ConstructionElement] = Field(default_factory=list)
+    # What ``scene`` is built from, boolean by boolean; absent from an older
+    # worker, in which case the Objects panel falls back to a flat list.
+    scene_tree: SceneTree | None = None
     relations: list[ConstructionRelation]
     materials: list[MaterialDefinition]
     studies: list[StudyPayload]

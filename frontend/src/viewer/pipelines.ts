@@ -25,6 +25,7 @@ import {
 import GRATICULE_WGSL from "./graticule.wgsl?raw";
 import OVERLAY_WGSL from "./overlay.wgsl?raw";
 import SIMULATION_WGSL from "./simulation.wgsl?raw";
+import UPSCALE_WGSL from "./upscale.wgsl?raw";
 import { wgslTokens } from "../tokens";
 
 /**
@@ -97,6 +98,14 @@ export async function compileModule(
 export interface DepthPair {
   tested: GPURenderPipeline;
   seen: GPURenderPipeline;
+  /**
+   * Only where the scene is nearer (`depthCompare: "greater"`), with the
+   * overlay's hidden-line fragment: the skeleton behind an x-rayed solid,
+   * dashed and dimmed. Drawn before `tested`, so the two partition the
+   * screen — in front at full weight, behind as a hidden line. Absent for
+   * overlays that have no hidden style.
+   */
+  hidden?: GPURenderPipeline;
 }
 
 export interface OverlayPipelines {
@@ -134,6 +143,11 @@ export function createOverlayPipelines(
     depthWriteEnabled: false,
     depthCompare: "always",
   };
+  const hiddenDepth: GPUDepthStencilState = {
+    format: DEPTH_FORMAT,
+    depthWriteEnabled: false,
+    depthCompare: "greater",
+  };
 
   /**
    * Build one overlay twice: depth-tested, and always visible.
@@ -147,6 +161,7 @@ export function createOverlayPipelines(
   const depthPair = (
     descriptor: Omit<GPURenderPipelineDescriptor, "depthStencil">,
     tested: GPUDepthStencilState,
+    hiddenEntryPoint?: string,
   ): DepthPair => ({
     tested: device.createRenderPipeline({ ...descriptor, depthStencil: tested }),
     seen: device.createRenderPipeline({
@@ -154,6 +169,15 @@ export function createOverlayPipelines(
       label: `${descriptor.label} (through the solid)`,
       depthStencil: alwaysVisibleDepth,
     }),
+    hidden:
+      hiddenEntryPoint && descriptor.fragment
+        ? device.createRenderPipeline({
+            ...descriptor,
+            label: `${descriptor.label} (hidden by the solid)`,
+            fragment: { ...descriptor.fragment, entryPoint: hiddenEntryPoint },
+            depthStencil: hiddenDepth,
+          })
+        : undefined,
   });
 
   const edgePipeline = depthPair(
@@ -179,6 +203,7 @@ export function createOverlayPipelines(
       primitive: { topology: "triangle-list" },
     },
     depthStencil,
+    "fs_edge_hidden",
   );
 
   // The face highlight is the one overlay that is a surface. It must not
@@ -233,6 +258,7 @@ export function createOverlayPipelines(
       primitive: { topology: "triangle-list" },
     },
     depthStencil,
+    "fs_handle_hidden",
   );
 
   const gizmoEdgePipeline = device.createRenderPipeline({
@@ -326,6 +352,30 @@ export function createOverlayPipelines(
 
 /** Bytes of the graticule uniform: ten vec4s, see `Graticule` in the WGSL. */
 export const GRATICULE_UNIFORM_SIZE = 160;
+
+/**
+ * The pass that stretches a reduced-resolution preview over the framebuffer.
+ *
+ * Colour and depth both come from the small targets, so it stands in for the
+ * full-size preview draw exactly: it writes every pixel, depth included, with
+ * `depthCompare: "always"`, and everything drawn after it is unchanged.
+ */
+export function createUpscalePipeline(
+  device: GPUDevice,
+  format: GPUTextureFormat,
+): GPURenderPipeline {
+  const module = device.createShaderModule({ code: UPSCALE_WGSL, label: "Upscale WGSL" });
+  return device.createRenderPipeline({
+    label: "Interaction preview upscale",
+    // Its bind group is its own and rebuilt with the targets, so the one
+    // case where an automatic layout is harmless.
+    layout: "auto",
+    vertex: { module, entryPoint: "vs_upscale" },
+    fragment: { module, entryPoint: "fs_upscale", targets: [{ format }] },
+    primitive: { topology: "triangle-list" },
+    depthStencil: { format: DEPTH_FORMAT, depthWriteEnabled: true, depthCompare: "always" },
+  });
+}
 
 export interface GraticulePipeline {
   graticulePipeline: GPURenderPipeline;

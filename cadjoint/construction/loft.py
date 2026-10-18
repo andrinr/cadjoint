@@ -62,5 +62,7 @@ def loft(
     solid = _place_on_plane(base, profile_a.plane)
     faces = loft_faces(profile_a, profile_b, height)
     attach_faces(solid, faces)
-    register_feature(profile_a, Feature("loft", faces, solid=solid))
+    register_feature(
+        profile_a, Feature("loft", faces, solid=solid, profiles=(profile_a, profile_b))
+    )
     return solid
