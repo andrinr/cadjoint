@@ -12,6 +12,7 @@
 
 import { describe, expect, it, vi } from "vitest";
 import {
+  OPEN_BOX_HALF,
   PARAMETER_SLOT_BYTES,
   ShaderModuleCache,
   packParameters,
@@ -76,6 +77,30 @@ describe("packParameters", () => {
     const packed = packParameters(unset);
     expect(Number.isNaN(packed[0])).toBe(true);
     expect(packed[8]).toBeCloseTo(0.75);
+  });
+
+  it("opens a culling box whose parameters a drag has overridden, and only that box", () => {
+    const boxed: ShaderProgramPayload = {
+      group: 3,
+      binding: 0,
+      buffer_bytes: 6 * 16,
+      parameters: [
+        { name: "r", offset: 0, components: 1, value: [0.5], free: true },
+        { name: "w", offset: 16, components: 1, value: [0.2], free: true },
+        { name: "__cull0.center", offset: 32, components: 3, value: [1, 2, 3], free: false, depends: ["r"] },
+        { name: "__cull0.half", offset: 48, components: 3, value: [0.5, 0.5, 0.5], free: false, depends: ["r"] },
+        { name: "__cull1.center", offset: 64, components: 3, value: [0, 0, 0], free: false, depends: ["w"] },
+        { name: "__cull1.half", offset: 80, components: 3, value: [0.2, 0.2, 0.2], free: false, depends: ["w"] },
+      ],
+    };
+    const at = (packed: Float32Array, offset: number) => Array.from(packed.slice(offset / 4, offset / 4 + 3));
+    const rest = packParameters(boxed);
+    expect(at(rest, 48)).toEqual([0.5, 0.5, 0.5]);
+    const dragging = packParameters(boxed, { r: [0.9] });
+    expect(at(dragging, 32)).toEqual([1, 2, 3]);
+    expect(at(dragging, 48)).toEqual([OPEN_BOX_HALF, OPEN_BOX_HALF, OPEN_BOX_HALF].map(Math.fround));
+    // The other box rests on nothing the drag touched, and keeps culling.
+    expect(at(dragging, 80).map((v) => Number(v.toFixed(6)))).toEqual([0.2, 0.2, 0.2]);
   });
 
   it("allocates at least one slot for a program with no parameters", () => {

@@ -169,8 +169,9 @@ def _direct_shader(scene) -> tuple[str, dict | None] | None:
     )
     from cadjoint.backends.wgsl.direct import UnsupportedNode, compile_sdf_direct
 
+    _uniforms, culling, _scope = _shader_options()
     try:
-        program = compile_sdf_direct(scene, uniforms=True)
+        program = compile_sdf_direct(scene, uniforms=True, culling=culling)
     except UnsupportedNode as reason:
         print(f"note: the direct shader backend cannot emit this scene ({reason}); tracing it.")
         return None
@@ -181,19 +182,23 @@ def _direct_shader(scene) -> tuple[str, dict | None] | None:
             "@group(1) @binding(0) var<storage, read> profile_vertices: array<vec2<f32>>;",
             f"const profile_vertices = array<vec2<f32>, {len(program.vertices)}>({literals});",
         )
+    derived = set(program.derived)
     slots = tuple(
         ShaderParameter(
             name=name,
             offset=index * PARAMETER_SLOT_BYTES,
             components=components,
             value=tuple(values),
-            free=True,
+            # A culling box is derived from the parameters, not one of them:
+            # nothing may bind a handle to it or hand it to the optimizer.
+            free=name not in derived,
+            depends=program.depends.get(name, ()),
         )
         for index, (name, components, values) in enumerate(program.parameters)
     )
-    # The two reserved slots are declared and written but never read: this
-    # form spells no NaN constant and does no bounds culling. Keeping them
-    # means the frontend writes one buffer layout, not two.
+    # The two reserved slots: this form spells no NaN constant, so the first
+    # is never read; the second is the cull margin its box tests add. Keeping
+    # both means the frontend writes one buffer layout, not two.
     contract = ShaderProgram(
         wgsl=source,
         parameters=slots,

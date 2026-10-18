@@ -305,7 +305,9 @@ def parameter_pipeline_layout(device, scene_layout, program):
             {
                 "binding": program.binding,
                 "visibility": wgpu.ShaderStage.VERTEX | wgpu.ShaderStage.FRAGMENT,
-                "buffer": {"type": wgpu.BufferBindingType.uniform},
+                # Read-only storage, as the renderer binds it: see
+                # `PARAMETER_ADDRESS_SPACE` in the codegen module.
+                "buffer": {"type": wgpu.BufferBindingType.read_only_storage},
             }
         ]
     )
@@ -326,7 +328,7 @@ def parameter_bind_group(device, layout, program, cull_margin=None):
     packed = program.buffer()
     if cull_margin is not None:
         packed[program.cull_margin_offset // 4] = cull_margin
-    buffer = device.create_buffer_with_data(data=packed.tobytes(), usage=wgpu.BufferUsage.UNIFORM)
+    buffer = device.create_buffer_with_data(data=packed.tobytes(), usage=wgpu.BufferUsage.STORAGE)
     return device.create_bind_group(
         layout=layout,
         entries=[{"binding": program.binding, "resource": {"buffer": buffer}}],

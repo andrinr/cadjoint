@@ -950,7 +950,9 @@ export class Renderer {
         {
           binding: program.binding,
           visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT,
-          buffer: { type: "uniform" },
+          // Storage, not uniform: `PARAMETER_ADDRESS_SPACE` in
+          // `cadjoint/backends/wgsl/codegen.py` has the measurements.
+          buffer: { type: "read-only-storage" },
         },
       ],
     });
@@ -1016,7 +1018,7 @@ export class Renderer {
       ? this.device.createBuffer({
           label: "SDF parameters",
           size,
-          usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+          usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
         })
       : null;
   }

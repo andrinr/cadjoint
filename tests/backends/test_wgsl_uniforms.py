@@ -88,13 +88,13 @@ def test_the_buffer_layout_is_one_vec4_slot_per_parameter():
         assert parameter.name in (free if parameter.free else fixed)
 
 
-def test_the_module_declares_the_uniform_it_reads():
+def test_the_module_declares_the_buffer_it_reads():
     program = compile_scene_with_uniforms(_scene())
     slots = len(program.parameters) + RESERVED_PARAMETER_SLOTS  # NaN, cull margin
     assert f"array<vec4<f32>, {slots}>" in program.wgsl
     assert (
         f"@group({program.group}) @binding({program.binding}) "
-        "var<uniform> sdf_parameters: SdfParameters;" in program.wgsl
+        "var<storage, read> sdf_parameters: SdfParameters;" in program.wgsl
     )
     for entry_point in ("sdf", "material_base", "material_optics"):
         assert f"fn {entry_point}(p: vec3<f32>)" in program.wgsl

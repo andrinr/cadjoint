@@ -30,6 +30,18 @@ _OPTICS_KEYS = ("metallic", "opacity", "ior", "reflectivity")
 DEFAULT_PARAMETER_GROUP = 3
 DEFAULT_PARAMETER_BINDING = 0
 
+#: The address space the parameter block is declared in: a read-only
+#: *storage* buffer, not a uniform one, although the "uniform form" keeps its
+#: name.  The block is read at every field evaluation — profile vertices by a
+#: loop index, culling boxes inside the skip branches — and on Apple GPUs
+#: through Dawn those reads from a uniform block are what kept culling from
+#: paying: with its boxes in a uniform block the culled
+#: ``scenes/motor_shield.py`` drew in 52-62 ms against 55 ms flat, bound as
+#: storage in 18 ms (``research/viewport-performance.md``).  The flat module
+#: costs the same either way.  Whoever binds it declares
+#: ``read-only-storage`` (``parameterLayoutFor`` in the frontend renderer).
+PARAMETER_ADDRESS_SPACE = "storage, read"
+
 #: Every parameter occupies one ``vec4<f32>`` slot, which is the only element
 #: type a WGSL uniform array can carry without per-field alignment padding.
 PARAMETER_SLOT_BYTES = 16
@@ -80,6 +92,8 @@ class ShaderParameter:
             its 16-byte slot is padding.
         value: The parameter's current value, as a list of floats.
         free: Whether it is a free (named, optimizable) parameter.
+        depends: For a slot derived from the parameters (a culling box), the
+            names of the slots it was computed from; empty otherwise.
     """
 
     name: str
@@ -87,6 +101,7 @@ class ShaderParameter:
     components: int
     value: tuple[float, ...]
     free: bool
+    depends: tuple[str, ...] = ()
 
     def as_dict(self) -> dict:
         """This entry as a plain JSON-serializable dict.
@@ -103,7 +118,7 @@ class ShaderParameter:
         the same slot; the two forms must render the same image, and that
         includes agreeing about the values nobody supplied.
         """
-        return {
+        entry = {
             "name": self.name,
             "offset": self.offset,
             "components": self.components,
@@ -112,6 +127,9 @@ class ShaderParameter:
             ],
             "free": self.free,
         }
+        if self.depends:
+            entry["depends"] = list(self.depends)
+        return entry
 
 
 @dataclass(frozen=True)
@@ -372,7 +390,7 @@ def compile_scene_with_uniforms(
     per-field alignment rules — declared as::
 
         struct SdfParameters { values: array<vec4<f32>, N> };
-        @group(G) @binding(B) var<uniform> sdf_parameters: SdfParameters;
+        @group(G) @binding(B) var<storage, read> sdf_parameters: SdfParameters;
 
     Parameters a pattern consumes structurally (a ``count``) keep their slot
     but are never read: the instance count decides how much shader gets
@@ -596,7 +614,10 @@ def _uniform_block(slots: list, group: int, binding: int) -> str:
     lines.append("struct SdfParameters {")
     lines.append(f"    values: array<vec4<f32>, {count}>,")
     lines.append("};")
-    lines.append(f"@group({group}) @binding({binding}) var<uniform> sdf_parameters: SdfParameters;")
+    lines.append(
+        f"@group({group}) @binding({binding}) "
+        f"var<{PARAMETER_ADDRESS_SPACE}> sdf_parameters: SdfParameters;"
+    )
     return "\n".join(lines)
 
 
