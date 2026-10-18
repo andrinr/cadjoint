@@ -155,6 +155,30 @@ h2 {
   font-weight: $cj-weight-semibold;
 }
 
+// The page outline nested in the sidebar under the current page
+// (docs/assets/nav.html): one step below the page names, body text in
+// ink-2, indented one inset; the current section on the 2px ink line.
+#TOC.in-sidebar {
+  margin: $cj-gap 0 $cj-inset $cj-inset;
+}
+#TOC.in-sidebar > ul {
+  padding-left: 0;
+}
+#TOC.in-sidebar > ul > li > a,
+#TOC.in-sidebar ul ul a {
+  margin-top: 0;
+  padding: 2px 0 2px $cj-inset;
+  font-family: inherit;
+  font-size: $cj-text-xs;
+  font-weight: normal;
+  letter-spacing: normal;
+  text-transform: none;
+  color: $cj-ink-2;
+}
+body.toc-in-sidebar #quarto-margin-sidebar {
+  display: none;
+}
+
 // Code: the sheet with a rule edge; highlighting is achromatic (A3).
 div.sourceCode,
 pre {

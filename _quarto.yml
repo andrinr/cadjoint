@@ -65,8 +65,12 @@ format:
     theme: [cosmo, docs/assets/cadjoint.scss, docs/assets/tokens.scss]
     highlight-style: none
     toc: true
-    toc-depth: 3
+    toc-depth: 2
+    toc-location: left
     code-copy: true
+    # One navigation panel: docs/assets/nav.html nests the page outline under
+    # the current page's entry in the sidebar.
+    include-after-body: docs/assets/nav.html
 
 execute:
   enabled: false  # render stored outputs, don't re-execute

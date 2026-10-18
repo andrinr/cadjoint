@@ -1,0 +1,19 @@
+<script>
+// One navigation panel. On a page with a section sidebar (guides,
+// reference), the page outline moves under the current page's entry, so
+// the sidebar shows where you are and what is on the page in one list.
+// Moving the element keeps its id, so Quarto's scroll highlighting works.
+document.addEventListener("DOMContentLoaded", () => {
+  const toc = document.querySelector("nav#TOC");
+  const active = document.querySelector("#quarto-sidebar .sidebar-link.active");
+  if (!toc || !active) return;
+  const item = active.closest(".sidebar-item");
+  const list = toc.querySelector(":scope > ul");
+  if (!item || !list) return;
+  list.classList.add("sidebar-page-outline");
+  toc.replaceChildren(list);
+  toc.classList.add("in-sidebar");
+  item.appendChild(toc);
+  document.body.classList.add("toc-in-sidebar");
+});
+</script>
