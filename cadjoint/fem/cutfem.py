@@ -682,12 +682,27 @@ def _vertices(f_sub, x_sub, cell, ij):
     return xi + t[..., None] * (xj - xi)
 
 
+def _mapped(evaluate: Callable, theta, points):
+    """``evaluate(theta, points)``, compiled when nothing is being traced.
+
+    The quadrature reads the field over every sub-grid vertex and every
+    facet point, and called eagerly that is a walk of the whole field with
+    each primitive its own XLA program — on ``scenes/end_cap.py`` 562 of
+    them, at 46 452 points, the largest cost of a cold cut-cell solve.
+    Inside a trace (the optimizer's design derivative) the caller's
+    transformation compiles it anyway, so this steps aside.
+    """
+    from cadjoint._compiled import call_jit
+
+    return call_jit(lambda p: evaluate(theta, p), points)
+
+
 def quadrature(theta, s: Structure):
     """The θ-dependent quadrature: volume and boundary points, weights, cells and normals."""
     dim = s.dim
     f = s.f
     x_sub = jnp.asarray(s.x_sub)
-    f_sub = f(theta, x_sub.reshape(-1, dim)).reshape(x_sub.shape[:2])
+    f_sub = _mapped(f, theta, x_sub.reshape(-1, dim)).reshape(x_sub.shape[:2])
 
     rule, w_rule = (jnp.asarray(a) for a in _volume_rule(dim))
     v = _vertices(f_sub, x_sub, jnp.asarray(s.vol_cell), jnp.asarray(s.vol_ij))  # (N, d+1, d)
@@ -697,7 +712,7 @@ def quadrature(theta, s: Structure):
     w = (measure[:, None] * w_rule[None]).reshape(-1)
     cell = jnp.repeat(jnp.asarray(s.vol_cell), len(w_rule))
     if s.mode == "smooth":
-        w = w * smooth_heaviside(-f(theta, pts), s.eps)
+        w = w * smooth_heaviside(-_mapped(f, theta, pts), s.eps)
 
     frule, fw = (jnp.asarray(a) for a in _facet_rule(dim))
     vb = _vertices(f_sub, x_sub, jnp.asarray(s.bnd_cell), jnp.asarray(s.bnd_ij))  # (N_b, d, d)
@@ -712,7 +727,7 @@ def quadrature(theta, s: Structure):
     # on a planar face, where the interpolated crossings land, and the
     # gradient of a distance field is the same a hair away.
     ref = jnp.repeat(jnp.asarray(s.bnd_ref), len(fw), axis=0)
-    grad = s.f.gradient(theta, bpts - 1e-7 * s.h * ref)
+    grad = _mapped(s.f.gradient, theta, bpts - 1e-7 * s.h * ref)
     normal = grad / _safe_sqrt(jnp.sum(grad * grad, axis=-1))[:, None]
     return (pts, w, cell), (bpts, bw, bcell, normal)
 
