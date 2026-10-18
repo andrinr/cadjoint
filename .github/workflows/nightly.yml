@@ -39,14 +39,28 @@ jobs:
       # The same cache as the per-push job, and deliberately the same key
       # prefix: this run compiles everything the fast loop skips as well, so
       # what it leaves behind is a superset of what a push needs.
+      # XLA compiles CPU executables for the host it runs on, and the
+      # persistent cache key does not record which CPU that was. GitHub's
+      # runners are not one model, so an entry written on one and read on
+      # another can compute differently: a run restoring cec2472's cache
+      # failed two knife-edge tests that cec2472 itself passed, with the
+      # same code and the same packages, twice in a row. The CPU model is in
+      # the key, so a run only ever reads executables built for its own CPU.
+      - name: Identify the runner CPU
+        id: cpu
+        run: |
+          model=$(grep -m1 'model name' /proc/cpuinfo | cut -d: -f2- | sed 's/^ *//')
+          echo "CPU: $model"
+          echo "id=$(echo "$model" | sha256sum | cut -c1-12)" >> "$GITHUB_OUTPUT"
+
       - name: Restore the JAX compilation cache
         uses: actions/cache@v4
         with:
           path: ~/.cache/cadjoint/jax
-          key: cadjoint-jax-${{ runner.os }}-py312-${{ hashFiles('pyproject.toml') }}-${{ github.run_id }}
+          key: cadjoint-jax-${{ runner.os }}-${{ steps.cpu.outputs.id }}-py312-${{ hashFiles('pyproject.toml') }}-${{ github.run_id }}
           restore-keys: |
-            cadjoint-jax-${{ runner.os }}-py312-${{ hashFiles('pyproject.toml') }}-
-            cadjoint-jax-${{ runner.os }}-py312-
+            cadjoint-jax-${{ runner.os }}-${{ steps.cpu.outputs.id }}-py312-${{ hashFiles('pyproject.toml') }}-
+            cadjoint-jax-${{ runner.os }}-${{ steps.cpu.outputs.id }}-py312-
 
       # `-v`, not `-q`. This job has no one waiting on it, and `-q` is what
       # made its failures unreadable: one line per 72 tests means a job that
