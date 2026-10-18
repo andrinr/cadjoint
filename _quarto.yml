@@ -28,36 +28,9 @@ website:
     logo: docs/assets/logo.svg
     logo-alt: cadjoint
     title: CADJOINT
-    left:
-      - text: Get started
-        href: docs/getting-started.qmd
-      - text: Guides
-        href: docs/guides.qmd
-      - text: Playground
-        href: docs/viewer.qmd
-      - text: API reference
-        href: reference/index.qmd
     right:
       - icon: github
         href: https://github.com/andrinr/cadjoint
-  sidebar:
-    - id: guides
-      title: Guides
-      style: floating
-      contents:
-        - docs/getting-started.qmd
-        - section: Guides
-          href: docs/guides.qmd
-          contents:
-            - docs/modelling.qmd
-            - docs/meshing.qmd
-            - docs/simulation.qmd
-            - docs/materials.qmd
-            - docs/optimization.qmd
-            - docs/rendering.qmd
-            - docs/plugins.qmd
-            - docs/flow.qmd
-        - docs/viewer.qmd
   page-footer:
     left: "cadjoint"
     right:
@@ -87,9 +60,30 @@ quartodoc:
   # One page per object; the index lists each object with its one-line
   # docstring summary.  Objects are documented at the path a user imports
   # them from (`construction.extrude`, not `construction.extrude.extrude`).
+  # The one site sidebar. quartodoc writes it, splicing the reference
+  # sections in at {{ contents }}; every page uses it.
   sidebar:
     file: reference/_sidebar.yml
+    style: floating
     collapse-level: 1
+    contents:
+      - docs/getting-started.qmd
+      - section: Guides
+        href: docs/guides.qmd
+        contents:
+          - docs/modelling.qmd
+          - docs/meshing.qmd
+          - docs/simulation.qmd
+          - docs/materials.qmd
+          - docs/optimization.qmd
+          - docs/rendering.qmd
+          - docs/plugins.qmd
+          - docs/flow.qmd
+      - docs/viewer.qmd
+      - section: API reference
+        href: reference/index.qmd
+        contents:
+          - "{{ contents }}"
   # quartodoc 0.11 renders every docstring section cadjoint uses except
   # Yields, and dies on the first generator or context manager it meets.
   # _quartodoc_renderer.py fills that one gap; drop it when upstream
