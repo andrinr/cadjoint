@@ -32,6 +32,9 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 from jax import Array
+from jax._src import core
+
+from cadjoint._compiled import call_jit
 
 
 def _safe_normalize(vectors: Array, fallback, *, epsilon: float) -> Array:
@@ -465,6 +468,15 @@ def edge_hermite_data(
         return HermiteData(points=points, gradients=gradients, t=t, values=values)
 
     start_inside = jnp.asarray(edges.start_inside, dtype=bool)
+    # The whole refinement as one program: eagerly, each field walk and the
+    # glue between them is an executable of its own, and each walk compiles
+    # the scene's whole tree again.  Under an outer
+    # transformation `call_jit` would only add a nested jit, so the walks
+    # stay as they are; the trust check compares two values from one walk
+    # either way, which is what keeps compiled and eager on the same side
+    # of its `<=`.
+    if edges.count and core.trace_state_clean():
+        return call_jit(refine, starts, ends, start_inside)
     return refine(starts, ends, start_inside)
 
 

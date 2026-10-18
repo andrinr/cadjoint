@@ -3148,35 +3148,17 @@ which §19.3 explains and §19.7 itemises.
 
 ## 19.7 What is left
 
-* **The Hermite path, and why it is blocked on a meshing fix rather than on
-  numerics.** Compiling the whole of `edge_hermite_data` as one program
-  (bisection, Newton, normals and fallback, with the duplicate field walks
-  merged) was built and measured: starter `mesh --public` cold 5.4 → 3.8 s,
-  end_cap `mesh --public` 18.7 → 13.7 s, end_cap `simulate` roughly halved.
-  It changes no topology (the wire layer is identical on both scenes) but it
-  moves 76 starter overlay vertices by more than 1e-3, up to 0.081 — most of a
-  cell — and the sharp layer goes 396 → 448 chords with a spurious crease
-  across the fins' mid-height in the side view. Reverted.
-
-  The cause is not FMA as such. Every edge whose crossing moved has *both*
-  lattice endpoints on the surface to ~1e-8: the edge lies inside a planar
-  face. There the Newton slope is ~0, the correction clips to a whole edge,
-  and its direction is the sign of a ~1e-8 residual — float noise. Eager and
-  compiled arms both roll dice on those edges (10 of 1 526 on the starter
-  overlay, t differing by exactly 1.0); the eager arm's happen to draw the
-  clean picture, and any change to rounding — fusion, a JAX upgrade, a
-  parameter nudge — rerolls them. Blocking contraction on the crossing
-  arithmetic with `optimization_barrier` changes nothing, which is how the
-  first explanation (FMA moving a crossing off a plane) was ruled out.
-
-  The fix belongs in the refinement: an edge with both endpoint values below
-  a tolerance is on the surface along its length and should not be
-  Newton-stepped. With that, the compiled form should be safe to take, and is
-  the largest remaining cold-time lever in `mesh` and in the cut-cell
-  `simulate`. One more trap found on the way: the Newton trust check
-  compares two field evaluations, so both must come from the same program
-  — mixing the compiled `mapped` walk with a bare `vmap` under a top-level
-  `grad` flipped `<=` on 24 sphere edges and zeroed their derivative.
+* **The Hermite path — done since (§19.8).** Compiling the whole of
+  `edge_hermite_data` first moved 76 starter overlay vertices by up to 0.081
+  and drew a spurious crease across the fins, because the refinement took
+  decisions on the sign of float noise on faces coplanar with lattice planes
+  (the edge lies inside the face, the Newton slope is ~0, the correction
+  clips to a whole edge). §19.8 removes those decisions, after which the
+  compiled form is taken. One trap found on the way and kept: the Newton
+  trust check compares two field evaluations, so both must come from the
+  same walk — mixing the compiled `mapped` walk with a bare `vmap` under a
+  top-level `grad` flipped `<=` on 24 sphere edges and zeroed their
+  derivative.
 * **jax-fem's problem construction** (`fem/jaxfem.py:312/357/916`,
   `<string>:10/12`): ~35 s of in-worker repeats across the suite, inside a
   third-party package (§18.6).
@@ -3199,7 +3181,79 @@ which §19.3 explains and §19.7 itemises.
   exact on end_cap's sampled points, so a stale margin changes no value
   there. A scene where a skip is *approximate* would make the test bite.
 
-## 19.8 Reproducing
+## 19.8 Noise-free Hermite refinement, then one program
+
+On the starter's overlay grid 60 of 1 526 crossing edges have both endpoints
+at |f| ≤ 1e-7 (the next-smallest is 5.2e-5): the fins' and deck's walls sit
+on lattice planes. Four decisions in `edge_hermite_data` read the sign of
+that noise, and each now reads a tolerance instead (16 ulp of the grid's
+coordinate magnitude, 5.7e-6 at float32 on the default box):
+
+* **An edge inside a face** (both ends and its midpoint within tolerance)
+  takes its midpoint as a constant. Every point is a root; the midpoint is
+  the centre of that set and does not depend on which end the noise calls
+  inside; any point gives the QEF the same plane. Derivative zero: the IFT
+  has ∂f/∂t = 0 and the tangential freedom is taken as no motion.
+* **An edge that runs along a face and leaves it** bisects with samples
+  within tolerance counted on the quiet endpoint's side, so it finds where
+  it leaves (the crease), not a noise-chosen point of the root segment.
+  Starting Newton from the bracket end off the surface, so that the point
+  lands on the crease exactly, was tried and dropped: on the box/sphere of
+  `test_crease_motion` the crossing then takes the leaving face's normal,
+  the QEF loses the face the edge lies in, and crease vertices fall 68 → 2.
+* **A Newton step from a noise-level residual with a noise-level slope**
+  (under 1 % of unit along the edge) moves by nothing and keeps the implicit
+  derivative. Skipping *every* noise-level step was tried first: it costs
+  the last digits on curved walls, which the ring overlay's crossing test
+  and the sharp-cutout export test both caught.
+* **Dead gradients** take a central difference over all three lattice axes
+  at a hundredth of a cell — exact for a plane through the point, the
+  bisector on a crease line — and so does every in-plane edge. The old
+  fallback stepped along the edge, which stays on the wall when the edge
+  lies in it. Dead is |g| < 1e-6 (measured 0 and 1e-8 noise), or
+  |g| < 1e-2 *and* pointing more than ~25° from the difference (measured: a
+  5e-4 sliver pointing along the wall). A short gradient that points the
+  right way is kept: float64 polygon walls give |g| ~ 1e-3 on half the
+  starter tet mesh's crossings, and replacing those (magnitude and
+  derivative) moved that mesh off the fin-tip kink
+  `test_starter_tet::…sits_on_a_kink…` pins.
+
+Overlay against `main` (`viewer.worker.main._mesh_source`, `tier.absent()`,
+three axis views inspected): starter wire 3 052 = 3 052, sharp 396 → 441 —
+the extra chords complete the deck-end, fin-corner and fin-root creases
+`main` drew in fragments, and there is no spurious chord. end_cap wire
+3 484 = 3 484, sharp 300 → 295: the same picture
+less one short fragment of the r ≈ 0.49 arc at z = 0.6 that `main` drew
+without its symmetric twins. Eager against compiled on the new code: Hermite
+`t` within 5e-7 and unit normals within 4e-4 on both scenes (before: 10
+edges at Δt = 1.0); the starter overlay is identical; on end_cap three wire
+vertices still move by up to 0.028 — inputs that agree to 5e-7, amplified
+downstream of `edge_hermite_data` (QEF and feature classification), which
+is the next fragility to chase.
+
+Then the refinement runs as one program through `call_jit` (eagerly under an
+outer transformation), with the bracket ends and midpoint in one walk, the
+Newton residual and slope from one `value_and_grad` walk, the trust check's
+two sides from one walk, and the final value and gradient from one walk.
+
+Same protocol as §19.5, three interleaved rounds, best (median):
+
+| request | base cold | rule cold | compiled cold | base warm | rule warm | compiled warm | programs |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| starter mesh | 4.75 (4.75) s | 3.81 (3.81) s | **3.32 (3.32) s** | 1.85 s | 1.59 s | **1.52 s** | 276 → 115 → 62 |
+| end_cap mesh | 16.46 (16.51) s | 12.75 (12.84) s | **12.43 (12.50) s** | 6.66 s | 5.48 s | 5.49 s | 783 → 140 → 88 |
+| end_cap simulate | 16.87 (16.92) s | 12.70 (12.71) s | **12.32 (12.39) s** | 6.01 s | 4.93 s | 4.90 s | 1 059 → 425 → 373 |
+
+Most of the gain is in the first commit: its walk merges and the jitted
+`value_and_grad` replace eager `vmap(grad)` walks that dispatched hundreds
+of one-op programs. Compiling the whole adds 0.5 s cold on the starter and
+0.3–0.4 s on end_cap, where the remaining cost is elsewhere; warm, it is
+flat there.
+
+The per-push suite (`-m "not slow" -n 4`, cache off) fails the same five
+tests as in §19.5 and nothing else (3 426 passed).
+
+## 19.9 Reproducing
 
     S=/tmp/c19; mkdir -p $S
     # the suite, cold, with the split of §19.1
