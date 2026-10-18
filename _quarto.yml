@@ -45,6 +45,7 @@ website:
       title: Guides
       style: floating
       contents:
+        - docs/getting-started.qmd
         - section: Guides
           href: docs/guides.qmd
           contents:
@@ -56,6 +57,7 @@ website:
             - docs/rendering.qmd
             - docs/plugins.qmd
             - docs/flow.qmd
+        - docs/viewer.qmd
   page-footer:
     left: "cadjoint"
     right:

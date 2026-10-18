@@ -1,5 +1,5 @@
 ---
-title: The Playground
+title: Playground
 description: A browser CAD app where the Python source is the only state — model, sketch, mesh, solve, and optimize in one window.
 ---
 

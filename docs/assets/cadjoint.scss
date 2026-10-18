@@ -192,6 +192,43 @@ h2 {
   text-decoration: none;
 }
 
+// Reference sidebar, mapped onto the same three levels:
+//   "API reference" (the index link)  caps section head, like "Guides"
+//   category (Solids, Meshing)        a page entry, body 13px ink-2
+//   sub-group and objects             body 12px on the hairline rail
+// The current object page takes the accent, like the current guide.
+#quarto-sidebar.reference-sidebar .sidebar-menu-container > ul > li:first-child .sidebar-link {
+  font-family: $font-family-monospace;
+  font-size: $cj-text-xs;
+  font-weight: $cj-weight-semibold;
+  letter-spacing: $cj-track-caps;
+  text-transform: uppercase;
+  color: $cj-ink-3;
+}
+#quarto-sidebar.reference-sidebar .sidebar-menu-container > ul > li:first-child .sidebar-link:not(.active) {
+  background: none;
+}
+#quarto-sidebar.reference-sidebar .sidebar-item-section > .sidebar-item-container .sidebar-link,
+#quarto-sidebar.reference-sidebar .sidebar-item-section > .sidebar-item-container .sidebar-item-text {
+  font-family: inherit;
+  font-size: $cj-text-md;
+  font-weight: normal;
+  letter-spacing: normal;
+  text-transform: none;
+  color: $cj-ink-2;
+}
+#quarto-sidebar.reference-sidebar ul.sidebar-section.depth1 {
+  margin-left: calc(#{$cj-inset} + 2px);
+  border-left: $cj-hairline solid $cj-rule;
+}
+#quarto-sidebar.reference-sidebar ul.sidebar-section.depth1 .sidebar-link,
+#quarto-sidebar.reference-sidebar ul.sidebar-section.depth1 .sidebar-item-section > .sidebar-item-container .sidebar-link {
+  font-size: $cj-text-sm;
+}
+#quarto-sidebar.reference-sidebar ul.sidebar-section.depth2 {
+  padding-left: $cj-inset;
+}
+
 // The page outline nested in the sidebar under the current page
 // (docs/assets/nav.html): one step below the page names, body text in
 // ink-2, indented one inset; the current section on the 2px ink line.
