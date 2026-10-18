@@ -486,8 +486,15 @@ fn shade_material(
     // they cast nothing. The window is unchanged at its ends — an unlit face
     // still lands at 0.13 and a fully lit one at 0.48 — but a face the key
     // has turned away from now sits inside it rather than on the floor.
-    let incidence = clamp(normal_dot_light * visibility + fill_incidence, 0.0, 1.0);
-    return base_color * mix(0.13, 0.48, incidence) * contour * cut;
+    //
+    // Under the X-Ray veil that window read flat: tops and sides of a part
+    // landed within a few sRGB steps of each other, and the form went to the
+    // skeleton drawn over it. So the key leads a little more — the fills
+    // carry 0.8 of their share — and the window opens to 0.11..0.52, which
+    // separates faces at different angles by roughly a third more without
+    // moving the part's mean tone.
+    let incidence = clamp(normal_dot_light * visibility + fill_incidence * 0.8, 0.0, 1.0);
+    return base_color * mix(0.11, 0.52, incidence) * contour * cut;
   }
   let intensity = max(u.light_dir.w, 1.0);
   // **White, not warm.** This used to be vec3(1.0, 0.92, 0.82), which tinted
@@ -788,7 +795,10 @@ fn trace_pixel(frag_xy: vec2<f32>) -> TraceResult {
       // Fade faces that point at the viewer and keep grazing angles solid, so
       // silhouettes and creases stay legible while interiors turn translucent.
       let facing = 1.0 - abs(dot(normal, ray.direction));
-      let alpha = mix(0.62, 0.98, facing * facing);
+      // 0.70 at the floor, up from 0.62: the veil is mixed into every face
+      // alike, so the further it reaches the more it flattens the shading
+      // between them.
+      let alpha = mix(0.70, 0.98, facing * facing);
       // On paper a face cannot fade toward the background: the ground is the
       // brightest thing on screen, so "transparent" and "absent" would be the
       // same pixel and an x-rayed solid disappears entirely (measured: sRGB
