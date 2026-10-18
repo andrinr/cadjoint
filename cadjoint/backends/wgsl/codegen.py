@@ -37,8 +37,7 @@ DEFAULT_PARAMETER_BINDING = 0
 #: through Dawn those reads from a uniform block are what kept culling from
 #: paying: with its boxes in a uniform block the culled
 #: ``scenes/motor_shield.py`` drew in 52-62 ms against 55 ms flat, bound as
-#: storage in 18 ms (``research/viewport-performance.md``).  The flat module
-#: costs the same either way.  Whoever binds it declares
+#: storage in 18 ms.  The flat module costs the same either way.  Whoever binds it declares
 #: ``read-only-storage`` (``parameterLayoutFor`` in the frontend renderer).
 PARAMETER_ADDRESS_SPACE = "storage, read"
 
