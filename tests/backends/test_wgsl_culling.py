@@ -326,11 +326,17 @@ def test_the_margin_reaches_every_skip_test():
     scene = _shipped_scene("end_cap")
     free, fixed, _ = extract_parameters(scene)
     points = _sample(scene, 40_000, seed=23)
+    # Mapped, not jitted.  The property lives in how the tree is traced, and a
+    # `vmap` traces it exactly as a `jit` does — the point is a tracer either
+    # way, so the outlined node functions run their jitted form and every
+    # threshold reads the margin when the field is evaluated.  What the jit
+    # added was XLA compiling end_cap's whole field twice: 19 of this test's
+    # 21 s in the cold per-push run, against 5 s for the two eager maps.
     with scalar_lowering():
-        flat = jax.jit(jax.vmap(functionalize_scene(scene)(free, fixed)[0]))(points)
-        off = jax.jit(
-            jax.vmap(culled_scene_sdf(scene)(free, fixed, jnp.float32(CULL_DISABLED_MARGIN)))
-        )(points)
+        flat = jax.vmap(functionalize_scene(scene)(free, fixed)[0])(points)
+        off = jax.vmap(culled_scene_sdf(scene)(free, fixed, jnp.float32(CULL_DISABLED_MARGIN)))(
+            points
+        )
     assert float(np.max(np.abs(np.asarray(flat) - np.asarray(off)))) <= TOLERANCE
 
 
