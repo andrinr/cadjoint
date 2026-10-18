@@ -3148,10 +3148,35 @@ which §19.3 explains and §19.7 itemises.
 
 ## 19.7 What is left
 
-* **The Hermite gradient** (`edge_detection.py`'s `vmap(grad(sdf))`):
-  5.2 s and 668 programs of a cold end_cap `simulate`, 2.2 s of a cold
-  end_cap `mesh`. Compiling it changes the mesh (§17.5); it needs visual QA
-  as its own change.
+* **The Hermite path, and why it is blocked on a meshing fix rather than on
+  numerics.** Compiling the whole of `edge_hermite_data` as one program
+  (bisection, Newton, normals and fallback, with the duplicate field walks
+  merged) was built and measured: starter `mesh --public` cold 5.4 → 3.8 s,
+  end_cap `mesh --public` 18.7 → 13.7 s, end_cap `simulate` roughly halved.
+  It changes no topology (the wire layer is identical on both scenes) but it
+  moves 76 starter overlay vertices by more than 1e-3, up to 0.081 — most of a
+  cell — and the sharp layer goes 396 → 448 chords with a spurious crease
+  across the fins' mid-height in the side view. Reverted.
+
+  The cause is not FMA as such. Every edge whose crossing moved has *both*
+  lattice endpoints on the surface to ~1e-8: the edge lies inside a planar
+  face. There the Newton slope is ~0, the correction clips to a whole edge,
+  and its direction is the sign of a ~1e-8 residual — float noise. Eager and
+  compiled arms both roll dice on those edges (10 of 1 526 on the starter
+  overlay, t differing by exactly 1.0); the eager arm's happen to draw the
+  clean picture, and any change to rounding — fusion, a JAX upgrade, a
+  parameter nudge — rerolls them. Blocking contraction on the crossing
+  arithmetic with `optimization_barrier` changes nothing, which is how the
+  first explanation (FMA moving a crossing off a plane) was ruled out.
+
+  The fix belongs in the refinement: an edge with both endpoint values below
+  a tolerance is on the surface along its length and should not be
+  Newton-stepped. With that, the compiled form should be safe to take, and is
+  the largest remaining cold-time lever in `mesh` and in the cut-cell
+  `simulate`. One more trap found on the way: the Newton trust check
+  compares two field evaluations, so both must come from the same program
+  — mixing the compiled `mapped` walk with a bare `vmap` under a top-level
+  `grad` flipped `<=` on 24 sphere edges and zeroed their derivative.
 * **jax-fem's problem construction** (`fem/jaxfem.py:312/357/916`,
   `<string>:10/12`): ~35 s of in-worker repeats across the suite, inside a
   third-party package (§18.6).
