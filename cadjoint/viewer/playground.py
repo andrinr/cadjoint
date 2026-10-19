@@ -11,9 +11,7 @@ every response carries it in ``X-Cadjoint-Api``.
 - ``GET  /api/session``  session token, the starter program, and ``api_version``
 - ``POST /api/compile``  run the user's Python in a disposable child process
                          and return WGSL shaders plus the construction tree
-                         (``/compile`` still answers, for older clients)
 - ``POST /api/patch``    rewrite sketch vertex literals in the user's source
-                         (``/patch`` still answers, for older clients)
 - ``POST /api/mesh``     run the source again and return only the dual-contour
                          mesh edges (requested lazily by the viewer)
 - ``POST /api/mesh_refresh`` re-solve the last extracted mesh edges at new
@@ -146,7 +144,7 @@ from cadjoint.viewer._worker_client import (
     simulate_source,
     warm_start,
 )
-from cadjoint.viewer.schema.api import API_VERSION, MAX_CLIENT_ID, ROUTES
+from cadjoint.viewer.schema.api import API_VERSION, MAX_CLIENT_ID
 from cadjoint.viewer.worker.export import EXPORT_TIMEOUT_SECONDS, export_source
 
 __all__ = [
@@ -232,11 +230,6 @@ def _post_routes() -> dict[str, Callable[[dict[str, Any]], dict[str, Any]]]:
         "/api/scenes/load": load_scene,
         "/api/scenes/save": save_scene,
     }
-    # The paths these two had before the contract moved everything under
-    # /api/: a page built against an older server still compiles and edits.
-    for route in ROUTES:
-        for alias in route.aliases:
-            routes[alias] = routes[route.path]
     return routes
 
 

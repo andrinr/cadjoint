@@ -228,13 +228,7 @@ class TestOptimization:
         assert type(literal.describe()["metric"]) is str
         assert type(literal.describe()["method"]) is str
 
-    def test_aliases_resolve_to_the_canonical_member(self, study):
-        assert self._optimization(study, gradient_path="plugins").gradient_path is (
-            GradientPath.TESSERACT
-        )
-        assert self._optimization(study, gradient_path="plugins-dc").gradient_path is (
-            GradientPath.TESSERACT_DC
-        )
+    def test_the_default_gradient_path_is_direct(self, study):
         assert self._optimization(study).gradient_path is GradientPath.DIRECT
 
     def test_unknown_values_name_the_members(self, study):

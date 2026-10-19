@@ -77,10 +77,6 @@ _METHODS = values(MeshMethod)
 #: these literals); the option set is :class:`cadjoint.enums.TetMesher`.
 _MESHERS = values(TetMesher)
 
-# The automatic domain-bounds scan samples the default meshing volume.
-_DEFAULT_BOUNDS = DEFAULT_BOUNDS
-_DEFAULT_SIZE = DEFAULT_SIZE
-
 _SCAN_CELLS = 32
 
 _CAPTURED_MESHES: ContextVar[list[SimMesh] | None] = ContextVar(
@@ -140,8 +136,8 @@ def _scan_bounds(
     """
     import jax.numpy as jnp
 
-    origin = np.asarray(_DEFAULT_BOUNDS, dtype=np.float64)
-    extent = np.asarray(_DEFAULT_SIZE, dtype=np.float64)
+    origin = np.asarray(DEFAULT_BOUNDS, dtype=np.float64)
+    extent = np.asarray(DEFAULT_SIZE, dtype=np.float64)
     spacing = extent / _SCAN_CELLS
     axes = [origin[i] + (np.arange(_SCAN_CELLS + 1)) * spacing[i] for i in range(3)]
     lattice = np.stack(np.meshgrid(*axes, indexing="ij"), axis=-1).reshape(-1, 3)

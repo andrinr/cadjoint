@@ -121,14 +121,6 @@ PRECISIONS = values(Precision)
 #: Study-form design->points derivative paths (see ``Optimization.gradient_path``).
 #: These spellings are the documented, user-facing ones and do not change.
 GRADIENT_PATHS = values(GradientPath)
-#: Accepted aliases -> canonical gradient path.  Both chain paths resolve
-#: every stage through :mod:`cadjoint.plugins`, so they can also be named
-#: for what they do rather than for the Tesseract that implements them
-#: today; the canonical names above stay the ones the docs use.
-GRADIENT_PATH_ALIASES = {
-    "plugins": GradientPath.TESSERACT,
-    "plugins-dc": GradientPath.TESSERACT_DC,
-}
 TRAJECTORY_LIMIT = 100
 
 _CAPTURED_OPTIMIZATIONS: ContextVar[list[Optimization] | None] = ContextVar(
@@ -378,7 +370,7 @@ class Optimization:
         gradient_path: Study form: how the design->points derivative is
             carried per step (keyword-only) — a
             :class:`~cadjoint.enums.GradientPath` or its plain string
-            spelling, normalised (aliases resolved) on construction.
+            spelling, normalised on construction.
             ``"direct"`` (default) is
             the validated frozen-topology path — node positions Newton
             re-projected onto the true SDF, solved in-process.
@@ -395,8 +387,7 @@ class Optimization:
             geometry the direct path does — tet ``SimMesh`` only.  Both
             chain paths resolve each stage through
             :mod:`cadjoint.plugins`, so where the mesher and the solver
-            actually run is configuration (``plugins.toml``), and both
-            spellings accept the aliases ``"plugins"`` / ``"plugins-dc"``.
+            actually run is configuration (``plugins.toml``).
             Both require the ``tesseract`` extra.  The final reported
             result is always evaluated on the direct path.
         steps: Default number of optimizer steps (keyword-only).
@@ -538,13 +529,10 @@ class Optimization:
             or self.remesh_every < 0
         ):
             raise ValueError("remesh_every must be a non-negative integer (0: never remesh).")
-        # Aliases resolve here, so the rest of the run sees one canonical
-        # member per path rather than two spellings of it.
         self.gradient_path = parse(
             GradientPath,
-            GRADIENT_PATH_ALIASES.get(self.gradient_path, self.gradient_path),
+            self.gradient_path,
             f"gradient_path must be one of: {', '.join(GRADIENT_PATHS)} "
-            f"(aliases: {', '.join(GRADIENT_PATH_ALIASES)}) "
             f"(got {self.gradient_path!r}).",
         )
         self._refuse_frozen_geometry()
@@ -939,9 +927,7 @@ class Optimization:
         #   -Y preserves) -> solver tesseract adjoint.  Same geometry as the
         #   direct path, black box confined to the one component that is
         #   genuinely one.
-        # Both chains resolve their stages through the plugin registry, so
-        # "tesseract"/"tesseract-dc" and their "plugins"/"plugins-dc"
-        # aliases select the same code; the alias only renames the switch.
+        # Both chains resolve their stages through the plugin registry.
         path = self.gradient_path
         use_dc_chain = path == GradientPath.TESSERACT_DC
         use_tesseract = path in (GradientPath.TESSERACT, GradientPath.TESSERACT_DC)

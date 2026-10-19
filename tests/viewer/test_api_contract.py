@@ -97,17 +97,8 @@ def matches(route: api.Route, document: dict[str, Any]) -> BaseModel:
 
 def test_every_buffered_and_streamed_post_route_is_in_the_table():
     served = set(playground._post_routes()) | set(playground._stream_routes())
-    named = {route.path for route in api.ROUTES} | {
-        alias for route in api.ROUTES for alias in route.aliases
-    }
+    named = {route.path for route in api.ROUTES}
     assert served <= named, f"routes without a contract entry: {sorted(served - named)}"
-
-
-def test_the_moved_routes_still_answer_at_their_old_paths():
-    routes = playground._post_routes()
-    assert routes["/compile"] is not None and routes["/patch"] is not None
-    assert ROUTES["/api/compile"].aliases == ("/compile",)
-    assert ROUTES["/api/patch"].aliases == ("/patch",)
 
 
 def test_every_route_in_the_table_is_answered(live):

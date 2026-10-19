@@ -499,8 +499,8 @@ def selection_from_description(payload: dict[str, Any]) -> NodeSelection:
             payload["center"],
             payload["axis"],
             payload["radius"],
-            inner=payload.get("inner", 0.0),
-            half_length=payload.get("half_length"),
+            inner=payload["inner"],
+            half_length=payload["half_length"],
         )
     if kind == "side":
         return Nodes.side(payload["side"], payload.get("tol"))

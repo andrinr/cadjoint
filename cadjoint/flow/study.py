@@ -497,7 +497,7 @@ class FlowStudy:
     """Declarative conjugate heat transfer in forced convection.
 
     Declared in a scene exactly like :class:`~cadjoint.fem.study.ThermalStudy`
-    -- constructing one inside :func:`~cadjoint.fem.study.capture_studies`
+    -- constructing one inside :func:`~cadjoint.studies.capture_studies`
     registers it -- but it meshes nothing.  The lattice is fixed and the
     design enters as a field on it, which is why the whole solve stays one
     differentiable JAX expression.

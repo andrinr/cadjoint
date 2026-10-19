@@ -86,19 +86,6 @@ def _plugin(kind: str):
     return plugin_for_kind(kind)
 
 
-def _tesseract(name: str):
-    """The raw Tesseract client of the plugin registered under ``name``.
-
-    Kept for callers that speak the Tesseract ABI directly (the packaging
-    tests round-trip ``apply``/``vector_jacobian_product`` against it).
-    New code should take a :class:`~cadjoint.plugins.Plugin` from
-    :func:`_plugin` instead, so it does not assume the transport.
-    """
-    from cadjoint.plugins import get_plugin
-
-    return get_plugin(name).client
-
-
 def _require_inputs(plugin: Any, payload: dict, output: str, stage: str) -> None:
     """Refuse a plugin that cannot accept this stage's frozen payload.
 
@@ -720,8 +707,6 @@ def freeze_study_chain_dc(
     study: Any,
     sim_mesh: Any,
     field: Callable[[Any], Any],
-    *,
-    freeze_interior: bool = True,
 ) -> FrozenDCChain:
     """Freeze the DC-surface + tetfill + solver chain for ``study``.
 
@@ -733,19 +718,6 @@ def freeze_study_chain_dc(
             there is no hex mode.
         field: The design field at the current (concrete) parameters; a
             callable on ``(..., 3)`` points.
-        freeze_interior: Hold the interior (Steiner) nodes across the
-            traced calls, so the tesseract re-evaluates the frozen fill
-            instead of re-running TetGen (the default, and the same
-            contract ``recompute_tet_points`` honours on the direct path).
-            TetGen's Steiner insertion is not continuous in the surface —
-            measured: a 1e-4 design step already changes the Steiner count
-            on the box bar — so ``False`` re-runs the black box per step
-            and is only usable where the topology happens to survive.
-            Frozen mode additionally relaxes the held interior toward the
-            moving boundary (:func:`_interior_relaxation`), so the two
-            modes' derivatives differ there: TetGen-in-the-loop mode drops
-            the solver's interior cotangents, frozen mode transports them
-            onto the boundary through the relaxation's transpose.
 
     Returns:
         The :class:`FrozenDCChain`.
@@ -819,12 +791,8 @@ def freeze_study_chain_dc(
     templates = {
         "element": np.int32(_ELEMENT_CODES[method]),
         "node_ids": np.arange(mesh.num_points, dtype=np.int32),
-        # Frozen-fill mode passes the real connectivity (and the held
-        # interior); TetGen-in-the-loop mode passes shapes only.
-        "cell_template": cells_out if freeze_interior else np.zeros(cells_out.shape, np.int32),
-        "interior_points": points[int(vertices.shape[0]) :]
-        if freeze_interior
-        else np.zeros((0, 3), np.float64),
+        "cell_template": cells_out,
+        "interior_points": points[int(vertices.shape[0]) :],
         **static,
     }
     kind, solver_kind, output, inputs = _solver_stage(study, mesh)
@@ -832,11 +800,11 @@ def freeze_study_chain_dc(
     _require_inputs(tetfill, templates, "nodes", "tetfill")
     _require_inputs(solver, inputs, output, solver_kind)
     solver_apply = solver.as_jax()
-    relax = _interior_relaxation(mesh) if freeze_interior else None
+    relax = _interior_relaxation(mesh)
 
     def solve(surface_points):
         filled = tetfill_apply(dict(points=surface_points, **templates))
-        nodes = filled["nodes"] if relax is None else relax(filled["nodes"])
+        nodes = relax(filled["nodes"])
         solved = solver_apply(dict(points=nodes, **inputs))
         return nodes, solved[output]
 

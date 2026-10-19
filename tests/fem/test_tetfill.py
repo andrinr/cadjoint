@@ -34,9 +34,10 @@ import jax
 import jax.numpy as jnp
 
 from cadjoint.fem.hexmesh import project_points
-from cadjoint.fem.tesseracts.chain import _tesseract, freeze_study_chain_dc
+from cadjoint.fem.tesseracts.chain import freeze_study_chain_dc
 from cadjoint.fem.tetmesh import tet10_from_tet4
 from cadjoint.meshing import GridSpec, extract_mesh, find_crossing_edges, sample_grid
+from cadjoint.plugins import get_plugin
 
 _MIN_RATIO = np.float64(1.5)
 _MIN_DIHEDRAL = np.float64(10.0)
@@ -75,7 +76,7 @@ def _payload(points, triangles, element, *, interior=None, template=None, node_i
 
 @pytest.fixture(scope="module")
 def tetfill():
-    return _tesseract("tetfill")
+    return get_plugin("tetfill").tesseract
 
 
 @pytest.fixture(scope="module")

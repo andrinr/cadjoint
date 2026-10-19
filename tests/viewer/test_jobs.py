@@ -477,7 +477,7 @@ class TestHttpRegistry:
     def test_a_compile_is_listed_and_its_result_comes_back_byte_identical(self, registry):
         with _running_server() as base:
             client = Client(base)
-            status, body = client.call("/compile", {"source": TINY_SOURCE})
+            status, body = client.call("/api/compile", {"source": TINY_SOURCE})
             assert status == 200
             assert body["ok"] is True
             job_id = body["job_id"]
@@ -533,7 +533,7 @@ class TestHttpRegistry:
             assert client.call("/api/jobs/job-424242/result")[0] == 404
 
             done = threading.Thread(
-                target=lambda: client.call("/compile", {"source": SLOW_SOURCE}), daemon=True
+                target=lambda: client.call("/api/compile", {"source": SLOW_SOURCE}), daemon=True
             )
             done.start()
             job_id = _wait_for(
@@ -567,7 +567,7 @@ class TestHttpRegistry:
     def test_clearing_empties_the_list(self, registry):
         with _running_server() as base:
             client = Client(base)
-            client.call("/compile", {"source": TINY_SOURCE})
+            client.call("/api/compile", {"source": TINY_SOURCE})
             assert client.call("/api/jobs")[1]["store"]["jobs"] == 1
 
             status, cleared = client.call("/api/jobs/clear", {})
@@ -585,7 +585,7 @@ class TestHttpCancellation:
                 target=lambda: answer.update(
                     zip(
                         ("status", "body"),
-                        client.call("/compile", {"source": SLOW_SOURCE}),
+                        client.call("/api/compile", {"source": SLOW_SOURCE}),
                         strict=True,
                     )
                 ),
@@ -643,7 +643,7 @@ class TestHttpCancellation:
                 target=lambda: answer.update(
                     zip(
                         ("status", "body"),
-                        client.call("/compile", {"source": SLOW_SOURCE, "client_id": "drag-1"}),
+                        client.call("/api/compile", {"source": SLOW_SOURCE, "client_id": "drag-1"}),
                         strict=True,
                     )
                 ),

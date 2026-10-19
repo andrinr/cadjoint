@@ -49,7 +49,7 @@ from cadjoint.fem.tetmesh import TetMesh, sdf_to_tet_mesh
 # flow package can use it without importing a finite-element package.  It is
 # re-exported here because a study declared against a mesh reaches for it in
 # the same breath as SimMesh and ThermalStudy.
-from cadjoint.studies import Nodes, NodeSelection, selection_from_description
+from cadjoint.studies import Nodes, NodeSelection, capture_studies, selection_from_description
 
 __all__ = [
     "FaceGroup",
@@ -91,7 +91,6 @@ from cadjoint.fem.study import (  # noqa: E402
     HeatFlux,
     ThermalStudy,
     Traction,
-    capture_studies,
     study_mesh,
 )
 

@@ -260,15 +260,15 @@ def _literal_name(call: ast.Call) -> str | None:
     )
 
 
-def _catalogue_factories() -> dict[str, str]:
-    """``factory name -> catalogue key``, including the US spelling alias.
+def _catalogue_factories() -> frozenset[str]:
+    """The catalogue's factory names.
 
     Imported lazily: the refusal path is the only one that needs it, and the
     catalogue builds every material in it on import of its own module.
     """
     from cadjoint.materials import CATALOGUE
 
-    return {**{key: key for key in CATALOGUE}, "aluminum_6061": "aluminium_6061"}
+    return frozenset(CATALOGUE)
 
 
 def _material_definitions(tree: ast.Module) -> list[_Definition]:
@@ -296,7 +296,7 @@ def _material_definitions(tree: ast.Module) -> list[_Definition]:
             index, factory = ordinal, None
             ordinal += 1
         elif called in factories:
-            index, factory = None, factories[called]
+            index, factory = None, called
         else:
             continue
         definitions.append(

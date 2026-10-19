@@ -368,9 +368,9 @@ class MaterialDefinition(Open):
     opacity: float
     ior: float
     reflectivity: float
-    physical: dict[str, float | None] | None = None
-    units: dict[str, str] | None = None
-    free: dict[str, bool] | None = None
+    physical: dict[str, float | None]
+    units: dict[str, str]
+    free: dict[str, bool]
     spans: dict[str, Span]
 
 

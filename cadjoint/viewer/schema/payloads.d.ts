@@ -309,9 +309,9 @@ export interface MaterialDefinition {
   opacity: number;
   ior: number;
   reflectivity: number;
-  physical?: Record<string, number | null> | null;
-  units?: Record<string, string> | null;
-  free?: Record<string, boolean> | null;
+  physical: Record<string, number | null>;
+  units: Record<string, string>;
+  free: Record<string, boolean>;
   spans: Record<string, [number, number]>;
   /** Fields the object's own describe() may add. */
   [key: string]: unknown;

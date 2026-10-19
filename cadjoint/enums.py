@@ -327,7 +327,7 @@ class GradientPath(Option):
 
 
 GradientPathLike = GradientPath | Literal["direct", "tesseract", "tesseract-dc"]
-"""A gradient path, or the plain string spelling of one (aliases included)."""
+"""A gradient path, or the plain string spelling of one."""
 
 
 class ObjectiveMetric(Option):

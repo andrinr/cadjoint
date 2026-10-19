@@ -784,8 +784,6 @@ class Route:
         stream: The response is NDJSON, one :data:`response` model per line.
         file: A success is a file attachment rather than JSON; only a failure
             is JSON (see ``X-Cadjoint-Export`` and :class:`ExportSummary`).
-        aliases: Older paths that still answer, for clients built before the
-            route moved under ``/api/``.
     """
 
     method: Literal["GET", "POST"]
@@ -798,7 +796,6 @@ class Route:
     tracked: bool = False
     stream: bool = False
     file: bool = False
-    aliases: tuple[str, ...] = ()
 
 
 ROUTES: tuple[Route, ...] = (
@@ -811,16 +808,8 @@ ROUTES: tuple[Route, ...] = (
         CompileRequest,
         (CompilePayload, Failure),
         tracked=True,
-        aliases=("/compile",),
     ),
-    Route(
-        "POST",
-        "/api/patch",
-        "PatchResponse",
-        PatchRequest,
-        (PatchResponse,),
-        aliases=("/patch",),
-    ),
+    Route("POST", "/api/patch", "PatchResponse", PatchRequest, (PatchResponse,)),
     Route("POST", "/api/mesh", "MeshResponse", CompileRequest, (MeshResult, Failure), tracked=True),
     Route("POST", "/api/brep", "BrepResponse", CompileRequest, (BrepResult, Failure), tracked=True),
     Route(

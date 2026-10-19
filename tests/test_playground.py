@@ -523,7 +523,14 @@ def test_session_endpoint_hands_out_a_token_and_the_example():
 
 @pytest.mark.parametrize(
     "path",
-    ["/compile", "/patch", "/api/mesh", "/api/optimize", "/api/scenes/load", "/api/scenes/save"],
+    [
+        "/api/compile",
+        "/api/patch",
+        "/api/mesh",
+        "/api/optimize",
+        "/api/scenes/load",
+        "/api/scenes/save",
+    ],
 )
 def test_write_endpoints_require_the_session_token(path):
     with running_server() as base:
@@ -539,7 +546,7 @@ def test_patch_endpoint_edits_the_program_text():
         with urlopen(
             post(
                 base,
-                "/patch",
+                "/api/patch",
                 {
                     "source": EXAMPLE_SOURCE,
                     "op": "insert_vertex",
@@ -579,7 +586,7 @@ def test_patch_endpoint_reports_failures_without_crashing():
             urlopen(
                 post(
                     base,
-                    "/patch",
+                    "/api/patch",
                     {
                         "source": EXAMPLE_SOURCE,
                         "op": "set_vertex",
@@ -1418,7 +1425,7 @@ def test_a_failed_compile_is_reported_again_by_the_linter():
         with urlopen(f"{base}/api/session") as response:
             token = json.loads(response.read())["token"]
         with pytest.raises(HTTPError) as error:
-            urlopen(post(base, "/compile", {"source": source}, token))
+            urlopen(post(base, "/api/compile", {"source": source}, token))
         assert error.value.code == 422
         with urlopen(post(base, "/api/lint", {"source": source}, token)) as response:
             lint = json.loads(response.read())
@@ -1440,7 +1447,7 @@ def test_every_timed_endpoint_answers_with_a_job_id_and_nothing_else_changed():
     with running_server() as base:
         with urlopen(f"{base}/api/session") as response:
             token = json.loads(response.read())["token"]
-        with urlopen(post(base, "/compile", {"source": source}, token)) as response:
+        with urlopen(post(base, "/api/compile", {"source": source}, token)) as response:
             served = json.loads(response.read())
 
     direct = compile_source(source)

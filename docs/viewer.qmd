@@ -496,8 +496,7 @@ frontend's types are generated from the same models into `payloads.d.ts`
 (`python -m cadjoint.viewer.schema.emit`). The contract is versioned:
 `GET /api/session` reports `api_version`, every response carries it in
 `X-Cadjoint-Api`, and a page built for another version says so instead of
-misreading the server. `/compile` and `/patch` moved to `/api/compile` and
-`/api/patch`; the old paths still answer.
+misreading the server.
 `tests/viewer/test_parity_roundtrip.py` checks that every operation's result
 parses, is deterministic and shows exactly the requested change, and that
 every `set_*` is idempotent.
