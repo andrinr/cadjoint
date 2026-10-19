@@ -52,8 +52,7 @@ def _format_keywords(arguments: dict) -> str:
     """``key=value, key=value`` for a whole call, compactly formatted.
 
     Every operation that *writes a new call* — a material definition, a new
-    solid — was spelling this out one keyword at a time; the argument list
-    is one thing, so it is formatted in one place.
+    solid — formats its argument list here.
     """
     return ", ".join(f"{key}={_format_value(value)}" for key, value in arguments.items())
 

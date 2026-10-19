@@ -33,6 +33,7 @@ from typing import Any
 
 import numpy as np
 
+from cadjoint.descriptions import ResultDescription
 from cadjoint.fem.hexmesh import HexMesh
 from cadjoint.fem.render_payload import cell_to_node_scalar
 from cadjoint.fem.simulate import ElasticResult, ThermalResult
@@ -181,7 +182,7 @@ class SimulationResult:
 
     # ── inspection / export ─────────────────────────────────────────────────
 
-    def describe(self) -> dict[str, Any]:
+    def describe(self) -> ResultDescription:
         """JSON-ready summary of the solved result (concrete results only).
 
         Returns:

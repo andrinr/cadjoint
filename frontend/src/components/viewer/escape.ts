@@ -1,11 +1,10 @@
 /**
  * What one press of Escape cancels.
  *
- * Escape used to clear *everything* at once — the pending constraint pick, a
+ * Clearing *everything* at once — the pending constraint pick, a
  * half-finished loft, the probe, the selection, the armed tool and the
- * editing mode, in one statement. That is not a cancel, it is a reset: a user
- * who armed the loft tool by accident lost their selection and their mode
- * along with it, and there was no way to back out of one step at a time.
+ * editing mode — is a reset, not a cancel: a user who armed the loft tool by
+ * accident would lose their selection and their mode along with it.
  *
  * So Escape cancels exactly one thing per press, most specific first, and the
  * user walks back out the way they walked in. The rungs, in order:

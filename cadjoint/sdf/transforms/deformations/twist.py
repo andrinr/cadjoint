@@ -81,7 +81,3 @@ class Twist(Transform):
         axis = self.params["axis"].xyz / jnp.linalg.norm(self.params["axis"].xyz)
         p_twisted = Twist._transform_point(p, self.params["strength"].value, axis)
         return self.sdf.material_at(p_twisted)
-
-    def to_functional(self):
-        """Return pure function for compilation."""
-        return Twist.sdf

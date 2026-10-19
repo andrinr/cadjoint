@@ -31,13 +31,11 @@ _STARTUP_TIMEOUT = 90.0
 
 @pytest.fixture(autouse=True, scope="package")
 def _plugins_x64():
-    """Scope jax's x64 mode to this suite (see ``tests/fem/conftest.py``)."""
-    import jax
+    """Scope jax's x64 mode to this suite."""
+    from tests.helpers import x64
 
-    previous = jax.config.jax_enable_x64
-    jax.config.update("jax_enable_x64", True)
-    yield
-    jax.config.update("jax_enable_x64", previous)
+    with x64():
+        yield
 
 
 @pytest.fixture(autouse=True)

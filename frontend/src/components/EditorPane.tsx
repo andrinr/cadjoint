@@ -201,7 +201,7 @@ export function EditorPane(props: EditorPaneProps) {
     onCleanup(() => view?.destroy());
   });
 
-  // Adopt source changes that came from elsewhere (session start, /patch),
+  // Adopt source changes that came from elsewhere (session start, /api/patch),
   // as the smallest edit that produces them: a whole-document replacement
   // sends the view back to line 1, and a patch is a few characters in one
   // literal the user is looking at (see `minimalChange`).

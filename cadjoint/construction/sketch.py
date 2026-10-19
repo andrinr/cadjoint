@@ -41,10 +41,10 @@ valued ``Parameter`` model does not have — see ``research/complex-scene.md``.
 In-plane rotation
 -----------------
 
-``u`` and ``v`` used to be derived from the normal alone, which made a
-sketch's "horizontal" an accident of the derivation on any tilted plane. A
-plane now takes an explicit ``x_axis``; omitting it keeps the old derivation
-exactly, so existing sketches are unchanged. The derived constructors fill it
+Deriving ``u`` and ``v`` from the normal alone makes a sketch's
+"horizontal" an accident of the derivation on any tilted plane, so a plane
+takes an explicit ``x_axis``; omitting it falls back to that derivation.
+The derived constructors fill it
 in from the reference — the profile's ``u`` for a cap, the swept edge
 direction for a side wall, the most nearly in-plane world axis for a tangent
 plane.
@@ -59,6 +59,7 @@ import jax.numpy as jnp
 import numpy as np
 from jax import Array
 
+from cadjoint.descriptions import PlaneDescription
 from cadjoint.fluent import Fluent
 from cadjoint.geometry.parameters import Parameter, Vector, Vector2, as_parameter
 from cadjoint.geometry.vectors import unit
@@ -442,7 +443,7 @@ class SketchPlane(Fluent):
         xy = jnp.asarray(xy)
         return self.origin.xyz + xy[..., :1] * u + xy[..., 1:2] * v
 
-    def describe(self) -> dict:
+    def describe(self) -> PlaneDescription:
         """Serialize the plane's frame for the viewer."""
         u, v, n = self.frame()
         return {

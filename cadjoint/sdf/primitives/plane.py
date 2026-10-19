@@ -47,9 +47,6 @@ class Plane(Primitive):
     def __call__(self, p: Array) -> Array:
         return Plane.sdf(p, self.params["height"].value)
 
-    def to_functional(self):
-        return Plane.sdf
-
     def patch_fields(self):
         """Single smooth patch: an infinite plane has no feature edges."""
         height = self.params["height"].value

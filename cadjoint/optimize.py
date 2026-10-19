@@ -6,8 +6,7 @@ viewer via :meth:`Optimization.describe`, and runnable directly by scripts
 and the playground via :meth:`Optimization.run`.  Constructing an
 optimization inside a :func:`capture_optimizations` context registers it
 automatically, so the compile worker can collect the optimizations a user
-program declares — mirroring ``capture_studies`` in
-:mod:`cadjoint.fem.study`.
+program declares — mirroring :func:`cadjoint.studies.capture_studies`.
 
 The optimized variables are the FREE parameters of one scene object: the
 named :class:`~cadjoint.geometry.parameters.Scalar` /
@@ -87,13 +86,14 @@ from __future__ import annotations
 
 import math
 from collections.abc import Iterator
-from contextlib import contextmanager
-from contextvars import ContextVar
+from contextlib import AbstractContextManager, contextmanager
 from dataclasses import KW_ONLY, dataclass, field
 from typing import Any, Callable
 
 import numpy as np
 
+from cadjoint.capture import Capture, one_named
+from cadjoint.descriptions import OptimizationDescription
 from cadjoint.enums import (
     GradientPath,
     GradientPathLike,
@@ -121,42 +121,19 @@ PRECISIONS = values(Precision)
 #: Study-form design->points derivative paths (see ``Optimization.gradient_path``).
 #: These spellings are the documented, user-facing ones and do not change.
 GRADIENT_PATHS = values(GradientPath)
-#: Accepted aliases -> canonical gradient path.  Both chain paths resolve
-#: every stage through :mod:`cadjoint.plugins`, so they can also be named
-#: for what they do rather than for the Tesseract that implements them
-#: today; the canonical names above stay the ones the docs use.
-GRADIENT_PATH_ALIASES = {
-    "plugins": GradientPath.TESSERACT,
-    "plugins-dc": GradientPath.TESSERACT_DC,
-}
 TRAJECTORY_LIMIT = 100
 
-_CAPTURED_OPTIMIZATIONS: ContextVar[list[Optimization] | None] = ContextVar(
-    "cadjoint_captured_optimizations",
-    default=None,
-)
+_OPTIMIZATIONS: Capture[Optimization] = Capture("cadjoint_captured_optimizations")
 
 
-@contextmanager
-def capture_optimizations() -> Iterator[list[Optimization]]:
+def capture_optimizations() -> AbstractContextManager[list[Optimization]]:
     """Collect every optimization constructed inside this context.
 
     Mirrors ``capture_studies``: the compile worker wraps user program
     execution in this context and receives the declared optimizations in
     construction order.
     """
-    optimizations: list[Optimization] = []
-    token = _CAPTURED_OPTIMIZATIONS.set(optimizations)
-    try:
-        yield optimizations
-    finally:
-        _CAPTURED_OPTIMIZATIONS.reset(token)
-
-
-def _register(optimization: Optimization) -> None:
-    captured = _CAPTURED_OPTIMIZATIONS.get()
-    if captured is not None:
-        captured.append(optimization)
+    return _OPTIMIZATIONS.collect()
 
 
 def _plain(value: Any) -> float | list[float]:
@@ -196,16 +173,11 @@ def _resolve_study(study: Any) -> Any:
     if isinstance(study, (ThermalStudy, ElasticStudy)):
         return study
     if isinstance(study, str):
-        captured = declared_studies()
-        declared = [candidate for candidate in captured if candidate.name == study]
-        if len(declared) == 1:
-            return declared[0]
-        if len(declared) > 1:
-            raise ValueError(f"The program declares more than one study named {study!r}.")
-        names = ", ".join(repr(candidate.name) for candidate in captured) or "none"
-        raise ValueError(
-            f"No declared study named {study!r} (declared: {names}). "
-            "Declare one before the optimization, or pass the study instance itself."
+        return one_named(
+            declared_studies(),
+            study,
+            "study",
+            hint="Declare one before the optimization, or pass the study instance itself.",
         )
     raise ValueError(
         "study must be a ThermalStudy/ElasticStudy or the name of a declared one, "
@@ -231,8 +203,8 @@ def _compiled_prefix(prefix: Any, *, enabled: bool) -> Any:
     A frozen topology holds the objective fixed for ``remesh_every`` steps and
     the parameter leaves keep their shapes and dtypes across a descent, so one
     traced program serves every step until the next refreeze; running it
-    op-by-op instead re-dispatches the whole chain per step (measured on the
-    starter: ~11 s per step eager against ~0.5 s jitted).
+    op-by-op instead re-dispatches the whole chain per step (~11 s per step
+    eager against ~0.5 s jitted on the starter).
 
     **Only the pure half is compiled, and that is the point.**  A frozen chain
     is a pure JAX prefix — the design field, dual contouring, the QEF vertex
@@ -243,21 +215,18 @@ def _compiled_prefix(prefix: Any, *, enabled: bool) -> Any:
     write that module to the persistent compilation cache at all
     (``jax/_src/compiler.py::_cache_write`` — "because it uses host
     callbacks").  One ``jax.jit`` spanning both halves is therefore
-    uncacheable *in its entirety*: on the starter that was 6.2 MB of HLO
-    retraced and recompiled in every process, warm cache or cold, about eight
-    seconds a run.  Compiling this half alone keeps it cacheable, and what is
-    left eager is a couple of plugin calls and a metric reduction.  Measured
-    in ``research/performance.md`` §15.
+    uncacheable *in its entirety* and retraced and recompiled in every
+    process.  Compiling this half alone keeps it cacheable, and what is left
+    eager is a couple of plugin calls and a metric reduction (see
+    ``research/performance.md`` §15).
 
-    Splitting also *removes* a hazard the whole-program form had to work
-    around.  ``tesseract_jax`` classifies an input as static exactly when it is
+    Splitting also avoids a static-input hazard.  ``tesseract_jax`` classifies an input as static exactly when it is
     not a tracer (``primitive.py``: ``is_static_mask``), and a frozen chain
     hands its plugins NumPy constants — the mesher's ``element`` code, the
     quality thresholds, the study's conductivity.  Under a ``jax.jit``
     enclosing the plugin call those arrive traced, and the VJP then invents a
     derivative slot for each: ``np.full(shape, np.nan, dtype)``, which for the
-    0-d ``int32`` ``element`` is a NaN cast to an integer.  The old form
-    defeated that with :func:`jax.ensure_compile_time_eval`; with every plugin
+    0-d ``int32`` ``element`` is a NaN cast to an integer.  With every plugin
     call outside every trace the constants are simply concrete, as they are on
     the eager path.
 
@@ -378,7 +347,7 @@ class Optimization:
         gradient_path: Study form: how the design->points derivative is
             carried per step (keyword-only) — a
             :class:`~cadjoint.enums.GradientPath` or its plain string
-            spelling, normalised (aliases resolved) on construction.
+            spelling, normalised on construction.
             ``"direct"`` (default) is
             the validated frozen-topology path — node positions Newton
             re-projected onto the true SDF, solved in-process.
@@ -395,8 +364,7 @@ class Optimization:
             geometry the direct path does — tet ``SimMesh`` only.  Both
             chain paths resolve each stage through
             :mod:`cadjoint.plugins`, so where the mesher and the solver
-            actually run is configuration (``plugins.toml``), and both
-            spellings accept the aliases ``"plugins"`` / ``"plugins-dc"``.
+            actually run is configuration (``plugins.toml``).
             Both require the ``tesseract`` extra.  The final reported
             result is always evaluated on the direct path.
         steps: Default number of optimizer steps (keyword-only).
@@ -458,7 +426,7 @@ class Optimization:
             self.precision,
             f"precision must be one of: {', '.join(PRECISIONS)} (got {self.precision!r}).",
         )
-        _register(self)
+        _OPTIMIZATIONS.record(self)
 
     def _validate_objective_form(self) -> None:
         if self.objective is None:
@@ -538,13 +506,10 @@ class Optimization:
             or self.remesh_every < 0
         ):
             raise ValueError("remesh_every must be a non-negative integer (0: never remesh).")
-        # Aliases resolve here, so the rest of the run sees one canonical
-        # member per path rather than two spellings of it.
         self.gradient_path = parse(
             GradientPath,
-            GRADIENT_PATH_ALIASES.get(self.gradient_path, self.gradient_path),
+            self.gradient_path,
             f"gradient_path must be one of: {', '.join(GRADIENT_PATHS)} "
-            f"(aliases: {', '.join(GRADIENT_PATH_ALIASES)}) "
             f"(got {self.gradient_path!r}).",
         )
         self._refuse_frozen_geometry()
@@ -572,7 +537,7 @@ class Optimization:
         mesh = getattr(self.study, "mesh", None)
         if not isinstance(mesh, SimMesh) or not mesh.frozen_geometry:
             return
-        raise tier.TierUnavailable(PluginKind.NODE_MAP.value, "not registered")
+        raise tier.TierUnavailable(PluginKind.NODE_MAP, "not registered")
 
     def _study_kind(self) -> StudyKind:
         from cadjoint.fem.study import ThermalStudy
@@ -602,7 +567,7 @@ class Optimization:
         free, _, _ = extract_parameters(target)
         return free
 
-    def describe(self, scene: Any = None) -> dict[str, Any]:
+    def describe(self, scene: Any = None) -> OptimizationDescription:
         """JSON-ready payload: everything the viewer needs to display it.
 
         Args:
@@ -737,8 +702,7 @@ class Optimization:
         *before* the first evaluation and the optimizer state carries them
         between steps, so a narrower scope would leave float32 leaves in the
         parameter pytree for a float64 gradient to update.  ``"single"``
-        does not touch the flag at all, which is what leaves the default
-        path -- every scene that does not ask for this -- as it was.
+        does not touch the flag at all, so the default path is unaffected.
         """
         if self.precision != Precision.DOUBLE:
             yield
@@ -932,16 +896,14 @@ class Optimization:
         #   descending and sign-consistent with the direct path on the
         #   crease-heavy starter heat sink (research/tet-vs-hex.md), but it
         #   meshes the interpolant (can need a finer lattice) and drops
-        #   tangential vertex motion — kept opt-in until cleared as default.
+        #   tangential vertex motion, so it is opt-in.
         # - "tesseract-dc": the narrow cut — JAX dual contouring on the TRUE
         #   SDF (frozen edges, differentiable Newton + QEF) -> tetfill
         #   tesseract (TetGen only; exact pass-through VJP on the vertices
         #   -Y preserves) -> solver tesseract adjoint.  Same geometry as the
         #   direct path, black box confined to the one component that is
         #   genuinely one.
-        # Both chains resolve their stages through the plugin registry, so
-        # "tesseract"/"tesseract-dc" and their "plugins"/"plugins-dc"
-        # aliases select the same code; the alias only renames the switch.
+        # Both chains resolve their stages through the plugin registry.
         path = self.gradient_path
         use_dc_chain = path == GradientPath.TESSERACT_DC
         use_tesseract = path in (GradientPath.TESSERACT, GradientPath.TESSERACT_DC)

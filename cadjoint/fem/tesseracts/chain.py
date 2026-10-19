@@ -86,19 +86,6 @@ def _plugin(kind: str):
     return plugin_for_kind(kind)
 
 
-def _tesseract(name: str):
-    """The raw Tesseract client of the plugin registered under ``name``.
-
-    Kept for callers that speak the Tesseract ABI directly (the packaging
-    tests round-trip ``apply``/``vector_jacobian_product`` against it).
-    New code should take a :class:`~cadjoint.plugins.Plugin` from
-    :func:`_plugin` instead, so it does not assume the transport.
-    """
-    from cadjoint.plugins import get_plugin
-
-    return get_plugin(name).client
-
-
 def _require_inputs(plugin: Any, payload: dict, output: str, stage: str) -> None:
     """Refuse a plugin that cannot accept this stage's frozen payload.
 
@@ -572,18 +559,16 @@ def _freeze_dc_surface(
 
     **Why the crossings are anchored rather than re-solved.**  The obvious
     map re-runs :func:`~cadjoint.meshing.edge_hermite_data` on the frozen
-    edge set every traced call.  That is wrong, and it is what used to break
-    the starter heat sink at step 5 of its own optimization: the root search
-    is bracketed by the *frozen sign pattern at the lattice vertices*, which
-    is discrete topology and expires.  Measured on ``scenes/starter.py``,
-    **168 of 858 brackets (20%) are already invalid one optimizer step
-    later** — the fin faces sit within 0.005 of a lattice plane, so a whole
-    plane of vertices changes sign at once.  On an expired edge bisection
-    collapses toward an endpoint, so the cell is fitted to a sample that is
-    not on the surface, ``qef_vertices``' cell clamp then pins neighbouring
-    cells' vertices onto their shared face, and the boundary tets built on
-    them go to zero volume (204 degenerate tets at step 2, ``min |vol|``
-    1.6e-21) until the FEM system is unsolvable.  Projecting the frozen
+    edge set every traced call.  That is wrong: the root search is bracketed
+    by the *frozen sign pattern at the lattice vertices*, which is discrete
+    topology and expires.  On ``scenes/starter.py`` a fifth of the brackets
+    are invalid one optimizer step later — the fin faces sit within 0.005 of
+    a lattice plane, so a whole plane of vertices changes sign at once.  On
+    an expired edge bisection collapses toward an endpoint, so the cell is
+    fitted to a sample that is not on the surface, ``qef_vertices``' cell
+    clamp then pins neighbouring cells' vertices onto their shared face, and
+    the boundary tets built on them go to zero volume until the FEM system
+    is unsolvable.  Projecting the frozen
     crossings instead needs no bracket at all, is defined for every design,
     and keeps every sample a genuine surface point with a genuine normal —
     so the QEF's plane fit still recovers **tangential** vertex motion, the
@@ -720,8 +705,6 @@ def freeze_study_chain_dc(
     study: Any,
     sim_mesh: Any,
     field: Callable[[Any], Any],
-    *,
-    freeze_interior: bool = True,
 ) -> FrozenDCChain:
     """Freeze the DC-surface + tetfill + solver chain for ``study``.
 
@@ -733,19 +716,6 @@ def freeze_study_chain_dc(
             there is no hex mode.
         field: The design field at the current (concrete) parameters; a
             callable on ``(..., 3)`` points.
-        freeze_interior: Hold the interior (Steiner) nodes across the
-            traced calls, so the tesseract re-evaluates the frozen fill
-            instead of re-running TetGen (the default, and the same
-            contract ``recompute_tet_points`` honours on the direct path).
-            TetGen's Steiner insertion is not continuous in the surface —
-            measured: a 1e-4 design step already changes the Steiner count
-            on the box bar — so ``False`` re-runs the black box per step
-            and is only usable where the topology happens to survive.
-            Frozen mode additionally relaxes the held interior toward the
-            moving boundary (:func:`_interior_relaxation`), so the two
-            modes' derivatives differ there: TetGen-in-the-loop mode drops
-            the solver's interior cotangents, frozen mode transports them
-            onto the boundary through the relaxation's transpose.
 
     Returns:
         The :class:`FrozenDCChain`.
@@ -819,12 +789,8 @@ def freeze_study_chain_dc(
     templates = {
         "element": np.int32(_ELEMENT_CODES[method]),
         "node_ids": np.arange(mesh.num_points, dtype=np.int32),
-        # Frozen-fill mode passes the real connectivity (and the held
-        # interior); TetGen-in-the-loop mode passes shapes only.
-        "cell_template": cells_out if freeze_interior else np.zeros(cells_out.shape, np.int32),
-        "interior_points": points[int(vertices.shape[0]) :]
-        if freeze_interior
-        else np.zeros((0, 3), np.float64),
+        "cell_template": cells_out,
+        "interior_points": points[int(vertices.shape[0]) :],
         **static,
     }
     kind, solver_kind, output, inputs = _solver_stage(study, mesh)
@@ -832,11 +798,11 @@ def freeze_study_chain_dc(
     _require_inputs(tetfill, templates, "nodes", "tetfill")
     _require_inputs(solver, inputs, output, solver_kind)
     solver_apply = solver.as_jax()
-    relax = _interior_relaxation(mesh) if freeze_interior else None
+    relax = _interior_relaxation(mesh)
 
     def solve(surface_points):
         filled = tetfill_apply(dict(points=surface_points, **templates))
-        nodes = filled["nodes"] if relax is None else relax(filled["nodes"])
+        nodes = relax(filled["nodes"])
         solved = solver_apply(dict(points=nodes, **inputs))
         return nodes, solved[output]
 

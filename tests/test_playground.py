@@ -2,12 +2,6 @@ from __future__ import annotations
 
 import ast
 import json
-import os
-import shutil
-import tempfile
-import threading
-from contextlib import contextmanager
-from pathlib import Path
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
@@ -18,12 +12,10 @@ from cadjoint.viewer._pathtracer import (
     WGSL_PRESENT_TEMPLATE,
     build_path_tracer_shader,
 )
-from cadjoint.viewer._scenes import SCENES_DIR_ENV
 from cadjoint.viewer._webgpu import build_viewer_shader, ensure_material_wgsl
 from cadjoint.viewer.playground import (
     EXAMPLE_SOURCE,
     compile_source,
-    create_server,
     list_scenes,
     load_scene,
     mesh_source,
@@ -32,6 +24,7 @@ from cadjoint.viewer.playground import (
     sanitize_scene_name,
     save_scene,
 )
+from tests.helpers import post, running_server, session_token
 
 
 def call_line(source: str, name: str) -> int:
@@ -467,50 +460,6 @@ def test_resolve_static_refuses_paths_outside_the_static_root():
     assert resolve_static("/../_webgpu.py") is None
 
 
-#: The repository's own scenes, copied into every live server's workspace.
-SHIPPED_SCENES = Path(__file__).resolve().parents[1] / "scenes"
-
-
-@contextmanager
-def running_server():
-    """A live playground on a free port, writing scenes to a temp directory.
-
-    The scenes root defaults to ``./scenes`` under the working directory,
-    which for a test run is the repository — so a request that saved a scene
-    used to leave a file in the checkout.  Each live server gets its own
-    temporary directory instead, seeded with copies of the shipped scenes so
-    the listing has something real in it.
-    """
-    with tempfile.TemporaryDirectory() as workspace:
-        root = Path(workspace) / "scenes"
-        root.mkdir()
-        for path in sorted(SHIPPED_SCENES.glob("*.py")):
-            shutil.copyfile(path, root / path.name)
-        previous = os.environ.get(SCENES_DIR_ENV)
-        os.environ[SCENES_DIR_ENV] = str(root)
-        server = create_server(0)
-        thread = threading.Thread(target=server.serve_forever, daemon=True)
-        thread.start()
-        try:
-            host, port = server.server_address
-            yield f"http://{host}:{port}"
-        finally:
-            server.shutdown()
-            server.server_close()
-            thread.join(timeout=2)
-            if previous is None:
-                os.environ.pop(SCENES_DIR_ENV, None)
-            else:
-                os.environ[SCENES_DIR_ENV] = previous
-
-
-def post(base: str, path: str, payload: dict, token: str | None = None) -> Request:
-    headers = {"Content-Type": "application/json"}
-    if token is not None:
-        headers["X-Cadjoint-Token"] = token
-    return Request(base + path, data=json.dumps(payload).encode(), headers=headers, method="POST")
-
-
 def test_session_endpoint_hands_out_a_token_and_the_example():
     with running_server() as base:
         with urlopen(f"{base}/api/session") as response:
@@ -523,7 +472,14 @@ def test_session_endpoint_hands_out_a_token_and_the_example():
 
 @pytest.mark.parametrize(
     "path",
-    ["/compile", "/patch", "/api/mesh", "/api/optimize", "/api/scenes/load", "/api/scenes/save"],
+    [
+        "/api/compile",
+        "/api/patch",
+        "/api/mesh",
+        "/api/optimize",
+        "/api/scenes/load",
+        "/api/scenes/save",
+    ],
 )
 def test_write_endpoints_require_the_session_token(path):
     with running_server() as base:
@@ -534,12 +490,11 @@ def test_write_endpoints_require_the_session_token(path):
 
 def test_patch_endpoint_edits_the_program_text():
     with running_server() as base:
-        with urlopen(f"{base}/api/session") as response:
-            token = json.loads(response.read())["token"]
+        token = session_token(base)
         with urlopen(
             post(
                 base,
-                "/patch",
+                "/api/patch",
                 {
                     "source": EXAMPLE_SOURCE,
                     "op": "insert_vertex",
@@ -573,13 +528,12 @@ def test_solver_patch_endpoint_forwards_optimizer_controls():
 
 def test_patch_endpoint_reports_failures_without_crashing():
     with running_server() as base:
-        with urlopen(f"{base}/api/session") as response:
-            token = json.loads(response.read())["token"]
+        token = session_token(base)
         with pytest.raises(HTTPError) as error:
             urlopen(
                 post(
                     base,
-                    "/patch",
+                    "/api/patch",
                     {
                         "source": EXAMPLE_SOURCE,
                         "op": "set_vertex",
@@ -672,8 +626,7 @@ def test_scene_endpoints_round_trip_over_http(tmp_path, monkeypatch):
     # proves that a refused traversal writes nothing beside it either.
     monkeypatch.chdir(tmp_path)
     with running_server() as base:
-        with urlopen(f"{base}/api/session") as response:
-            token = json.loads(response.read())["token"]
+        token = session_token(base)
 
         with urlopen(
             post(base, "/api/scenes/save", {"name": "part.py", "source": "scene = None\n"}, token)
@@ -1358,30 +1311,17 @@ def test_optimize_events_report_a_timeout_as_a_clear_error():
 
 
 def test_optimize_endpoint_streams_ndjson_over_http():
-    import threading
-    from urllib.request import urlopen
-
-    from cadjoint.viewer.playground import create_server
-
-    server = create_server(0)
-    thread = threading.Thread(target=server.serve_forever, daemon=True)
-    thread.start()
-    try:
-        host, port = server.server_address
-        base = f"http://{host}:{port}"
-        with urlopen(f"{base}/api/session") as response:
-            token = json.loads(response.read())["token"]
+    with running_server() as base:
         request = post(
-            base, "/api/optimize", {"source": OPTIMIZE_SOURCE, "name": "fit-radius"}, token
+            base,
+            "/api/optimize",
+            {"source": OPTIMIZE_SOURCE, "name": "fit-radius"},
+            session_token(base),
         )
         with urlopen(request) as response:
             assert response.status == 200
             assert response.headers["Content-Type"].startswith("application/x-ndjson")
             events = [json.loads(line) for line in response if line.strip()]
-    finally:
-        server.shutdown()
-        server.server_close()
-        thread.join(timeout=2)
 
     kinds = [event["event"] for event in events]
     assert kinds == ["progress"] * 4 + ["done"]
@@ -1415,10 +1355,9 @@ def test_a_failed_compile_is_reported_again_by_the_linter():
         "boom = 1 / 0\n"
     )
     with running_server() as base:
-        with urlopen(f"{base}/api/session") as response:
-            token = json.loads(response.read())["token"]
+        token = session_token(base)
         with pytest.raises(HTTPError) as error:
-            urlopen(post(base, "/compile", {"source": source}, token))
+            urlopen(post(base, "/api/compile", {"source": source}, token))
         assert error.value.code == 422
         with urlopen(post(base, "/api/lint", {"source": source}, token)) as response:
             lint = json.loads(response.read())
@@ -1438,9 +1377,8 @@ def test_every_timed_endpoint_answers_with_a_job_id_and_nothing_else_changed():
     # worker produced, plus the id under which the server now remembers it.
     source = "from cadjoint.sdf.primitives import Sphere\n\nscene = Sphere(0.5)\n"
     with running_server() as base:
-        with urlopen(f"{base}/api/session") as response:
-            token = json.loads(response.read())["token"]
-        with urlopen(post(base, "/compile", {"source": source}, token)) as response:
+        token = session_token(base)
+        with urlopen(post(base, "/api/compile", {"source": source}, token)) as response:
             served = json.loads(response.read())
 
     direct = compile_source(source)
@@ -1455,8 +1393,7 @@ def test_a_streamed_optimize_run_is_replayable_from_the_job_store():
     # progress events carry the job id while they stream, and the whole run
     # is fetchable again from the store afterwards.
     with running_server() as base:
-        with urlopen(f"{base}/api/session") as response:
-            token = json.loads(response.read())["token"]
+        token = session_token(base)
         request = post(
             base, "/api/optimize", {"source": OPTIMIZE_SOURCE, "name": "fit-radius"}, token
         )

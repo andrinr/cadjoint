@@ -13,8 +13,8 @@ build a request the compiler agrees with — and a cross-check that the two
 descriptions of the same contract agree.
 
 Every operation that addresses an existing object takes ``id`` (the stable
-identity, resolved against the source in this same request) *or* the legacy
-``line``/``index`` the payload used to report. Both are optional in the
+identity, resolved against the source in this same request) *or* a
+``line``/``index`` pair. Both are optional in the
 models because either one satisfies the server; which combinations are
 sufficient is what the validators decide.
 """

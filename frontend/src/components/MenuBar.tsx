@@ -83,7 +83,7 @@ export function MenuBar() {
   };
 
   /**
-   * Open… is the scene browser now, not a list of file names.
+   * Open… is the scene browser, not a list of file names.
    *
    * A modal list of names could only answer "which file", and the question a
    * user actually has in front of a directory of parts is "which *part*".

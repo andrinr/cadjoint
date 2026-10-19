@@ -206,12 +206,6 @@ class TestRevolveAxis:
         section = [[1.0, -0.2], [1.4, -0.2], [1.4, 0.2], [1.0, 0.2]]
         assert len(revolve(profile(section, name="r")).faces) == 0
 
-    def test_describe_is_serializable(self):
-        section = [[1.0, -0.2], [1.4, -0.2], [1.4, 0.2], [1.0, 0.2]]
-        payload = revolve(profile(section, name="r")).axis.describe()
-        assert payload["kind"] == "axis"
-        assert payload["origin"] == [0.0, 0.0, 0.0]
-
 
 class TestPrimitiveFaces:
     def test_a_box_declares_six(self):

@@ -70,9 +70,9 @@ _SOLVE_METHODS = values(ConstraintSolveMethod)
 #
 # A request may address its target by the stable id the payload published
 # instead of by the line the payload happened to report.  An id is resolved
-# against the *current* text and then written into the legacy fields, so every
-# validator below keeps checking exactly what it always checked — and a
-# frontend that still sends lines keeps working unchanged.
+# against the *current* text and then written into the ``line``/``index``
+# fields, so every validator below checks one shape, and a request that sends
+# lines directly is accepted too.
 
 _UNRESOLVED_ID = "No statement in this program has the id {identifier!r}."
 _WRONG_ID_KIND = "The id {identifier!r} names a {kind}, which `{operation}` cannot address."
@@ -127,7 +127,7 @@ _OWNER_TARGETS = frozenset({"feature", "primitive"})
 
 
 def _derived_fields(identity: Identity, index: dict[str, Identity]) -> dict[str, Any] | None:
-    """The legacy request fields an id stands in for, or None for a kind it cannot fill."""
+    """The line/index request fields an id stands in for, or None for a kind it cannot fill."""
     if identity.kind in _LINE_KINDS:
         return {"line": identity.line}
     if identity.kind == "vertex":
@@ -865,7 +865,7 @@ def patch_source(request: dict[str, Any]) -> dict[str, Any]:
 
     Args:
         request: ``{"source", "op"}`` plus the operation's own fields — an
-            ``"id"`` naming the target, or the legacy ``"line"``/``"index"``,
+            ``"id"`` naming the target, or ``"line"``/``"index"``,
             and e.g. ``"xy"`` for the operations that place a vertex.
 
     Returns:

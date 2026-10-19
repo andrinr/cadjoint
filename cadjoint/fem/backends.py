@@ -60,12 +60,11 @@ from __future__ import annotations
 from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass, field
-from pathlib import Path
 from typing import Any, Callable, Protocol, runtime_checkable
 
 import numpy as np
 
-from cadjoint.enums import FemBackend, PluginKind, PluginTransport, StudyKind, StudyKindLike
+from cadjoint.enums import FemBackend, PluginKind, StudyKind, StudyKindLike
 
 _FEM_EXTRA_MESSAGE = (
     "jax-fem is not installed. Install the 'fem' extra: pip install cadjoint[fem] "
@@ -261,10 +260,6 @@ class TesseractBackend:
     ``backend="tesseract"`` is a documented, user-facing string.
 
     Args:
-        api_path: A ``tesseract_api.py`` to run in-process as the thermal
-            solver, bypassing the registry.  Equivalent to registering a
-            ``local`` spec for it.
-        elastic_api_path: The same for the elastic solver.
         thermal: A plugin name (or a :class:`~cadjoint.plugins.Plugin`) to
             use as the thermal solver instead of whatever fills the kind.
         elastic: The same for the elastic solver.
@@ -272,14 +267,7 @@ class TesseractBackend:
 
     name = FemBackend.TESSERACT.value
 
-    def __init__(
-        self,
-        api_path: str | Path | None = None,
-        *,
-        elastic_api_path: str | Path | None = None,
-        thermal: Any = None,
-        elastic: Any = None,
-    ):
+    def __init__(self, *, thermal: Any = None, elastic: Any = None):
         try:
             from tesseract_core import Tesseract  # noqa: F401
         except ImportError as error:
@@ -289,11 +277,6 @@ class TesseractBackend:
             StudyKind.THERMAL: thermal,
             StudyKind.ELASTIC: elastic,
         }
-        self._api_paths: dict[str, Path] = {}
-        if api_path is not None:
-            self._api_paths[StudyKind.THERMAL] = Path(api_path)
-        if elastic_api_path is not None:
-            self._api_paths[StudyKind.ELASTIC] = Path(elastic_api_path)
         self._plugins: dict[str, Any] = {}
 
     #: Solver stage (a :class:`~cadjoint.enums.StudyKind`) -> the
@@ -314,23 +297,13 @@ class TesseractBackend:
             The :class:`~cadjoint.plugins.Plugin` to call.
         """
         if stage not in self._plugins:
-            from cadjoint.plugins import PluginSpec, TesseractPlugin, get_plugin, plugin_for_kind
+            from cadjoint.plugins import get_plugin, plugin_for_kind
 
             chosen = self._selection.get(stage)
-            path = self._api_paths.get(stage)
             if chosen is not None and not isinstance(chosen, str):
                 plugin = chosen
             elif isinstance(chosen, str):
                 plugin = get_plugin(chosen)
-            elif path is not None:
-                plugin = TesseractPlugin(
-                    PluginSpec(
-                        name=f"{stage}_api_path",
-                        kind=self._KINDS[stage],
-                        transport=PluginTransport.LOCAL,
-                        api_path=path,
-                    )
-                )
             else:
                 plugin = plugin_for_kind(self._KINDS[stage])
             self._plugins[stage] = plugin

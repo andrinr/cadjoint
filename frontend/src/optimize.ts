@@ -2,7 +2,7 @@
  * Pure helpers for the Optimize panel.
  *
  * Optimizations are declared in the scene program (`Optimization(...)`); the
- * panel edits them through /patch source operations and runs them through
+ * panel edits them through /api/patch source operations and runs them through
  * POST /api/optimize, whose response is adopted exactly like a patch. The
  * replay player re-renders intermediate parameter snapshots by substituting
  * the literals client-side and ghost-compiling — nothing here touches the
@@ -85,7 +85,7 @@ export function parseOptimizeStreamLine(line: string): OptimizeStreamEvent | nul
   return null;
 }
 
-/** Body for POST /patch editing a numeric optimization argument. */
+/** Body for POST /api/patch editing a numeric optimization argument. */
 export function setOptimizationValueRequest(
   optimization: OptimizationPayload,
   argument: "steps" | "learning_rate",
@@ -100,7 +100,7 @@ export function setOptimizationValueRequest(
   };
 }
 
-/** Body for POST /patch deleting the declaration from the program. */
+/** Body for POST /api/patch deleting the declaration from the program. */
 export function deleteOptimizationRequest(
   optimization: OptimizationPayload,
 ): Record<string, unknown> {

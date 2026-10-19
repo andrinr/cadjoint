@@ -56,9 +56,6 @@ class Model:
         """The proto3 JSON encoding of ``zeroset.v1.Model``."""
         return {"node": self.nodes, "root": self.root, "theta": self.theta}
 
-    def to_json(self) -> str:
-        return json.dumps(self.to_dict())
-
 
 class Table:
     """The node table, with the grammar as methods that intern into it.
@@ -168,9 +165,6 @@ class Table:
 
     def vsub(self, a: Vec3, b: Vec3) -> Vec3:
         return tuple(self.sub(x, y) for x, y in zip(a, b))  # type: ignore[return-value]
-
-    def vadd(self, a: Vec3, b: Vec3) -> Vec3:
-        return tuple(self.add_(x, y) for x, y in zip(a, b))  # type: ignore[return-value]
 
     def vscale(self, s: Index, v: Vec3) -> Vec3:
         return tuple(self.mul(s, x) for x in v)  # type: ignore[return-value]

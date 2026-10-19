@@ -9,7 +9,13 @@
  * side applies intrinsically in that order.
  */
 
-import type { ConstructionKind, ConstructionTransform, GizmoMode } from "../types";
+import type {
+  ConstructionKind,
+  ConstructionNode,
+  ConstructionTransform,
+  GizmoMode,
+  Selection,
+} from "../types";
 import {
   add,
   cross,
@@ -22,6 +28,7 @@ import {
   type View,
 } from "./math";
 import { projectPoint } from "./math";
+import { pointSegmentDistance } from "./hittest";
 import { AXIS_RGB } from "../tokens";
 
 export type AxisIndex = 0 | 1 | 2;
@@ -213,15 +220,7 @@ function segmentDistance(px: number, py: number, a: Vec3, b: Vec3, view: View): 
   const first = projectPoint(a, view);
   const second = projectPoint(b, view);
   if (!first.visible || !second.visible) return Infinity;
-  const dx = second.x - first.x;
-  const dy = second.y - first.y;
-  const lengthSquared = dx * dx + dy * dy;
-  if (lengthSquared < 1e-12) return Math.hypot(px - first.x, py - first.y);
-  const t = Math.max(
-    0,
-    Math.min(1, ((px - first.x) * dx + (py - first.y) * dy) / lengthSquared),
-  );
-  return Math.hypot(px - (first.x + t * dx), py - (first.y + t * dy));
+  return pointSegmentDistance(px, py, first.x, first.y, second.x, second.y);
 }
 
 /** Which gizmo axis the pointer is over, if any. */
@@ -288,4 +287,37 @@ export function angleDelta(from: number, to: number): number {
   while (delta > Math.PI) delta -= 2 * Math.PI;
   while (delta < -Math.PI) delta += 2 * Math.PI;
   return delta;
+}
+
+/** The selected primitive the gizmo attaches to, if any. */
+export function gizmoTarget(
+  selection: Selection | null,
+  profiles: readonly ConstructionNode[],
+): { node: ConstructionNode; origin: Vec3 } | null {
+  if (!selection || selection.vertexIndex !== null) return null;
+  const node = profiles.find((candidate) => candidate.id === selection.nodeId);
+  if (!node?.transform || !node.editable) return null;
+  if (selection.part === "plane" && node.plane) {
+    // The plane was taken hold of by its own frame: the arrows sit on the
+    // origin the drag will rewrite, not on the polygon.
+    return { node, origin: node.plane.origin as Vec3 };
+  }
+  if (node.kind === "profile" && node.vertices.length > 0) {
+    const sum = node.vertices.reduce<Vec3>(
+      (center, vertex) => [
+        center[0] + vertex.world[0],
+        center[1] + vertex.world[1],
+        center[2] + vertex.world[2],
+      ] as Vec3,
+      [0, 0, 0],
+    );
+    const count = node.vertices.length;
+    return {
+      node,
+      // The plane origin can sit far outside an offset polygon. Keep the
+      // translation arrows on the selected geometry where they are visible.
+      origin: [sum[0] / count, sum[1] / count, sum[2] / count],
+    };
+  }
+  return { node, origin: node.transform.position as Vec3 };
 }

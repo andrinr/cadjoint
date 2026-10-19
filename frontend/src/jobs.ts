@@ -3,8 +3,8 @@
  *
  * Every request that costs real time — compile, mesh, mesh inspection, solve,
  * optimization run, export, lint, the startup warm-up — is registered on the server as
- * a *job* and keeps its result after the response is read. That turns three
- * things that used to be impossible into ordinary bookkeeping:
+ * a *job* and keeps its result after the response is read. That makes three
+ * things ordinary bookkeeping:
  *
  *   - **A result outlives the panel that asked for it.** A panel stores four
  *     small fields ({@link JobRef}) instead of a megabyte of mesh, and asks
@@ -25,6 +25,7 @@
 
 import { createSignal } from "solid-js";
 import * as api from "./api";
+import { browserStorage, type KeyValueStorage } from "./storage";
 import type { JobProgress, JobsSnapshot, JobSummary } from "./types";
 
 export type {
@@ -40,8 +41,6 @@ export type {
 
 /** The kinds of work the server registers. */
 export type JobKind = JobSummary["kind"];
-
-export type JobStatus = JobSummary["status"];
 
 /**
  * What a panel stores instead of a result.
@@ -166,13 +165,7 @@ export function jobRefFor(refs: JobRefs, scene: string, kind: JobKind): JobRef |
   return refs.scenes[scene]?.[kind] ?? null;
 }
 
-/** The minimal storage surface, so tests can pass a plain object. */
-export interface RefStorage {
-  getItem(key: string): string | null;
-  setItem(key: string, value: string): void;
-}
-
-export function readJobRefs(storage: RefStorage | undefined): JobRefs {
+export function readJobRefs(storage: KeyValueStorage | null): JobRefs {
   if (!storage) return emptyJobRefs();
   try {
     return parseJobRefs(storage.getItem(JOB_REFS_STORAGE_KEY));
@@ -181,7 +174,7 @@ export function readJobRefs(storage: RefStorage | undefined): JobRefs {
   }
 }
 
-export function writeJobRefs(storage: RefStorage | undefined, refs: JobRefs): void {
+export function writeJobRefs(storage: KeyValueStorage | null, refs: JobRefs): void {
   if (!storage) return;
   try {
     storage.setItem(JOB_REFS_STORAGE_KEY, JSON.stringify(refs));
@@ -190,26 +183,21 @@ export function writeJobRefs(storage: RefStorage | undefined, refs: JobRefs): vo
   }
 }
 
-/** The browser's storage, or nothing when it is unavailable (private mode). */
-export function refStorage(): RefStorage | undefined {
-  return typeof localStorage === "undefined" ? undefined : localStorage;
-}
-
 /** Store one job reference for a scene, in one call. */
 export function saveJobRef(scene: string, ref: JobRef): void {
-  const storage = refStorage();
+  const storage = browserStorage();
   writeJobRefs(storage, rememberJobRef(readJobRefs(storage), scene, ref));
 }
 
 /** Drop one job reference for a scene, in one call. */
 export function dropJobRef(scene: string, kind: JobKind): void {
-  const storage = refStorage();
+  const storage = browserStorage();
   writeJobRefs(storage, forgetJobRef(readJobRefs(storage), scene, kind));
 }
 
 /** Read one job reference for a scene, in one call. */
 export function loadJobRef(scene: string, kind: JobKind): JobRef | null {
-  return jobRefFor(readJobRefs(refStorage()), scene, kind);
+  return jobRefFor(readJobRefs(browserStorage()), scene, kind);
 }
 
 // ── matching a job to the document ─────────────────────────────────────────
@@ -392,18 +380,6 @@ function now(): number {
 }
 
 /**
- * Nudge the poller: refresh now, and keep polling while work is running.
- *
- * For a caller that has just started something the registry will know about
- * but does not itself want to watch — a compile, say. Cheap by design: a
- * poll already running is not doubled, and one that finds nothing pending
- * stops after a single request.
- */
-export function pokeJobs(): void {
-  void refreshJobs();
-}
-
-/**
  * Start polling, and stop when the returned function is called.
  *
  * Reference-counted: the Processes window subscribes while it is open, and a
@@ -426,11 +402,6 @@ export function watchJobs(): () => void {
       timer = undefined;
     }
   };
-}
-
-/** Whether anything is polling right now (for tests and diagnostics). */
-export function jobsWatchers(): number {
-  return watchers;
 }
 
 /** One line of "something is running", for a chip that is not a window. */

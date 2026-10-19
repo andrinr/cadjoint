@@ -23,8 +23,8 @@ class Intersection(BooleanOp):
             ``Intersection(a, b)`` is a blended one and a caller who wants the
             sharp operation has to ask for ``smoothness=0``. The value does
             not scale with the part: 0.1 is a tenth of a unit whatever the
-            unit stands for, which on a normalised engine block came to
-            20 mm and removed a water jacket. See
+            unit stands for, enough on a large part to erase a thin
+            internal feature. See
             :mod:`cadjoint.sdf.boolean.smooth` for what the blend costs —
             it moves the field by up to ``smoothness`` per operation, and
             by the full amount wherever the operands agree.
@@ -92,7 +92,3 @@ class Intersection(BooleanOp):
         boundary probe, and a missing patch it could not recover.
         """
         return _operand_patch_fields(self)
-
-    def to_functional(self):
-        """Return pure function for compilation."""
-        return Intersection.sdf

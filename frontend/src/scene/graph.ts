@@ -6,14 +6,15 @@
  * parameters and the default material.
  */
 
-export const SCENE_FORMAT = "cadjoint-scene";
-export const SCENE_VERSIONS = [1, 2] as const;
-
+import { SCENE_GRAPH } from "../../../cadjoint/viewer/schema/constants.ts";
 import type {
   SceneGraph as PayloadSceneGraph,
   SceneGraphMaterial,
   SceneGraphNode,
 } from "../../../cadjoint/viewer/schema/payloads";
+
+export const SCENE_FORMAT = SCENE_GRAPH.format;
+export const SCENE_VERSIONS: readonly number[] = SCENE_GRAPH.versions;
 
 export type Vec = number[];
 
@@ -35,7 +36,7 @@ export const DEFAULT_MATERIAL: SceneMaterial = {
 
 /** The root of a scene graph, checking its format and version. */
 export function sceneRoot(graph: SceneGraph): SceneNode {
-  if (graph.format !== SCENE_FORMAT || !(SCENE_VERSIONS as readonly number[]).includes(graph.version))
+  if (graph.format !== SCENE_FORMAT || !SCENE_VERSIONS.includes(graph.version))
     throw new Error(`scene is ${graph.format} v${graph.version}; this reads ${SCENE_FORMAT} v${SCENE_VERSIONS.join(", v")}`);
   return graph.root;
 }

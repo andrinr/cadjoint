@@ -6,11 +6,10 @@
  * that should never cost a frame: the BC rubber band, the probe chip anchored
  * to a picked vertex, and the dismissible viewer error.
  *
- * There is deliberately no compile indicator among them. There was one, and
- * with the top bar's running-work chip beside it the app said "compiling" in
- * two places at once; the chip won, because it names the work, counts its
- * seconds and can stop it, and because an instrument's viewport should carry
- * as little chrome as it can get away with.
+ * There is deliberately no compile indicator among them: the top bar's
+ * running-work chip says it, names the work, counts its seconds and can stop
+ * it, and an instrument's viewport should carry as little chrome as it can
+ * get away with.
  *
  * They are grouped only by where they sit. Each reads the shared state it
  * reports on; the rubber band is the exception, since it belongs to the

@@ -11,14 +11,12 @@
  *   the statement, because "where is this object in my program" is the
  *   question a whole-object selection asks.
  *
- * The second level is the one that was missing. The memo used to answer with
- * `spans.position`, which is the position *literal* — so selecting a primitive
- * scrolled the editor to three numbers, and selecting a sketch did nothing at
- * all, because a profile publishes no argument spans. Sketches are exactly
- * what a user selects while working on sketch placement, so "nothing at all"
- * was the common case.
+ * `spans.position` is the position *literal*, three numbers rather than the
+ * object, and a profile publishes no argument spans at all — so a sketch,
+ * which is what a user selects while working on sketch placement, is revealed
+ * only through its statement.
  *
- * `statementSpan` on the payload is the fix; this module is the rule that
+ * `statementSpan` on the payload carries the declaration; this module is the rule that
  * chooses between it and the precise span, kept out of `App.tsx` so it can be
  * tested without a component.
  */
@@ -61,8 +59,8 @@ export function focusSpan(
   }
   const statement = node.statementSpan;
   if (statement) return { from: statement[0], to: statement[1], precise: false };
-  // Older payloads, and anything the statement locator could not place: the
-  // position literal is still better than nothing for a primitive.
-  const position = node.spans?.position;
+  // A statement the locator could not place: the position literal is still
+  // better than nothing for a primitive.
+  const position = node.spans.position;
   return position ? { from: position[0], to: position[1], precise: true } : null;
 }

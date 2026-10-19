@@ -55,12 +55,9 @@ export function panCamera(
   const dx = deltaX * PAN_SPEED * camera.distance;
   const dy = deltaY * PAN_SPEED * camera.distance;
   const { target } = camera;
-  // The camera's own screen frame, from the one place that builds it. This
-  // used to hand-roll a second basis, and that copy was Y-up while
-  // `cameraPosition` is Z-up: it put the screen vertical in +Y, which on a
-  // Z-up scene is the floor, so a horizontal drag lifted the target out of
-  // the ground plane and a vertical one skated along it. Pan follows the
-  // shaders' frame now, which is also the one the picking ray uses.
+  // The camera's own screen frame, from the one place that builds it (Z-up,
+  // like `cameraPosition`): pan follows the shaders' frame, which is also the
+  // one the picking ray uses.
   const { right, up } = cameraBasis(cameraPosition(camera), target);
   return {
     ...camera,

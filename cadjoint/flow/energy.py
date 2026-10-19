@@ -55,7 +55,7 @@ carry weight:
   doubles the air's effective conductivity.  The measurements are in
   ``research/flow-solver.md``.
 
-**The linear solve is GMRES, and bicgstab was tried first.**  The operator
+**The linear solve is GMRES, not bicgstab.**  The operator
 is non-symmetric whenever the flow moves, which rules out CG; bicgstab is
 the obvious cheap alternative and it is the wrong one here.  JAX's bicgstab
 carries no breakdown guard, and on a *pure advection* column -- an inlet
@@ -168,7 +168,7 @@ class EnergyConfig:
             stored fields, which is the reason not to simply set it very
             high on a large lattice.  :func:`energy_imbalance` is the
             check that catches a stall, and
-            :meth:`~cadjoint.flow.FlowStudy.warnings` runs it.
+            :attr:`~cadjoint.flow.study.FlowStudyResult.warnings` runs it.
 
     Raises:
         ValueError: On a non-positive diffusivity or conductivity ratio, or

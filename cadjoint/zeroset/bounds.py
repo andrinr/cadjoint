@@ -36,17 +36,14 @@ dependence on each input, is the usual next step when looseness is what
 limits pruning; :func:`surface_cells` is written so that swapping the
 carrier is the only change needed.
 
-**The mean-value form was tried here and removed.**  Carrying gradient
-intervals alongside the value and intersecting with ``f(c) ± Σ ρ|∇f|``
-should tighten the bound, and it is the same test
-:mod:`cadjoint.meshing.adaptive` performs with a caller-supplied constant.
-Measured on ``scenes/starter.py`` and ``scenes/motor_shield.py`` it bought
-about 6 % on the bound's width for roughly twenty times the cost, because
-the polygon fields route through ``sign``, whose derivative is unbounded
-across its jump, and every ``min``/``max`` hull widens the gradient again.
-It also lost soundness on the coarsest boxes of an octree descent in a way
-this author did not track down.  Affine arithmetic addresses the same
-looseness at its actual cause, which is dependency, not linearisation.
+**No mean-value form.**  Carrying gradient intervals alongside the value
+and intersecting with ``f(c) ± Σ ρ|∇f|`` (the test
+:mod:`cadjoint.meshing.adaptive` performs with a caller-supplied constant)
+tightens the bound by only a few percent at many times the cost: the
+polygon fields route through ``sign``, whose derivative is unbounded across
+its jump, and every ``min``/``max`` hull widens the gradient again.  Affine
+arithmetic addresses the looseness at its actual cause, which is
+dependency, not linearisation.
 """
 
 from __future__ import annotations
@@ -221,13 +218,9 @@ class _Walker:
         # alive for the walk keeps the ids distinct.  (`evaluate.py` carries
         # the same guard for the same reason.)
         self._alive: list[Any] = []
-        # **A memo on `shape` was tried here and buys nothing.**  Counting
-        # visits against distinct shape nodes looks like heavy redundancy —
-        # cylinder_block 3.11x, motor_shield 1.80x, end_cap 1.69x — and it
-        # is tempting to cache the result per node.  Measured, almost none
-        # of those repeats are shareable: 2 of 872 calls on cylinder_block
-        # and **zero** on every other shipped scene.  A shape node is
-        # revisited because a pattern stores its child once and each
+        # **No memo on `shape`.**  Shape nodes are visited several times
+        # each, but almost none of those repeats are shareable.  A shape
+        # node is revisited because a pattern stores its child once and each
         # instance bounds it over that instance's own warped box, so the
         # repeats are different computations that happen to share an index,
         # not the same computation done twice.  A memo keyed on the node

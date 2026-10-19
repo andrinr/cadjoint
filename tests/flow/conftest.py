@@ -11,13 +11,12 @@ process, so it is a package-scoped fixture that restores what it found.
 
 from __future__ import annotations
 
-import jax
 import pytest
+
+from tests.helpers import x64
 
 
 @pytest.fixture(autouse=True, scope="package")
 def _flow_x64():
-    previous = jax.config.jax_enable_x64
-    jax.config.update("jax_enable_x64", True)
-    yield
-    jax.config.update("jax_enable_x64", previous)
+    with x64():
+        yield

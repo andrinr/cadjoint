@@ -25,10 +25,8 @@ import {
   setBrepHiddenKinds,
   setBrepOffSurfaceOnly,
 } from "../../state";
-import { BREP_OFF_SURFACE, CHROME, type Rgb } from "../../tokens";
-
-const css = (rgb: Rgb) =>
-  `rgb(${Math.round(rgb[0] * 255)}, ${Math.round(rgb[1] * 255)}, ${Math.round(rgb[2] * 255)})`;
+import { cssColor } from "../../simColors";
+import { BREP_OFF_SURFACE, CHROME } from "../../tokens";
 
 /** A length in model units, to the precision the payload carries. */
 const length = (value: number | null | undefined): string => {
@@ -101,7 +99,7 @@ function Legend(props: { model: BrepModel }) {
               onChange={(event) => toggle(entry.kind, event.currentTarget.checked)}
               data-testid={`brep-kind-${entry.kind}`}
             />
-            <span class="brep-swatch" style={{ background: css(entry.rgb) }} />
+            <span class="brep-swatch" style={{ background: cssColor(entry.rgb) }} />
             <span>{entry.label}</span>
             <small>{entry.count}</small>
           </label>

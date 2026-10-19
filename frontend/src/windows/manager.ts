@@ -40,7 +40,7 @@ export const [windowManager, setWindowManager] = createSignal<WindowManager | nu
 /**
  * The same object on `window`, for the end-to-end tests and the console.
  *
- * Every operation now has a real button in the Window menu and the tests
+ * Every operation has a real button in the Window menu and the tests
  * drive those; this stays as the console handle, and as the way a test can
  * put the dock into a starting arrangement without clicking its way there.
  */

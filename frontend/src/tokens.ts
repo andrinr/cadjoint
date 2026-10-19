@@ -152,10 +152,10 @@ export const CHROME = {
 
   // ── construction ────────────────────────────────────────────────────────
   // The skeleton the part is built from — sketch edges, axes, construction
-  // circles — and its vertex handles, drawn by the GPU over the solid. This
-  // used to be the ink ladder (`ink-3` at rest), and on paper the part is
-  // grey too: a 2px dark-grey line through a mid-grey solid, and a pale grey
-  // square on a pale grey facet, were the same reading as the shading. A
+  // circles — and its vertex handles, drawn by the GPU over the solid. On
+  // paper the part is grey, so a grey skeleton — a 2px dark-grey line through
+  // a mid-grey solid, a pale grey square on a pale grey facet — reads as
+  // shading. A
   // drawing is two things at once, the part and how it was made, and the
   // only channel the part does not already use is hue. So the skeleton takes
   // one, and it takes it alone.
@@ -313,8 +313,7 @@ export const TYPE_SCALE = {
  *
  * Tracking is a function of size, not a house style: at 9px the counters need
  * 0.16em to stay open and at 15px the same value would fall apart into
- * letters. A single `--tracking-caps` is the tell of a system that has not
- * measured its own labels, and it is what this replaces.
+ * letters, so there is no single `--tracking-caps`.
  */
 export const TRACKING = {
   "tracking-3xs": "0.16em",
@@ -421,6 +420,17 @@ export function hexToRgb(hex: string): Rgb {
   return [0, 2, 4].map((offset) =>
     parseInt(full.slice(offset, offset + 2), 16) / 255,
   ) as unknown as Rgb;
+}
+
+/** A normalized triple as a `#rrggbb` string, channels clamped to 0…1. */
+export function rgbToHex(rgb: readonly number[]): string {
+  return `#${rgb
+    .map((channel) =>
+      Math.round(Math.min(1, Math.max(0, channel)) * 255)
+        .toString(16)
+        .padStart(2, "0"),
+    )
+    .join("")}`;
 }
 
 /** WCAG contrast between two chrome tokens. */
@@ -534,8 +544,8 @@ export const VIEWPORT_STATES = {
 } as const satisfies Record<string, ChromeToken>;
 
 /**
- * The same ladder while a solved field is on screen (V2, C7): the ink steps
- * the skeleton used before it had a hue. Over a field the field is the only
+ * The same ladder while a solved field is on screen (V2, C7), in the ink
+ * steps rather than the skeleton's hue. Over a field the field is the only
  * colour, and the construction magenta sits beside magma's middle — over the
  * quality view it would read as a value.
  */

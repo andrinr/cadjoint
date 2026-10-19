@@ -327,9 +327,6 @@ the objective identical to 13 digits
 | `"tesseract"` | `GradientPath.TESSERACT` | Lattice samples → `mesher` Tesseract → solver Tesseract. Meshes the trilinear interpolant, so the gradient carries only normal boundary motion. |
 | `"tesseract-dc"` | `GradientPath.TESSERACT_DC` | Dual contouring stays in JAX on the true SDF; only TetGen is wrapped, by the `tetfill` Tesseract with its exact pass-through VJP. Tet meshes only. |
 
-The aliases `"plugins"` and `"plugins-dc"` name the same two chain paths and
-resolve to the canonical member on construction.
-
 `"tesseract-dc"` keeps dual contouring in JAX against the true field, which
 preserves fin creases; the starter scene declares it. Both Tesseract paths need
 the `tesseract` extra. Whichever path runs the descent, the final result is

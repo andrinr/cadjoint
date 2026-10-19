@@ -2,17 +2,17 @@
  * The workspace: a dock, a tray for what has been parked, and the rules that
  * tie both to the editing mode.
  *
- * What a mode means now
- * --------------------
- * Modes no longer force windows on and off. A mode owns a *layout*: the
+ * What a mode means
+ * -----------------
+ * A mode does not force windows on and off; it owns a *layout*: the
  * arrangement you were last in while you were in that mode, seeded from a
  * default the first time. Entering Simulate restores your Simulate desk;
  * going back to Model restores the Model desk exactly as you left it, down to
  * which windows were floating and which were parked in the tray. Opening the
  * Simulate window while in Model mode is allowed — it simply becomes part of
  * what Model remembers. That is strictly more honest than hiding windows a
- * mode "does not own": the user asked for free-form windows, and a mode that
- * kept yanking them away would be fighting them.
+ * mode "does not own": windows are free-form, and a mode that kept yanking
+ * them away would be fighting the user.
  *
  * Persistence is per mode and best-effort. A record that cannot be read, or
  * that names a window this build no longer has, is discarded in favour of the
@@ -22,7 +22,8 @@
 import { createEffect, createSignal, For, on, onCleanup, onMount, Show } from "solid-js";
 import type { JSX } from "solid-js";
 import type { EditingMode } from "../editingMode";
-import { editingMode, setPanels, setPanelVisibilityHandler, type PanelVisibility } from "../state";
+import { editingMode } from "../state";
+import { browserStorage } from "../storage";
 import { ProcessesPanel } from "../components/ProcessesPanel";
 import { createDock, type Dock } from "./dock";
 import { publishWindowManager, type WindowManager } from "./manager";
@@ -55,14 +56,6 @@ export interface WindowLayoutProps {
   renderWindow: (id: WindowId) => JSX.Element;
 }
 
-/** The Window menu's older, coarser vocabulary, kept working. */
-const PANEL_KEY_TO_WINDOW: Record<keyof PanelVisibility, WindowId> = {
-  editor: "editor",
-  objectTree: "objects",
-  materials: "materials",
-  sketch: "sketch",
-};
-
 export function WindowLayout(props: WindowLayoutProps) {
   let host!: HTMLDivElement;
   let dock: Dock | undefined;
@@ -70,7 +63,7 @@ export function WindowLayout(props: WindowLayoutProps) {
   /** Guards the reconciliation that runs while we are rebuilding the dock. */
   let rebuilding = false;
 
-  const storage = typeof localStorage === "undefined" ? undefined : localStorage;
+  const storage = browserStorage();
   let workspace: Workspace = readWorkspace(storage);
 
   const [states, setStates] = createSignal<WindowStates>(workspace.windows);
@@ -288,30 +281,13 @@ export function WindowLayout(props: WindowLayoutProps) {
     dock.layout();
     applyMode(activeMode);
     publishWindowManager(manager);
-    setPanelVisibilityHandler((key: keyof PanelVisibility, visible: boolean) => {
-      const id = PANEL_KEY_TO_WINDOW[key];
-      if (visible) openWindow(id);
-      else closeWindow(id);
-    });
 
     onCleanup(() => {
       if (persistHandle !== undefined) clearTimeout(persistHandle);
       persistNow();
-      setPanelVisibilityHandler(null);
       publishWindowManager(null);
       dock?.dispose();
       dock = undefined;
-    });
-  });
-
-  // Mirror the dock into the coarse `panels()` record the menu bar reads.
-  createEffect(() => {
-    const current = states()[activeMode];
-    setPanels({
-      editor: current.editor === "open",
-      objectTree: current.objects === "open",
-      materials: current.materials === "open",
-      sketch: current.sketch === "open",
     });
   });
 

@@ -1,8 +1,7 @@
 """Argument validation shared by every declared study.
 
 One home for the checks a study's constructor repeats: the three-number
-vectors that name a region, a point, an axis or a lattice origin.  These
-were four byte-identical copies before this module existed — one each in
+vectors that name a region, a point, an axis or a lattice origin, used by
 the selection language, the simulation mesh, the FEM study layer and the
 flow study layer.
 """

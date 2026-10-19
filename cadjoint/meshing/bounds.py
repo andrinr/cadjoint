@@ -4,7 +4,7 @@
 modelled in the playground's units, and wrong for a 100 mm part modelled in
 millimetres, which it clips to a 6 mm chunk without a word — the surface
 crossing its boundary is a warning the export suppresses, and a box wholly
-inside the part has no surface to cross at all (issue #49).
+inside the part has no surface to cross at all.
 :func:`fit_bounds` finds the part instead:
 
 - **Growing scales.**  Cubes of half-width 1, 4, 16 … 4096 are scanned at

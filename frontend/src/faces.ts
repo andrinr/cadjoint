@@ -109,7 +109,7 @@ export function allFaces(
 ): { face: ConstructionFace; nodeId: string }[] {
   const entries: { face: ConstructionFace; nodeId: string }[] = [];
   for (const node of nodes) {
-    for (const face of node.faces ?? []) entries.push({ face, nodeId: node.id });
+    for (const face of node.faces) entries.push({ face, nodeId: node.id });
   }
   return entries;
 }
@@ -213,7 +213,7 @@ export function resolveSurfaceHit(
 }
 
 /**
- * The `/patch` reference that reproduces a picked face in source.
+ * The `/api/patch` reference that reproduces a picked face in source.
  *
  * Null when the face has no variable to name — a feature built inside a loop
  * has faces the viewer can draw but cannot write back, and the honest answer
@@ -250,7 +250,7 @@ export function tangentReference(
 ): SketchPlaneReference | null {
   const node = nodes.find((item) => item.id === hit.nodeId);
   if (!node) return null;
-  const owner = (node.faces ?? []).find((face) => face.owner?.variable)?.owner;
+  const owner = node.faces.find((face) => face.owner?.variable)?.owner;
   const line = owner?.line ?? node.line;
   if (line === null || line === undefined) return null;
   return { kind: "tangent", owner: line, near: hit.point };
@@ -281,7 +281,7 @@ export interface FaceTarget {
   near: [number, number, number];
 }
 
-/** The `/patch` reference a target resolves to against the current tree. */
+/** The `/api/patch` reference a target resolves to against the current tree. */
 export function referenceFor(
   nodes: readonly ConstructionNode[],
   target: FaceTarget,

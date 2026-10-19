@@ -1,6 +1,5 @@
-import { chromium, expect, test, type Page } from "@playwright/test";
-
-import type { ShaderStats } from "../src/viewer/renderer";
+import { chromium, expect, test } from "@playwright/test";
+import { PORT, recompile, stats, waitForCompile, WEBGPU_ARGS } from "./helpers/app";
 
 /**
  * A parameter edit must not rebuild the scene's pipelines.
@@ -22,57 +21,12 @@ import type { ShaderStats } from "../src/viewer/renderer";
  * stopped installing anything would pass.
  */
 
-const PORT = process.env.CADJOINT_E2E_PORT ?? 8799;
-
-async function waitForCompile(page: Page) {
-  // The settle signal is the toolbar's busy seam. It is present for exactly
-  // as long as the app is behind its own source — from the edit, through the
-  // debounce window and the request, until the shaders are installed — which
-  // the status line no longer is: while work is in flight the status says
-  // nothing at all, so that the one indicator for running work is the
-  // toolbar's chip. A settled status is therefore a second, independent
-  // signal, and "Starting…" is the placeholder to wait past on a cold load.
-  await expect(page.getByTestId("status")).not.toHaveText(/^(|Starting…)$/, {
-    timeout: 90_000,
-  });
-  await expect(page.getByTestId("toolbar-busy")).toHaveCount(0, { timeout: 90_000 });
-}
-
-async function stats(page: Page): Promise<ShaderStats | null> {
-  return page.evaluate(() => window.__cadjointShaders?.() ?? null);
-}
-
-/** Replace the whole document and press Run. */
-async function recompile(page: Page, source: string) {
-  await page.evaluate((text) => {
-    type EditorLike = {
-      view?: {
-        state: { doc: { length: number } };
-        dispatch: (spec: unknown) => void;
-        focus: () => void;
-      };
-    };
-    const content = document.querySelector("[data-testid=editor] .cm-content") as
-      | (HTMLElement & { cmView?: EditorLike; cmTile?: EditorLike })
-      | null;
-    const view = content?.cmView?.view ?? content?.cmTile?.view;
-    if (!view) throw new Error("no CodeMirror view");
-    view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: text } });
-  }, source);
-  await page.getByTestId("run").click();
-  await waitForCompile(page);
-}
+/** How long a compile of this spec's scenes may take. */
+const COMPILE_TIMEOUT = 90_000;
 
 test("a parameter edit uploads a buffer and rebuilds no pipelines", async ({}, testInfo) => {
   const browser = await chromium.launch({
-    args: [
-      "--enable-unsafe-webgpu",
-      "--enable-features=Vulkan,WebGPU",
-      "--use-angle=metal",
-      "--use-gl=angle",
-      "--ignore-gpu-blocklist",
-      "--enable-gpu",
-    ],
+    args: WEBGPU_ARGS,
   });
   const page = await browser.newPage({ viewport: { width: 1200, height: 800 } });
 
@@ -95,7 +49,7 @@ test("a parameter edit uploads a buffer and rebuilds no pipelines", async ({}, t
     test.skip(true, "No WebGPU adapter in this browser build");
     return;
   }
-  await waitForCompile(page);
+  await waitForCompile(page, COMPILE_TIMEOUT);
 
   // A scene small enough to recompile three times inside the timeout, and
   // parametric enough that one literal is a parameter edit.
@@ -116,7 +70,7 @@ test("a parameter edit uploads a buffer and rebuilds no pipelines", async ({}, t
     "scene = Union((ball, slab), smoothness=0.05)",
     "",
   ].join("\n");
-  await recompile(page, base);
+  await recompile(page, base, COMPILE_TIMEOUT);
 
   const first = await stats(page);
   expect(first, "the app publishes its shader counters").not.toBeNull();
@@ -124,7 +78,7 @@ test("a parameter edit uploads a buffer and rebuilds no pipelines", async ({}, t
   expect(first!.pipelineBuilds).toBeGreaterThan(0);
 
   // ── the claim ────────────────────────────────────────────────────────
-  await recompile(page, base.replace("Scalar(0.60,", "Scalar(0.42,"));
+  await recompile(page, base.replace("Scalar(0.60,", "Scalar(0.42,"), COMPILE_TIMEOUT);
   const moved = await stats(page);
   expect(moved!.pipelineBuilds, "a parameter edit builds no pipeline").toBe(
     first!.pipelineBuilds,
@@ -139,7 +93,7 @@ test("a parameter edit uploads a buffer and rebuilds no pipelines", async ({}, t
     "scene = Union((ball, slab), smoothness=0.05)",
     "scene = Union((ball, slab, Box(size=[0.2, 0.2, 1.4])), smoothness=0.05)",
   );
-  await recompile(page, topology);
+  await recompile(page, topology, COMPILE_TIMEOUT);
   const rebuilt = await stats(page);
   expect(rebuilt!.pipelineBuilds, "a topology edit does build pipelines").toBeGreaterThan(
     moved!.pipelineBuilds,
@@ -149,7 +103,7 @@ test("a parameter edit uploads a buffer and rebuilds no pipelines", async ({}, t
   // Going back to a source this session already compiled is an undo, and it
   // must not recompile the module. The pipelines are rebuilt — they were
   // replaced by the topology edit — but `misses` must not move.
-  await recompile(page, base);
+  await recompile(page, base, COMPILE_TIMEOUT);
   const undone = await stats(page);
   expect(undone!.pipelineBuilds, "the earlier shader is installed again").toBeGreaterThan(
     rebuilt!.pipelineBuilds,
@@ -191,14 +145,7 @@ test("a parameter edit uploads a buffer and rebuilds no pipelines", async ({}, t
  */
 test("dragging a parameter at frame rate rebuilds no pipeline", async ({}, testInfo) => {
   const browser = await chromium.launch({
-    args: [
-      "--enable-unsafe-webgpu",
-      "--enable-features=Vulkan,WebGPU",
-      "--use-angle=metal",
-      "--use-gl=angle",
-      "--ignore-gpu-blocklist",
-      "--enable-gpu",
-    ],
+    args: WEBGPU_ARGS,
   });
   const page = await browser.newPage({ viewport: { width: 1200, height: 800 } });
   const errors: string[] = [];
@@ -214,7 +161,7 @@ test("dragging a parameter at frame rate rebuilds no pipeline", async ({}, testI
     test.skip(true, "No WebGPU adapter in this browser build");
     return;
   }
-  await waitForCompile(page);
+  await waitForCompile(page, COMPILE_TIMEOUT);
 
   await recompile(
     page,
@@ -226,6 +173,7 @@ test("dragging a parameter at frame rate rebuilds no pipeline", async ({}, testI
       "scene = Union((Sphere(radius=radius), Box(size=[0.9, 0.5, 0.2])), smoothness=0.05)",
       "",
     ].join("\n"),
+    COMPILE_TIMEOUT,
   );
 
   const before = await stats(page);
@@ -297,14 +245,7 @@ test("dragging a parameter at frame rate rebuilds no pipeline", async ({}, testI
  */
 test("changing a march setting rebuilds nothing", async ({}, testInfo) => {
   const browser = await chromium.launch({
-    args: [
-      "--enable-unsafe-webgpu",
-      "--enable-features=Vulkan,WebGPU",
-      "--use-angle=metal",
-      "--use-gl=angle",
-      "--ignore-gpu-blocklist",
-      "--enable-gpu",
-    ],
+    args: WEBGPU_ARGS,
   });
   const page = await browser.newPage({ viewport: { width: 1200, height: 800 } });
   const errors: string[] = [];
@@ -320,7 +261,7 @@ test("changing a march setting rebuilds nothing", async ({}, testInfo) => {
     test.skip(true, "No WebGPU adapter in this browser build");
     return;
   }
-  await waitForCompile(page);
+  await waitForCompile(page, COMPILE_TIMEOUT);
 
   const source = [
     "from cadjoint.sdf import Sphere, Box, Union",
@@ -330,7 +271,7 @@ test("changing a march setting rebuilds nothing", async ({}, testInfo) => {
     "scene = Union((Sphere(radius=radius), Box(size=[0.9, 0.5, 0.2])), smoothness=0.05)",
     "",
   ].join("\n");
-  await recompile(page, source);
+  await recompile(page, source, COMPILE_TIMEOUT);
 
   // Open the settings and expand the per-setting editor.
   await page.getByTestId("display-options").click();
@@ -365,7 +306,7 @@ test("changing a march setting rebuilds nothing", async ({}, testInfo) => {
   // ── and they survive a recompile ─────────────────────────────────────
   // The settings are the viewer's, not the scene's, so a fresh compile must
   // not reset them.
-  await recompile(page, source.replace("Scalar(0.60,", "Scalar(0.44,"));
+  await recompile(page, source.replace("Scalar(0.60,", "Scalar(0.44,"), COMPILE_TIMEOUT);
   await page.getByTestId("display-options").click();
   await expect(page.getByTestId("render-panel")).toBeVisible();
   await page.getByTestId("render-customize").click();

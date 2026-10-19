@@ -53,7 +53,3 @@ class Xor(BooleanOp):
 
         m1, m2 = self.sdfs[0].material_at(p), self.sdfs[1].material_at(p)
         return blend_materials(m1, m2, jnp.array(0.5))
-
-    def to_functional(self):
-        """Return pure function for compilation."""
-        return Xor.sdf

@@ -3,10 +3,12 @@ import {
   FLYOUT_HOVER_OPEN_MS,
   FLYOUT_LEAVE_CLOSE_MS,
   FlyoutController,
+  LAST_USED_STORAGE_KEY,
   loadLastUsed,
   persistLastUsed,
   type FlyoutTimers,
 } from "../src/flyout";
+import { memoryStorage } from "./helpers";
 
 /** Deterministic timer queue the tests can advance by hand. */
 function fakeTimers() {
@@ -130,16 +132,6 @@ describe("flyout state machine", () => {
 describe("last-used persistence", () => {
   const VALID = { create: ["sketch", "box"], transform: ["translate", "scale"] };
 
-  function memoryStorage(initial: string | null = null) {
-    let value = initial;
-    return {
-      getItem: () => value,
-      setItem: (_key: string, next: string) => {
-        value = next;
-      },
-    };
-  }
-
   it("round-trips the per-group choice", () => {
     const storage = memoryStorage();
     persistLastUsed({ create: "box", transform: "scale" }, storage);
@@ -147,14 +139,18 @@ describe("last-used persistence", () => {
   });
 
   it("drops unknown groups and stale children", () => {
-    const storage = memoryStorage(
-      JSON.stringify({ create: "warp-drive", legacy: "sketch", transform: "scale" }),
-    );
+    const storage = memoryStorage({
+      [LAST_USED_STORAGE_KEY]: JSON.stringify({
+        create: "warp-drive",
+        legacy: "sketch",
+        transform: "scale",
+      }),
+    });
     expect(loadLastUsed(VALID, storage)).toEqual({ transform: "scale" });
   });
 
   it("tolerates corrupt and missing storage", () => {
-    expect(loadLastUsed(VALID, memoryStorage("{not json"))).toEqual({});
+    expect(loadLastUsed(VALID, memoryStorage({ [LAST_USED_STORAGE_KEY]: "{not json" }))).toEqual({});
     expect(loadLastUsed(VALID, memoryStorage())).toEqual({});
     expect(loadLastUsed(VALID, undefined)).toEqual({});
   });

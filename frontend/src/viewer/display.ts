@@ -43,26 +43,17 @@ export interface QualityPreset {
   /**
    * Sphere-tracing steps a primary ray may take.
    *
-   * The tier used to stop at the JavaScript boundary: pixel budget, bounces,
-   * shadow samples and the sample target were all read here, but the march
-   * itself was a constant baked into the WGSL — 96 steps in the preview and
-   * 160 in the path tracer — so "Ultra" meant two different marches on the
-   * two sides of the same picture. It is a uniform now (`path_settings.w`),
-   * and this is the one place the ladder is written.
+   * A uniform (`path_settings.w`) read by both the preview and the path
+   * tracer, so a tier marches the same on both sides of the picture; this is
+   * the one place the value is written.
    *
    * **The same on every tier, because it costs the same on every tier.**
-   * Measured on `scenes/end_cap.py` at three resolutions, a budget of 64
-   * against 384 — six times the cap — is inside the noise at all of them
-   * (1.9/1.9/1.9/1.9 ms at 319 k pixels, 2.5/2.6/2.7/2.8 at 900 k,
-   * 4.1/3.9/3.9/3.9 at 1600 k). Almost every ray converges and returns long
-   * before the cap, so the cap is not what is being paid for. What separates
-   * the tiers is the pixel budget: 1.9 → 2.7 → 3.9 ms across the same three,
-   * which is the whole of the difference.
-   *
-   * A ladder here was therefore all cost and no saving — Draft's 64 steps
-   * bought nothing and punched holes in `end_cap`'s silhouette (§13.8) — so
-   * the ladder is gone. `DisplaySettings.marchSteps` still overrides it for
-   * a scene that needs more, which `scenes/motor_shield.py` does.
+   * Almost every ray converges and returns long before the cap, so on
+   * `scenes/end_cap.py` a budget of 64 and one of 384 cost the same within
+   * noise; what separates the tiers is the pixel budget. A lower budget saves
+   * nothing and punches holes in `end_cap`'s silhouette (§13.8).
+   * `DisplaySettings.marchSteps` overrides it for a scene that needs more,
+   * which `scenes/motor_shield.py` does.
    */
   marchSteps: number;
 }
@@ -244,7 +235,7 @@ export interface DisplaySettings {
    * The B-rep inspector: the private tier's derived B-rep drawn in place of
    * the solid — faces in categorical colours, edges by kind, vertices — so an
    * extraction can be judged by eye (src/brep.ts). Like `showAllPlanes`, a
-   * preset stored before it existed lacks it, so it is read as `=== true`.
+   * stored preset may lack it, so it is read as `=== true`.
    */
   showBrep: boolean;
   showConstraints: boolean;

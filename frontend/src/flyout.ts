@@ -10,6 +10,8 @@
  * Pure logic with injected timers so it can be unit tested without a DOM.
  */
 
+import { browserStorage, type KeyValueStorage } from "./storage";
+
 export interface FlyoutTimers {
   set(callback: () => void, delayMs: number): number;
   clear(id: number): void;
@@ -113,19 +115,6 @@ export class FlyoutController {
 
 export const LAST_USED_STORAGE_KEY = "cadjoint.railLastUsed.v1";
 
-export interface StringStorage {
-  getItem(key: string): string | null;
-  setItem(key: string, value: string): void;
-}
-
-function defaultStorage(): StringStorage | undefined {
-  try {
-    return typeof localStorage === "undefined" ? undefined : localStorage;
-  } catch {
-    return undefined;
-  }
-}
-
 /**
  * Load the per-group last-used child map, dropping anything unrecognised.
  *
@@ -134,7 +123,7 @@ function defaultStorage(): StringStorage | undefined {
  */
 export function loadLastUsed(
   valid: Record<string, readonly string[]>,
-  storage: StringStorage | undefined = defaultStorage(),
+  storage: KeyValueStorage | null = browserStorage(),
 ): Record<string, string> {
   try {
     const raw = storage?.getItem(LAST_USED_STORAGE_KEY);
@@ -154,7 +143,7 @@ export function loadLastUsed(
 
 export function persistLastUsed(
   lastUsed: Record<string, string>,
-  storage: StringStorage | undefined = defaultStorage(),
+  storage: KeyValueStorage | null = browserStorage(),
 ): void {
   try {
     storage?.setItem(LAST_USED_STORAGE_KEY, JSON.stringify(lastUsed));

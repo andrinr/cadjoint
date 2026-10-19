@@ -97,8 +97,8 @@ def _default_name(kind: str) -> str:
 
     Every primitive's parameters are named after it (``<name>_position``,
     ``<name>_radius``), and extraction refuses two free parameters with one
-    name — so two unnamed cylinders in one program used to be an error the
-    author only met at the first constraint solve. The counter is per kind
+    name, so two unnamed cylinders in one program need distinct defaults.
+    The counter is per kind
     and per process; within one program it is what makes the names unique.
     """
     count = _unnamed_counts.get(kind, 0) + 1

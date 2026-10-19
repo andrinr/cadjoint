@@ -122,24 +122,6 @@ export const MENU_COMMANDS: Record<string, string> = {
   "Help › README": "help-readme",
 };
 
-/** Test ids the e2e specs address; everything else is `menu-<command>`. */
-const LEGACY_TESTIDS: Record<string, string> = {
-  "file-new": "menu-file-new",
-  "file-open": "menu-file-open",
-  "file-save": "menu-file-save",
-  "file-save-as": "menu-file-save-as",
-  "file-download": "menu-file-download",
-  "file-export": "menu-file-export",
-  "edit-undo": "menu-edit-undo",
-  "edit-redo": "menu-edit-redo",
-  "mode-model": "menu-window-mode-model",
-  "mode-sketch": "menu-window-mode-sketch",
-  "mode-simulate": "menu-window-mode-simulate",
-  "window-reset": "menu-window-reset",
-  "help-shortcuts": "menu-help-shortcuts",
-  "help-readme": "menu-help-readme",
-};
-
 function menuPath(menu: string, section: string | null, label: string): string {
   return section ? `${menu} › ${section} › ${label}` : `${menu} › ${label}`;
 }
@@ -149,10 +131,6 @@ export function windowOfCommand(command: string): WindowId | null {
   if (!command.startsWith("window-")) return null;
   const id = command.slice("window-".length);
   return WINDOW_DEFS.some((def) => def.id === id) ? (id as WindowId) : null;
-}
-
-function testidFor(command: string): string {
-  return LEGACY_TESTIDS[command] ?? `menu-${command}`;
 }
 
 /** The seven menus, in order, every leaf bound to its command. */
@@ -173,7 +151,7 @@ export function menuModel(): MenuModel[] {
           key: shortcutLabel(command),
           modes: item.modes,
           radio: command.startsWith("mode-") || undefined,
-          testid: testidFor(command),
+          testid: `menu-${command}`,
         };
       }),
     })),

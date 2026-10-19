@@ -202,11 +202,6 @@ class TesseractPlugin:
             self._tesseract, self._spawned = self.spec.open()
         return self._tesseract
 
-    @property
-    def client(self) -> Any:
-        """Alias of :attr:`tesseract` for callers that speak of the client."""
-        return self.tesseract
-
     def __getattr__(self, name: str) -> Any:
         """Forward anything not defined here to the Tesseract itself.
 

@@ -366,7 +366,7 @@ describe("which world plane the grid is ruled on", () => {
   const planeOf = (name: string) => gridPlane(preset(name).yaw, preset(name).pitch);
 
   it("keeps the floor wherever the floor is worth drawing", () => {
-    // The two views the floor was always right for...
+    // The two views the floor is right for...
     expect(planeOf("top")).toBe("XY");
     expect(planeOf("bottom")).toBe("XY");
     // ...the corner views, including the one the session opens on, where all
@@ -386,7 +386,7 @@ describe("which world plane the grid is ruled on", () => {
   });
 
   it("gives the four side views the wall they are facing", () => {
-    // The report: from Front, Back, Left or Right the floor is exactly edge-on
+    // From Front, Back, Left or Right the floor is exactly edge-on
     // and rules as a single line, so there is no grid in precisely the views
     // someone squares a measurement up in.
     expect(planeOf("front")).toBe("XZ");
@@ -510,10 +510,10 @@ describe("the grid shader and the readout agree", () => {
   });
 
   it("keeps drawing the near half of an orthographic ground plane", () => {
-    // The other half of the report: the fragment rejected every plane point
-    // whose ray parameter was negative. Under perspective that is the sky.
-    // Under orthographic there is no eye, so it was the near third of the
-    // floor, cut off along a hard horizontal line across the viewport.
+    // Rejecting every plane point whose ray parameter is negative is right
+    // under perspective, where that is the sky. Under orthographic there is
+    // no eye, and it would cut the near third of the floor off along a hard
+    // horizontal line across the viewport.
     expect(wgsl).toContain("orthographic || along > 0.0");
   });
 });

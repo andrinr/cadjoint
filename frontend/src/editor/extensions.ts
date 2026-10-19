@@ -254,16 +254,15 @@ const signaturePlugin = ViewPlugin.fromClass(
 /**
  * Put every floating surface away when the editor stops being used.
  *
- * The three of them have three different lifetimes, and only one of them used
- * to be right. The completion popup closes itself on blur (autocompletion's
- * `closeOnBlur`, on by default). The lint hover already had a `mouseleave` on
- * the editor's own element — but the editor's element is not the *pane*: the
- * header, the hint and the console below it are all outside it, so a pointer
- * moving down through them left the editor without ever leaving it, and the
- * tooltip stayed. And the signature tooltip is not a hover at all: it is a
- * `StateField`, shown because of where the caret is, so nothing about the
- * pointer or the focus was ever going to close it. Clicking the viewport left
- * a call signature floating over a pane nobody was typing in.
+ * The three of them have three different lifetimes. The completion popup
+ * closes itself on blur (autocompletion's `closeOnBlur`, on by default). The
+ * lint hover has a `mouseleave` on the editor's own element — but the
+ * editor's element is not the *pane*: the header, the hint and the console
+ * below it are all outside it, so a pointer moving down through them leaves
+ * the editor without ever leaving it, and the tooltip stays. And the
+ * signature tooltip is not a hover at all: it is a `StateField`, shown
+ * because of where the caret is, so nothing about the pointer or the focus
+ * closes it on its own.
  *
  * So dismissal is stated once, for all three, on the two events that actually
  * mean "not editing any more": focus leaving the editor, and the pointer

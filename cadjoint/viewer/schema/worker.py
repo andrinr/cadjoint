@@ -8,8 +8,7 @@ boundary check the server runs on everything a worker sends before any of
 it reaches a route.
 
 Why check what the worker already built: the worker is a separate process
-running arbitrary user code, and until this module only ``compile`` and
-``export`` replies were checked at all.  A reply that does not match its
+running arbitrary user code.  A reply that does not match its
 model is a bug on one side of the contract, and it is reported as one — an
 ``error_kind: "contract"`` failure naming the field — instead of being
 forwarded to a browser that was promised something else.
@@ -17,6 +16,7 @@ forwarded to a browser that was promised something else.
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import Any, Literal
 
 from pydantic import BaseModel, ValidationError
@@ -115,27 +115,26 @@ class ExportWorkerReply(Strict):
     output: str
 
 
-WORKER_REQUESTS: dict[str, type[BaseModel]] = {
-    "compile": CompileWorkerRequest,
-    "mesh": MeshWorkerRequest,
-    "brep": BrepWorkerRequest,
-    "simulate": SimulateWorkerRequest,
-    "mesh_inspect": MeshInspectWorkerRequest,
-    "optimize": OptimizeWorkerRequest,
-    "export": ExportWorkerRequest,
-}
-"""The request each mode takes."""
+@dataclass(frozen=True)
+class ModeContract:
+    """What one worker mode takes and what it answers with when it succeeds.
 
-WORKER_REPLIES: dict[str, type[BaseModel]] = {
-    "compile": CompilePayload,
-    "mesh": MeshWorkerReply,
-    "brep": BrepResult,
-    "simulate": SimulateResult,
-    "mesh_inspect": MeshInspectResult,
-    "optimize": OptimizeResult,
-    "export": ExportWorkerReply,
+    Every mode fails as a :class:`WorkerFailure`.
+    """
+
+    request: type[BaseModel]
+    reply: type[BaseModel]
+
+
+MODES: dict[WorkerMode, ModeContract] = {
+    "compile": ModeContract(CompileWorkerRequest, CompilePayload),
+    "mesh": ModeContract(MeshWorkerRequest, MeshWorkerReply),
+    "brep": ModeContract(BrepWorkerRequest, BrepResult),
+    "simulate": ModeContract(SimulateWorkerRequest, SimulateResult),
+    "mesh_inspect": ModeContract(MeshInspectWorkerRequest, MeshInspectResult),
+    "optimize": ModeContract(OptimizeWorkerRequest, OptimizeResult),
+    "export": ModeContract(ExportWorkerRequest, ExportWorkerReply),
 }
-"""The successful reply each mode sends; every mode fails as a :class:`WorkerFailure`."""
 
 
 def _contract_failure(mode: str, error: ValidationError, what: str = "reply") -> dict[str, Any]:
@@ -163,12 +162,12 @@ def checked_reply(mode: str, reply: dict[str, Any]) -> dict[str, Any]:
         ``reply`` itself, unchanged, when it validates; otherwise a
         :class:`WorkerFailure` with ``error_kind: "contract"``.
     """
-    model = WORKER_REPLIES.get(mode)
-    if model is None:
+    contract = MODES.get(mode)
+    if contract is None:
         return reply
     try:
         if reply.get("ok") is True:
-            model.model_validate(reply)
+            contract.reply.model_validate(reply)
         else:
             WorkerFailure.model_validate(reply)
     except ValidationError as error:
@@ -194,11 +193,11 @@ def checked_request(request: dict[str, Any]) -> dict[str, Any] | None:
     misread.
     """
     mode = str(request.get("mode"))
-    model = WORKER_REQUESTS.get(mode)
-    if model is None:
+    contract = MODES.get(mode)
+    if contract is None:
         return {"ok": False, "error_kind": "contract", "error": f"No worker mode {mode!r}."}
     try:
-        model.model_validate(request)
+        contract.request.model_validate(request)
     except ValidationError as error:
         return _contract_failure(mode, error, "request")
     return None

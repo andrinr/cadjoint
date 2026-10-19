@@ -70,13 +70,13 @@ _TESSERACTS = Path(__file__).resolve().parents[1] / "fem" / "tesseracts"
 
 #: name -> (kind, package directory) for the packages shipped in this repo.
 BUILTIN_PACKAGES: dict[str, tuple[str, Path]] = {
-    "mesher": (PluginKind.MESHER.value, _TESSERACTS / "mesher"),
-    "tetfill": (PluginKind.TETFILL.value, _TESSERACTS / "tetfill"),
-    "thermal_jaxfem": (PluginKind.THERMAL_SOLVER.value, _TESSERACTS / "thermal_jaxfem"),
-    "elastic_jaxfem": (PluginKind.ELASTIC_SOLVER.value, _TESSERACTS / "elastic_jaxfem"),
-    "elastic_calculix": (PluginKind.ELASTIC_SOLVER.value, _TESSERACTS / "elastic_calculix"),
-    "flow_brinkman": (PluginKind.FLOW_SOLVER.value, _TESSERACTS / "flow_brinkman"),
-    "tet_gmsh": (PluginKind.TET_MESHER.value, _TESSERACTS / "tet_gmsh"),
+    "mesher": (PluginKind.MESHER, _TESSERACTS / "mesher"),
+    "tetfill": (PluginKind.TETFILL, _TESSERACTS / "tetfill"),
+    "thermal_jaxfem": (PluginKind.THERMAL_SOLVER, _TESSERACTS / "thermal_jaxfem"),
+    "elastic_jaxfem": (PluginKind.ELASTIC_SOLVER, _TESSERACTS / "elastic_jaxfem"),
+    "elastic_calculix": (PluginKind.ELASTIC_SOLVER, _TESSERACTS / "elastic_calculix"),
+    "flow_brinkman": (PluginKind.FLOW_SOLVER, _TESSERACTS / "flow_brinkman"),
+    "tet_gmsh": (PluginKind.TET_MESHER, _TESSERACTS / "tet_gmsh"),
 }
 
 #: Which plugin fills each kind unless the config says otherwise.  The two
@@ -87,14 +87,14 @@ BUILTIN_PACKAGES: dict[str, tuple[str, Path]] = {
 #: one plugin for each through the entry-point group, and a kind with a
 #: single plugin and no default resolves to it.
 BUILTIN_DEFAULTS: dict[str, str] = {
-    PluginKind.MESHER.value: "mesher",
-    PluginKind.TETFILL.value: "tetfill",
-    PluginKind.THERMAL_SOLVER.value: "thermal_jaxfem",
-    PluginKind.ELASTIC_SOLVER.value: "elastic_jaxfem",
-    PluginKind.FLOW_SOLVER.value: "flow_brinkman",
+    PluginKind.MESHER: "mesher",
+    PluginKind.TETFILL: "tetfill",
+    PluginKind.THERMAL_SOLVER: "thermal_jaxfem",
+    PluginKind.ELASTIC_SOLVER: "elastic_jaxfem",
+    PluginKind.FLOW_SOLVER: "flow_brinkman",
     # The only tet_mesher there is; the built-in tetfill stays the
     # no-dependency fallback under its own kind.
-    PluginKind.TET_MESHER.value: "tet_gmsh",
+    PluginKind.TET_MESHER: "tet_gmsh",
 }
 
 _VERSION_LINE = re.compile(r"^version:\s*['\"]?([^'\"\s]+)['\"]?\s*$", re.MULTILINE)
@@ -401,15 +401,6 @@ class PluginRegistry:
         specs = {name: spec for name, spec in self._specs.items() if spec.kind not in excluded}
         defaults = {kind: name for kind, name in self._defaults.items() if kind not in excluded}
         return PluginRegistry(specs, defaults, source=self.source)
-
-    def set_default(self, kind: str, name: str) -> None:
-        """Point ``kind`` at the plugin registered as ``name``.
-
-        Raises:
-            KeyError: If ``name`` is not registered.
-        """
-        self.spec(name)
-        self._defaults[kind] = name
 
     def plugin(self, name: str) -> Plugin:
         """The (cached) plugin instance registered under ``name``."""

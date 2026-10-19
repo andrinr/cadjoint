@@ -567,8 +567,8 @@ def _pad_dirichlet_selection(problem: Any, ghost_node: int) -> None:
     the shapes — a dozen one-op programs keyed on exactly the count being
     padded away, which is the trap ``research/performance.md`` §17.7
     describes from the other side.  Handing the finished NumPy arrays back
-    to the device with ``jnp.asarray`` was tried and measured *worse*
-    (six more eager programs per solve, §18.5): jax-fem is happy to index
+    to the device with ``jnp.asarray`` is *worse* (six more eager programs
+    per solve, §18.5): jax-fem is happy to index
     with a host array, and the transfers are not free.
     """
     finite_element = problem.fes[0]

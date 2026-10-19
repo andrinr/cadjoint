@@ -56,21 +56,6 @@ def _mesh(body, method: str = "tet4"):
     ).build(body)
 
 
-@pytest.fixture(scope="module", autouse=True)
-def _x64():
-    """Double precision for this module only, restored on the way out.
-
-    The finite-difference comparisons below need it.  ``jax_enable_x64`` is
-    process-global, so leaving it on leaks into every module that runs
-    afterwards: every array becomes float64, and the WGSL emitter — which
-    has no 64-bit numeric type — then refuses scenes it should accept.
-    """
-    previous = jax.config.jax_enable_x64
-    jax.config.update("jax_enable_x64", True)
-    yield
-    jax.config.update("jax_enable_x64", previous)
-
-
 @pytest.fixture(scope="module")
 def creased():
     body = _body(0.0)

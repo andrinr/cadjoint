@@ -14,8 +14,6 @@ from __future__ import annotations
 
 import json
 import struct
-import threading
-from contextlib import contextmanager
 from pathlib import Path
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
@@ -23,6 +21,7 @@ from urllib.request import Request, urlopen
 import pytest
 
 from cadjoint.enums import ExportFormat
+from cadjoint.viewer._export_client import export_source
 from cadjoint.viewer._jobs import JOB_KINDS, RESULT_KINDS
 from cadjoint.viewer._limits import (
     EXPORT_DEFAULT_RESOLUTION,
@@ -30,15 +29,15 @@ from cadjoint.viewer._limits import (
     EXPORT_MIN_RESOLUTION,
     MAX_SOURCE_BYTES,
 )
-from cadjoint.viewer.playground import REGISTRY, create_server
+from cadjoint.viewer.playground import REGISTRY
 from cadjoint.viewer.worker.export import (
     EXPORT_CONTENT_TYPES,
     EXPORT_EXTENSIONS,
     export_filename,
     export_scene,
-    export_source,
     validate_export_request,
 )
+from tests.helpers import post, running_server, session_token
 
 BOX_SOURCE = """
 from cadjoint.geometry import Vector
@@ -207,7 +206,7 @@ class TestWorker:
             result, path = _export(tmp_path, BOX_SOURCE, format="step")
             assert result["ok"] is True, result
             assert result["report"]["path"] == "mesh"
-            assert result["report"]["tier"] == tier.message(PluginKind.STEP_EXPORT.value)
+            assert result["report"]["tier"] == tier.message(PluginKind.STEP_EXPORT)
         text = path.read_text()
         assert text.startswith("ISO-10303-21;")
         assert "MANIFOLD_SOLID_BREP(" in text
@@ -302,44 +301,20 @@ class TestWorker:
 # ── HTTP layer ──────────────────────────────────────────────────────────────
 
 
-@contextmanager
-def _running_server():
-    server = create_server(0)
-    thread = threading.Thread(target=server.serve_forever, daemon=True)
-    thread.start()
-    try:
-        host, port = server.server_address
-        yield f"http://{host}:{port}"
-    finally:
-        server.shutdown()
-        server.server_close()
-        thread.join(timeout=2)
-
-
-def _token(base: str) -> str:
-    with urlopen(base + "/api/session") as response:
-        return json.load(response)["token"]
-
-
 def _post(base: str, payload: dict, token: str | None = None) -> Request:
-    headers = {"Content-Type": "application/json"}
-    if token is not None:
-        headers["X-Cadjoint-Token"] = token
-    return Request(
-        base + "/api/export", data=json.dumps(payload).encode(), headers=headers, method="POST"
-    )
+    return post(base, "/api/export", payload, token)
 
 
 class TestHttp:
     def test_export_requires_the_session_token(self):
-        with _running_server() as base:
+        with running_server() as base:
             with pytest.raises(HTTPError) as error:
                 urlopen(_post(base, {"source": BOX_SOURCE, "format": "stl"}))
             assert error.value.code == 403
 
     def test_a_bad_request_is_json_and_422(self):
-        with _running_server() as base:
-            token = _token(base)
+        with running_server() as base:
+            token = session_token(base)
             with pytest.raises(HTTPError) as error:
                 urlopen(_post(base, {"source": BOX_SOURCE, "format": "dxf"}, token))
             assert error.value.code == 422
@@ -348,8 +323,8 @@ class TestHttp:
             assert body["job_id"].startswith("job-")
 
     def test_the_file_comes_back_as_a_tracked_attachment(self):
-        with _running_server() as base:
-            token = _token(base)
+        with running_server() as base:
+            token = session_token(base)
             request = _post(base, {"source": BOX_SOURCE, "format": "stl", "resolution": 8}, token)
             with urlopen(request, timeout=300) as response:
                 headers = response.headers

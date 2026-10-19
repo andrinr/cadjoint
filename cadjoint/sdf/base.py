@@ -52,7 +52,6 @@ class SDF(Fluent):
     Subclasses must implement:
     - @staticmethod def sdf(...): Pure function for computation (CONVENTION)
     - __call__(p): Evaluate SDF (delegates to sdf())
-    - to_functional(): Return the static sdf method
 
     Pattern for primitives:
         @staticmethod
@@ -62,9 +61,6 @@ class SDF(Fluent):
         def __call__(self, p: Array) -> Array:
             return ClassName.sdf(p, self.params['param1'].value, self.params['param2'].value)
 
-        def to_functional(self):
-            return ClassName.sdf
-
     Pattern for transforms:
         @staticmethod
         def sdf(child_sdf: Callable, p: Array, param: float) -> Array:
@@ -72,9 +68,6 @@ class SDF(Fluent):
 
         def __call__(self, p: Array) -> Array:
             return ClassName.sdf(self.child_sdf, p, self.params['param'].value)
-
-        def to_functional(self):
-            return ClassName.sdf
     """
 
     # Set to False on approximate SDFs (e.g. non-isometric deformations like
@@ -95,11 +88,10 @@ class SDF(Fluent):
         :func:`cadjoint.construction.faces.attach_faces` binds ``faces``,
         ``face``, ``cap``, ``side`` and ``axis`` onto the SDF a generator
         returns, so ``extrude(profile, depth).cap("+")`` is a plain instance
-        attribute and never reaches this method. What *did* reach it before
-        was every downstream node: ``Difference(body, hole).cap("+")`` raised
-        ``AttributeError``, so the moment a body had a hole in it, it stopped
-        being something you could sketch on — which is most of feature-based
-        CAD.
+        attribute and never reaches this method. What reaches it is every
+        downstream node: ``Difference(body, hole).cap("+")`` must still
+        resolve, or a body with a hole in it stops being something you can
+        sketch on — which is most of feature-based CAD.
 
         Booleans and patterns do not move the base body's surface: cutting a
         hole in a plate leaves the plate's top face in the same plane, and
@@ -157,30 +149,11 @@ class SDF(Fluent):
     def __call__(self, p: Array) -> Array:
         """Evaluate the signed distance at point(s) p.
 
-        This is for direct use only. During compilation, this is replaced
-        by the pure function from to_functional().
-
         Args:
             p: Point(s) to evaluate, shape (..., 3) for 3D or (..., 2) for 2D
 
         Returns:
             Signed distance value(s), shape (...)
-        """
-        pass
-
-    @abstractmethod
-    def to_functional(self) -> Callable:
-        """Return pure function for JAX tracing and compilation.
-
-        Returns:
-            Pure function with signature: (p: Array, **params) -> Array
-            where params are the primitive/transform parameters.
-
-        Example:
-            ```python
-            sphere = Sphere(radius=1.0)
-            func = sphere.to_functional()
-            ```
         """
         pass
 

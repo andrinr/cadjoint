@@ -11,7 +11,7 @@
 import type { JSX } from "solid-js";
 import type { FaceTarget } from "../../faces";
 import type { ConstraintKind } from "../../types";
-import type { DisplaySettings } from "../../viewer/renderer";
+import type { DisplaySettings } from "../../viewer/display";
 import type { Renderer } from "../../viewer/renderer";
 
 export interface ViewerPaneProps {
@@ -51,7 +51,7 @@ export interface ViewerPaneProps {
    * Plant a sketch on the picked face.
    *
    * `sketchLine` names an existing sketch to re-plant; null means "make one
-   * first". The target is resolved to a `/patch` reference *after* any
+   * first". The target is resolved to a `/api/patch` reference *after* any
    * insertion, because inserting a sketch moves the line numbers a reference
    * is written in terms of.
    */

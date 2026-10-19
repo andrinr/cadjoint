@@ -11,9 +11,7 @@ every response carries it in ``X-Cadjoint-Api``.
 - ``GET  /api/session``  session token, the starter program, and ``api_version``
 - ``POST /api/compile``  run the user's Python in a disposable child process
                          and return WGSL shaders plus the construction tree
-                         (``/compile`` still answers, for older clients)
 - ``POST /api/patch``    rewrite sketch vertex literals in the user's source
-                         (``/patch`` still answers, for older clients)
 - ``POST /api/mesh``     run the source again and return only the dual-contour
                          mesh edges (requested lazily by the viewer)
 - ``POST /api/mesh_refresh`` re-solve the last extracted mesh edges at new
@@ -90,9 +88,10 @@ The parts underneath it:
   NDJSON streaming, static files
 - :mod:`cadjoint.viewer._worker_client` — the endpoints that run the editor's
   Python in a child process
-- :mod:`cadjoint.viewer.worker.export` — ``/api/export``: which writer, which
-  content type, and the worker half that extracts and writes
-- :mod:`cadjoint.viewer._patch_requests` — ``/patch`` request validation
+- :mod:`cadjoint.viewer._export_client` — ``/api/export``: runs the export
+  worker (:mod:`cadjoint.viewer.worker.export`, which picks the writer and
+  content type) and hands the file back
+- :mod:`cadjoint.viewer._patch_requests` — ``/api/patch`` request validation
 - :mod:`cadjoint.viewer._intelligence` — the ruff and jedi endpoints
 - :mod:`cadjoint.viewer._scenes` — saved scene files
 - :mod:`cadjoint.viewer._example_scene` — the starter program
@@ -111,6 +110,7 @@ from typing import Any
 from urllib.parse import urlsplit
 
 from cadjoint.viewer._example_scene import EXAMPLE_SOURCE
+from cadjoint.viewer._export_client import EXPORT_TIMEOUT_SECONDS, export_source
 from cadjoint.viewer._http import STATIC_ROOT, PlaygroundBase, resolve_static
 from cadjoint.viewer._intelligence import (
     complete_source,
@@ -146,8 +146,7 @@ from cadjoint.viewer._worker_client import (
     simulate_source,
     warm_start,
 )
-from cadjoint.viewer.schema.api import API_VERSION, MAX_CLIENT_ID, ROUTES
-from cadjoint.viewer.worker.export import EXPORT_TIMEOUT_SECONDS, export_source
+from cadjoint.viewer.schema.api import API_VERSION, MAX_CLIENT_ID
 
 __all__ = [
     "API_VERSION",
@@ -232,11 +231,6 @@ def _post_routes() -> dict[str, Callable[[dict[str, Any]], dict[str, Any]]]:
         "/api/scenes/load": load_scene,
         "/api/scenes/save": save_scene,
     }
-    # The paths these two had before the contract moved everything under
-    # /api/: a page built against an older server still compiles and edits.
-    for route in ROUTES:
-        for alias in route.aliases:
-            routes[alias] = routes[route.path]
     return routes
 
 
@@ -580,10 +574,9 @@ def create_server(port: int = DEFAULT_PORT) -> ThreadingHTTPServer:
     # Jedi's first analysis costs a few hundred milliseconds; pay it on a
     # background thread now so the editor's first completion is already warm.
     warm_up()
-    # Same idea one order of magnitude up: one background `compile` and one
-    # `mesh` of the scene the editor opens with, so the first real request
-    # meets a warm XLA cache instead of paying 45-53 s for a cold one.
-    # Both are daemon threads and neither delays `serve_forever`.
+    # Same idea one order of magnitude up: one background `compile` of the
+    # scene the editor opens with, so the first real request meets a warm XLA
+    # cache. It runs on a daemon thread and does not delay `serve_forever`.
     warm_start()
     return server
 

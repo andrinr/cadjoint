@@ -1,9 +1,8 @@
 /**
  * Which characters a selection reveals in the editor.
  *
- * The bug this pins is a silent one: selecting a sketch used to reveal
- * nothing, because the memo asked for `spans.position` and a profile has no
- * argument spans at all. Nothing happened, no error, and sketches are exactly
+ * A profile has no argument spans, so a rule that reads `spans.position`
+ * reveals nothing for a sketch — silently, with no error — and sketches are
  * what a user selects while placing one. So the cases below are mostly about
  * *always returning something* — and about the precision flag, which is what
  * stops a twenty-two-line declaration from being painted over whole.
@@ -38,7 +37,7 @@ describe("focusSpan", () => {
   });
 
   it("reveals a primitive's declaration rather than its position literal", () => {
-    // The old rule answered [60, 78] here — three numbers, not the object.
+    // [60, 78] is the position literal — three numbers, not the object.
     expect(focusSpan(primitive, null)).toEqual({ from: 10, to: 95, precise: false });
   });
 

@@ -109,16 +109,16 @@ class TestTheFixtureBlanksTheRegistry:
         with tier.absent():
             from cadjoint.plugins import registry
 
-            assert PluginKind.TET_MESHER.value in registry().kinds()
-            assert PluginKind.MESHER.value in registry().kinds()
+            assert PluginKind.TET_MESHER in registry().kinds()
+            assert PluginKind.MESHER in registry().kinds()
 
     def test_component_degrades_and_require_refuses(self):
         with tier.absent():
-            assert tier.component(PluginKind.BREP.value) is None
-            assert tier.component(PluginKind.BREP.value, default="fallback") == "fallback"
+            assert tier.component(PluginKind.BREP) is None
+            assert tier.component(PluginKind.BREP, default="fallback") == "fallback"
             with pytest.raises(tier.TierUnavailable) as caught:
-                tier.require(PluginKind.BREP.value)
-            assert caught.value.kind == PluginKind.BREP.value
+                tier.require(PluginKind.BREP)
+            assert caught.value.kind == PluginKind.BREP
             assert "diff-brep" in str(caught.value)
 
     def test_the_report_is_json_ready_and_names_the_provider(self):
@@ -206,7 +206,7 @@ class TestStepExportFallsBackToFaceted:
             result = self._export(tmp_path)
             assert result["ok"] is True, result
             assert result["report"]["path"] == "mesh"
-            assert result["report"]["tier"] == tier.message(PluginKind.STEP_EXPORT.value)
+            assert result["report"]["tier"] == tier.message(PluginKind.STEP_EXPORT)
             assert (tmp_path / "out.step").read_text().startswith("ISO-10303-21;")
 
     def test_with_the_tier_the_kind_takes_it_and_the_report_says_nothing(self, tmp_path, stub_tier):
@@ -261,7 +261,7 @@ class TestTheCompilePayloadCarriesTheTier:
             body = {"ok": True, **tier.status().as_dict()}
         assert body["ok"] and body["installed"] is False
         assert body["contract_version"] == tier.CONTRACT_VERSION
-        assert body["kinds"][PluginKind.NODE_MAP.value]["available"] is False
+        assert body["kinds"][PluginKind.NODE_MAP]["available"] is False
 
 
 # ── the FEM path ─────────────────────────────────────────────────────────────

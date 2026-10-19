@@ -9,8 +9,8 @@
  */
 
 import { BC_TYPE_COLORS } from "../../selectionEval";
+import { cssColor } from "../../simColors";
 import type { BoundaryConditionType } from "../../types";
 
 /** The BC type's overlay colour as a CSS `rgb()` string. */
-export const bcSwatch = (type: BoundaryConditionType): string =>
-  `rgb(${BC_TYPE_COLORS[type].map((channel) => Math.round(channel * 255)).join(", ")})`;
+export const bcSwatch = (type: BoundaryConditionType): string => cssColor(BC_TYPE_COLORS[type]);

@@ -40,6 +40,7 @@ from typing import Callable
 import jax.numpy as jnp
 from jax import Array
 
+from cadjoint.descriptions import FaceDescription
 from cadjoint.geometry.vectors import unit
 
 # Below this squared length a direction carries no orientation; the guarded
@@ -318,7 +319,7 @@ class Face:
 
     # ── payload ──────────────────────────────────────────────────────────────
 
-    def describe(self) -> dict:
+    def describe(self) -> FaceDescription:
         """Serialize the face for the viewer.
 
         Returns:
@@ -365,14 +366,6 @@ class Axis:
     def point(self, distance) -> Array:
         """A point ``distance`` along the axis from its origin."""
         return self.origin + jnp.asarray(distance) * self.direction
-
-    def describe(self) -> dict:
-        """Serialize the axis for the viewer."""
-        return {
-            "kind": "axis",
-            "origin": [float(x) for x in self.origin],
-            "direction": [float(x) for x in self.direction],
-        }
 
     def __repr__(self) -> str:
         return f"Axis(origin={list(self.origin)}, direction={list(self.direction)})"
@@ -457,10 +450,6 @@ class FaceSet:
             KeyError: If the feature declares no such side wall.
         """
         return self.face(f"side{int(index)}")
-
-    def describe(self) -> list[dict]:
-        """Serialize every declared face for the viewer."""
-        return [face.describe() for face in self.all()]
 
     def __repr__(self) -> str:
         return f"FaceSet({self.owner_kind}, {self.keys()})"

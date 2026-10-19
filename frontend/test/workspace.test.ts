@@ -22,19 +22,9 @@ import {
   WORKSPACE_STORAGE_KEY,
   writeWorkspace,
   type Workspace,
-  type WorkspaceStorage,
 } from "../src/windows/workspace";
 import { defaultModeWindows } from "../src/windows/windowState";
-
-function memoryStorage(): WorkspaceStorage & { data: Map<string, string> } {
-  const data = new Map<string, string>();
-  return {
-    data,
-    getItem: (key) => data.get(key) ?? null,
-    setItem: (key, value) => void data.set(key, value),
-    removeItem: (key) => void data.delete(key),
-  };
-}
+import { failingStorage, memoryStorage } from "./helpers";
 
 const layoutOf = (...ids: string[]) => ({
   grid: { root: {}, width: 100, height: 100, orientation: "HORIZONTAL" },
@@ -121,20 +111,10 @@ describe("round trips", () => {
   });
 
   it("treats a storage that throws as no storage at all", () => {
-    const hostile: WorkspaceStorage = {
-      getItem: () => {
-        throw new Error("private mode");
-      },
-      setItem: () => {
-        throw new Error("quota");
-      },
-      removeItem: () => {
-        throw new Error("quota");
-      },
-    };
+    const hostile = failingStorage();
     expect(readWorkspace(hostile)).toEqual(emptyWorkspace());
     expect(() => writeWorkspace(hostile, emptyWorkspace())).not.toThrow();
     expect(() => clearWorkspace(hostile)).not.toThrow();
-    expect(readWorkspace(undefined)).toEqual(emptyWorkspace());
+    expect(readWorkspace(null)).toEqual(emptyWorkspace());
   });
 });

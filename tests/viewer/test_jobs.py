@@ -17,7 +17,6 @@ import subprocess
 import sys
 import threading
 import time
-from contextlib import contextmanager
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
@@ -25,6 +24,7 @@ import pytest
 
 from cadjoint.viewer import _jobs, playground
 from cadjoint.viewer._jobs import JobRegistry, attach_process, source_hash
+from tests.helpers import running_server, session_token
 
 # A program the worker takes a long time to finish, with no numerics in it:
 # the point is a request that is still running when the test cancels it.
@@ -399,27 +399,12 @@ class TestClientCancellation:
 # ── Over live HTTP ──────────────────────────────────────────────────────────
 
 
-@contextmanager
-def _running_server():
-    server = playground.create_server(0)
-    thread = threading.Thread(target=server.serve_forever, daemon=True)
-    thread.start()
-    try:
-        host, port = server.server_address
-        yield f"http://{host}:{port}"
-    finally:
-        server.shutdown()
-        server.server_close()
-        thread.join(timeout=2)
-
-
 class Client:
     """The three lines of urllib every test below would otherwise repeat."""
 
     def __init__(self, base: str) -> None:
         self.base = base
-        with urlopen(f"{base}/api/session") as response:
-            self.token = json.loads(response.read())["token"]
+        self.token = session_token(base)
 
     def _request(self, path: str, payload=None, method: str | None = None) -> Request:
         headers = {"Content-Type": "application/json", "X-Cadjoint-Token": self.token}
@@ -461,7 +446,7 @@ class Client:
     ],
 )
 def test_the_job_endpoints_require_the_session_token(path, payload):
-    with _running_server() as base:
+    with running_server() as base:
         request = Request(
             base + path,
             data=json.dumps(payload).encode() if payload is not None else None,
@@ -475,9 +460,9 @@ def test_the_job_endpoints_require_the_session_token(path, payload):
 
 class TestHttpRegistry:
     def test_a_compile_is_listed_and_its_result_comes_back_byte_identical(self, registry):
-        with _running_server() as base:
+        with running_server() as base:
             client = Client(base)
-            status, body = client.call("/compile", {"source": TINY_SOURCE})
+            status, body = client.call("/api/compile", {"source": TINY_SOURCE})
             assert status == 200
             assert body["ok"] is True
             job_id = body["job_id"]
@@ -504,7 +489,7 @@ class TestHttpRegistry:
 
     def test_a_simulate_result_survives_the_response_being_discarded(self, registry):
         pytest.importorskip("jax_fem", reason="a study solve needs the fem extra")
-        with _running_server() as base:
+        with running_server() as base:
             client = Client(base)
             status, body = client.call(
                 "/api/simulate", {"source": STUDY_SOURCE, "kind": "study", "name": "bar"}
@@ -527,13 +512,13 @@ class TestHttpRegistry:
             assert summary["result_bytes"] == len(refetched.encode("utf-8"))
 
     def test_an_unknown_job_is_a_404_and_a_running_one_has_no_result_yet(self, registry):
-        with _running_server() as base:
+        with running_server() as base:
             client = Client(base)
             assert client.call("/api/jobs/job-424242")[0] == 404
             assert client.call("/api/jobs/job-424242/result")[0] == 404
 
             done = threading.Thread(
-                target=lambda: client.call("/compile", {"source": SLOW_SOURCE}), daemon=True
+                target=lambda: client.call("/api/compile", {"source": SLOW_SOURCE}), daemon=True
             )
             done.start()
             job_id = _wait_for(
@@ -554,7 +539,7 @@ class TestHttpRegistry:
 
     def test_a_lint_job_is_recorded_but_its_diagnostics_are_not_kept(self, registry):
         pytest.importorskip("ruff", reason="/api/lint needs the editor extra")
-        with _running_server() as base:
+        with running_server() as base:
             client = Client(base)
             status, body = client.call("/api/lint", {"source": TINY_SOURCE})
             assert status == 200
@@ -565,9 +550,9 @@ class TestHttpRegistry:
             assert gone["job_id"] == job_id
 
     def test_clearing_empties_the_list(self, registry):
-        with _running_server() as base:
+        with running_server() as base:
             client = Client(base)
-            client.call("/compile", {"source": TINY_SOURCE})
+            client.call("/api/compile", {"source": TINY_SOURCE})
             assert client.call("/api/jobs")[1]["store"]["jobs"] == 1
 
             status, cleared = client.call("/api/jobs/clear", {})
@@ -579,13 +564,13 @@ class TestHttpRegistry:
 class TestHttpCancellation:
     def test_cancelling_a_running_compile_kills_the_worker_and_answers_the_caller(self, registry):
         answer: dict = {}
-        with _running_server() as base:
+        with running_server() as base:
             client = Client(base)
             caller = threading.Thread(
                 target=lambda: answer.update(
                     zip(
                         ("status", "body"),
-                        client.call("/compile", {"source": SLOW_SOURCE}),
+                        client.call("/api/compile", {"source": SLOW_SOURCE}),
                         strict=True,
                     )
                 ),
@@ -637,13 +622,13 @@ class TestHttpCancellation:
         could have while the request is still in flight.
         """
         answer: dict = {}
-        with _running_server() as base:
+        with running_server() as base:
             client = Client(base)
             caller = threading.Thread(
                 target=lambda: answer.update(
                     zip(
                         ("status", "body"),
-                        client.call("/compile", {"source": SLOW_SOURCE, "client_id": "drag-1"}),
+                        client.call("/api/compile", {"source": SLOW_SOURCE, "client_id": "drag-1"}),
                         strict=True,
                     )
                 ),
@@ -682,14 +667,14 @@ class TestHttpCancellation:
             _wait_for(lambda: not _pid_alive(pid), timeout=10.0)
 
     def test_a_cancel_without_a_label_is_refused(self, registry):
-        with _running_server() as base:
+        with running_server() as base:
             client = Client(base)
             assert client.call("/api/jobs/cancel_client", {})[0] == 400
             assert client.call("/api/jobs/cancel_client", {"client_id": "x" * 200})[0] == 400
 
     def test_cancelling_a_streamed_optimize_ends_the_stream(self, registry):
         events: list = []
-        with _running_server() as base:
+        with running_server() as base:
             client = Client(base)
             source = SLOW_SOURCE + (
                 "\nfrom cadjoint.optimize import Optimization\n"

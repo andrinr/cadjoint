@@ -6,6 +6,7 @@
  * mode. The signals live in `state.ts`; the DOM lives in `ToolRail.tsx`.
  */
 
+import { browserStorage, type KeyValueStorage } from "./storage";
 import type { ConstructionNode } from "./types";
 
 export type EditingMode = "model" | "sketch" | "simulate";
@@ -88,26 +89,14 @@ export function autoEnterSketchMode(
 
 export const EDITING_MODE_STORAGE_KEY = "cadjoint.editingMode.v1";
 
-/** Minimal storage surface so tests can inject a memory store. */
-export interface StringStorage {
-  getItem(key: string): string | null;
-  setItem(key: string, value: string): void;
-}
-
-function defaultStorage(): StringStorage | undefined {
-  try {
-    return typeof localStorage === "undefined" ? undefined : localStorage;
-  } catch {
-    return undefined;
-  }
-}
-
 /** The persisted editing mode, defaulting to model on anything unexpected. */
-export function loadEditingMode(storage: StringStorage | undefined = defaultStorage()): EditingMode {
+export function loadEditingMode(
+  storage: KeyValueStorage | null = browserStorage(),
+): EditingMode {
   try {
     const raw = storage?.getItem(EDITING_MODE_STORAGE_KEY);
-    // A persisted "render" from before the mode was retired falls back to
-    // model — render settings live in the eye-icon popover now.
+    // Anything else, a stored "render" included, falls back to model; render
+    // settings live in the eye-icon popover.
     return raw === "sketch" || raw === "simulate" ? raw : "model";
   } catch {
     return "model";
@@ -116,7 +105,7 @@ export function loadEditingMode(storage: StringStorage | undefined = defaultStor
 
 export function persistEditingMode(
   mode: EditingMode,
-  storage: StringStorage | undefined = defaultStorage(),
+  storage: KeyValueStorage | null = browserStorage(),
 ): void {
   try {
     storage?.setItem(EDITING_MODE_STORAGE_KEY, mode);

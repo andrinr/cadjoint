@@ -113,7 +113,7 @@ def test_the_seam_projection_compiles_one_program():
     once rather than four times over.  Jitting *without* rolling measured
     worse than the eager path it replaced — ``research/performance.md`` §16.
     """
-    from cadjoint.viewer._edge_overlay import _project_seam_groups
+    from cadjoint.viewer._lattice_edges import _project_seam_groups
 
     rows = np.arange(24, dtype=np.int64)
     vertices = _points(24, 5)
@@ -127,7 +127,7 @@ def test_the_seam_projection_compiles_one_program():
 
 def test_the_seam_residual_compiles_one_program():
     """The acceptance test a projected seam group is judged by."""
-    from cadjoint.viewer._edge_overlay import _seam_residual
+    from cadjoint.viewer._lattice_edges import _seam_residual
 
     points = _points(24, 6)
 

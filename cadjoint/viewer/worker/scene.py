@@ -14,7 +14,8 @@ needs the optional solver extra reports when the import fails.
 from __future__ import annotations
 
 import contextlib
-from collections.abc import Callable
+import io
+from collections.abc import Callable, Iterator
 from typing import Any
 
 from cadjoint.viewer.source_map import PLAYGROUND_FILENAME
@@ -67,25 +68,13 @@ _FEM_UNAVAILABLE_MESSAGE = (
 )
 
 
-def _named_study(studies: list[Any], name: Any) -> Any:
-    """The one declared study called *name* (or raise, listing the others)."""
-    matches = [study for study in studies if study.name == name]
-    if not matches:
-        declared = ", ".join(repr(study.name) for study in studies) or "none"
-        raise ValueError(f"The program declares no study named {name!r} (declared: {declared}).")
-    if len(matches) > 1:
-        raise ValueError(f"The program declares more than one study named {name!r}.")
-    return matches[0]
+#: How much of a mode's captured stdout/stderr its reply carries (the tail).
+OUTPUT_TAIL = 8_000
 
 
-def _named_optimization(optimizations: list[Any], name: Any) -> Any:
-    """The one declared optimization called *name* (or raise, listing them)."""
-    matches = [optimization for optimization in optimizations if optimization.name == name]
-    if not matches:
-        declared = ", ".join(repr(optimization.name) for optimization in optimizations) or "none"
-        raise ValueError(
-            f"The program declares no optimization named {name!r} (declared: {declared})."
-        )
-    if len(matches) > 1:
-        raise ValueError(f"The program declares more than one optimization named {name!r}.")
-    return matches[0]
+@contextlib.contextmanager
+def captured_output() -> Iterator[Callable[[], str]]:
+    """Capture stdout and stderr; yields a function returning the tail so far."""
+    buffer = io.StringIO()
+    with contextlib.redirect_stdout(buffer), contextlib.redirect_stderr(buffer):
+        yield lambda: buffer.getvalue()[-OUTPUT_TAIL:]

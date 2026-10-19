@@ -5,13 +5,9 @@
  * `shader_hash`), assembled the way `cadjoint/viewer/worker/main.py` does
  * with the direct backend in its uniform form.
  */
-import {
-  compileGraphDirect,
-  DEFAULT_PARAMETER_BINDING,
-  DEFAULT_PARAMETER_GROUP,
-  PARAMETER_SLOT_BYTES,
-  RESERVED_PARAMETER_SLOTS,
-} from "./direct.ts";
+import { SHADER_PARAMETERS } from "../../../cadjoint/viewer/schema/constants.ts";
+import type { ShaderParameter, ShaderProgram } from "../../../cadjoint/viewer/schema/payloads";
+import { compileGraphDirect } from "./direct.ts";
 import type { SceneGraph } from "./graph.ts";
 import {
   DEFAULT_MATERIAL_WGSL,
@@ -46,26 +42,6 @@ export function buildPathTracerShader(sceneCode: string): string {
   return WGSL_PATH_TRACER_TEMPLATE.replace(SCENE_MARKER, () => sceneCode);
 }
 
-/** One entry of the program's parameter list, as `ShaderParameter.as_dict` writes it. */
-export type ProgramParameter = {
-  name: string;
-  offset: number;
-  components: number;
-  value: (number | null)[];
-  free: boolean;
-  depends?: string[];
-};
-
-/** `ShaderProgram.as_dict`. */
-export type ProgramContract = {
-  group: number;
-  binding: number;
-  buffer_bytes: number;
-  nan_offset: number;
-  cull_margin_offset: number | null;
-  parameters: ProgramParameter[];
-};
-
 export type SceneShaders = {
   sdf: string;
   shader: string;
@@ -73,18 +49,18 @@ export type SceneShaders = {
   preview_shader: string;
   path_shader: string;
   present_shader: string;
-  program: ProgramContract;
+  program: ShaderProgram;
   shader_hash: string;
 };
 
 /** The scene module and its buffer contract, as the worker's `_direct_shader` builds them. */
-export function sceneProgram(graph: SceneGraph, culling = true): { wgsl: string; program: ProgramContract } {
+export function sceneProgram(graph: SceneGraph, culling = true): { wgsl: string; program: ShaderProgram } {
   const direct = compileGraphDirect(graph, { uniforms: true, culling });
   const derived = new Set(direct.derived);
-  const parameters = direct.parameters.map(([name, components, values], index): ProgramParameter => {
-    const entry: ProgramParameter = {
+  const parameters = direct.parameters.map(([name, components, values], index): ShaderParameter => {
+    const entry: ShaderParameter = {
       name,
-      offset: index * PARAMETER_SLOT_BYTES,
+      offset: index * slotBytes,
       components,
       value: values.map((v) => (Number.isFinite(v) ? v : null)),
       free: !derived.has(name),
@@ -97,15 +73,17 @@ export function sceneProgram(graph: SceneGraph, culling = true): { wgsl: string;
   return {
     wgsl: direct.wgsl,
     program: {
-      group: DEFAULT_PARAMETER_GROUP,
-      binding: DEFAULT_PARAMETER_BINDING,
-      buffer_bytes: (slots + RESERVED_PARAMETER_SLOTS) * PARAMETER_SLOT_BYTES,
-      nan_offset: slots * PARAMETER_SLOT_BYTES,
-      cull_margin_offset: (slots + 1) * PARAMETER_SLOT_BYTES,
+      group: SHADER_PARAMETERS.group,
+      binding: SHADER_PARAMETERS.binding,
+      buffer_bytes: (slots + SHADER_PARAMETERS.reservedSlots) * slotBytes,
+      nan_offset: slots * slotBytes,
+      cull_margin_offset: (slots + 1) * slotBytes,
       parameters,
     },
   };
 }
+
+const slotBytes = SHADER_PARAMETERS.slotBytes;
 
 async function sha256Hex(text: string): Promise<string> {
   const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));

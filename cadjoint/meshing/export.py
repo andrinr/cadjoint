@@ -272,7 +272,7 @@ def remove_slivers(mesh: Mesh) -> tuple[Mesh, int]:
     The index graph is manifold, but a file without indices is not: an STL
     reader merges coincident points, those triangles then have no area,
     and their edges are used a third and fourth time — the file is not
-    watertight (issue #52).  This does that merge first, keeps the faces
+    watertight.  This does that merge first, keeps the faces
     on the lowest row of each coincident group, and drops every triangle
     that no longer has three distinct corners.  ``save_stl`` and
     ``save_obj`` apply it; ``save_step`` has its own edge weld.

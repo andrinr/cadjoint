@@ -27,6 +27,8 @@
  * module's cache either, because it never asks for a module at all.
  */
 
+import { SHADER_PARAMETERS } from "../../../cadjoint/viewer/schema/constants";
+
 /** One design parameter's slot, mirroring `ShaderParameter` in the schema. */
 export interface ShaderParameterSlot {
   name: string;
@@ -94,22 +96,21 @@ export interface ShaderProgramPayload {
  * The cull margin that leaves culling on.
  *
  * World-unit slack on every skip test, so float rounding in the box distance
- * can never flip a test the exact arithmetic would not. Mirrors `CULL_MARGIN`
- * in `cadjoint/backends/wgsl/_culling.py`.
+ * can never flip a test the exact arithmetic would not.
  */
-export const CULL_MARGIN_ON = 1e-4;
+export const CULL_MARGIN_ON = SHADER_PARAMETERS.cullMargin;
 
 /**
  * The cull margin that switches culling off.
  *
  * Infinity, so no box test can ever pass and no operand is ever skipped. The
- * image is identical either way — measured at zero changed pixels on every
- * shipped scene — and the cost is 2.0x to 2.4x the frame.
+ * image is identical either way — zero changed pixels on every shipped
+ * scene — and the cost is 2.0x to 2.4x the frame.
  */
 export const CULL_MARGIN_OFF = Number.POSITIVE_INFINITY;
 
-/** Bytes per parameter: one `vec4<f32>`. Mirrors `PARAMETER_SLOT_BYTES`. */
-export const PARAMETER_SLOT_BYTES = 16;
+/** Bytes per parameter: one `vec4<f32>`. */
+export const PARAMETER_SLOT_BYTES = SHADER_PARAMETERS.slotBytes;
 
 /**
  * The parameter values, packed for upload.
@@ -156,7 +157,7 @@ export function packParameters(
   // every bounding-box skip test is compared against from the other.
   if (program.nan_offset !== undefined) packed[program.nan_offset / 4] = Number.NaN;
   // `null` and absent both mean the program reserved no margin slot — a
-  // literal-form shader, or one built before the toggle existed. Writing
+  // literal-form shader, or one without the cull toggle. Writing
   // anywhere on that basis would land on a real parameter.
   if (program.cull_margin_offset != null) {
     packed[program.cull_margin_offset / 4] = cullMargin;

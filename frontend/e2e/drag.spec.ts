@@ -1,9 +1,17 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-import { chromium, expect, test, type Browser, type Page } from "@playwright/test";
-
-import type { ShaderStats } from "../src/viewer/renderer";
+import { expect, test, type Page } from "@playwright/test";
+import {
+  dragFrom,
+  findHandle,
+  openViewer,
+  recompile,
+  SCENES,
+  setEditorText,
+  stats,
+  waitForCompile,
+} from "./helpers/app";
 
 /**
  * What a handle drag actually costs, and whether the viewport says so.
@@ -31,120 +39,8 @@ import type { ShaderStats } from "../src/viewer/renderer";
  * path would fail the assertion it was used to set up.
  */
 
-const PORT = process.env.CADJOINT_E2E_PORT ?? 8799;
-
-const SCENES = resolve(import.meta.dirname, "..", "..", "scenes");
-
-async function waitForCompile(page: Page) {
-  // The settle signal is the toolbar's busy seam. It is present for exactly
-  // as long as the app is behind its own source — from the edit, through the
-  // debounce window and the request, until the shaders are installed — which
-  // the status line no longer is: while work is in flight the status says
-  // nothing at all, so that the one indicator for running work is the
-  // toolbar's chip. A settled status is therefore a second, independent
-  // signal, and "Starting…" is the placeholder to wait past on a cold load.
-  await expect(page.getByTestId("status")).not.toHaveText(/^(|Starting…)$/, {
-    timeout: 120_000,
-  });
-  await expect(page.getByTestId("toolbar-busy")).toHaveCount(0, { timeout: 120_000 });
-}
-
-async function stats(page: Page): Promise<ShaderStats | null> {
-  return page.evaluate(() => window.__cadjointShaders?.() ?? null);
-}
-
-/** Replace the whole document, run it, and wait for the compile to land. */
-async function recompile(page: Page, source: string) {
-  await page.evaluate((text) => {
-    type EditorLike = {
-      view?: {
-        state: { doc: { length: number } };
-        dispatch: (spec: unknown) => void;
-      };
-    };
-    const content = document.querySelector("[data-testid=editor] .cm-content") as
-      | (HTMLElement & { cmView?: EditorLike; cmTile?: EditorLike })
-      | null;
-    const view = content?.cmView?.view ?? content?.cmTile?.view;
-    if (!view) throw new Error("no CodeMirror view");
-    view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: text } });
-  }, source);
-  await page.getByTestId("run").click();
-  await waitForCompile(page);
-}
-
-/**
- * A page on a browser with WebGPU, or null when this build has no adapter.
- *
- * `navigator.gpu` is not exposed on `about:blank`, so the probe has to come
- * after the navigation or a machine that has WebGPU reports that it does not.
- */
-async function openViewer(): Promise<{ browser: Browser; page: Page; errors: string[] } | null> {
-  const browser = await chromium.launch({
-    args: [
-      "--enable-unsafe-webgpu",
-      "--enable-features=Vulkan,WebGPU",
-      "--use-angle=metal",
-      "--use-gl=angle",
-      "--ignore-gpu-blocklist",
-      "--enable-gpu",
-    ],
-  });
-  const page = await browser.newPage({ viewport: { width: 1200, height: 800 } });
-  const errors: string[] = [];
-  page.on("pageerror", (error) => errors.push(error.message));
-  page.on("console", (message) => {
-    if (message.type() === "error") errors.push(message.text());
-  });
-  await page.goto(`http://127.0.0.1:${PORT}/`);
-  const adapter = await page.evaluate(async () => {
-    if (!navigator.gpu) return null;
-    return (await navigator.gpu.requestAdapter()) ? "available" : null;
-  });
-  if (!adapter) {
-    await browser.close();
-    return null;
-  }
-  await waitForCompile(page);
-  return { browser, page, errors };
-}
-
-/** Where a handle of the wanted kind is on screen, found by the hint bar. */
-type Found = { x: number; y: number; hint: string } | null;
-
-/**
- * Sweep the pointer over the viewport until the hint names a handle.
- *
- * The readout under the viewport is the app's own answer to "what would
- * dragging this cost", and it is computed by the very function that decides
- * whether the handle is drawn filled — so using it to *locate* the handle is
- * what makes the later assertions a check on the mark and not just on the
- * renderer. The sweep is synthetic and read-only; the drag itself is driven
- * with the real mouse.
- */
-async function findHandle(page: Page, kind: "free parameter" | "fixed value"): Promise<Found> {
-  return page.evaluate((phrase) => {
-    const canvas = document.querySelector("canvas") as HTMLCanvasElement | null;
-    if (!canvas) return null;
-    const rect = canvas.getBoundingClientRect();
-    const hint = () => document.querySelector("[data-testid=viewer-hint]")?.textContent ?? "";
-    for (let y = rect.top + 6; y < rect.bottom - 6; y += 5) {
-      for (let x = rect.left + 6; x < rect.right - 6; x += 5) {
-        canvas.dispatchEvent(
-          new PointerEvent("pointermove", {
-            clientX: x,
-            clientY: y,
-            bubbles: true,
-            pointerId: 1,
-          }),
-        );
-        const text = hint();
-        if (text.includes(phrase)) return { x, y, hint: text };
-      }
-    }
-    return null;
-  }, kind);
-}
+/** How long a compile of this spec's scenes may take. */
+const COMPILE_TIMEOUT = 120_000;
 
 /** The canvas as a string, for "did the image change" without pixel maths. */
 async function frame(page: Page): Promise<number> {
@@ -156,23 +52,14 @@ async function frame(page: Page): Promise<number> {
   });
 }
 
-/** Drag from a point by `steps` real mouse moves, without releasing. */
-async function dragFrom(page: Page, x: number, y: number, dx: number, dy: number, steps: number) {
-  await page.mouse.move(x, y);
-  await page.mouse.down();
-  for (let step = 1; step <= steps; step += 1) {
-    await page.mouse.move(x + (dx * step) / steps, y + (dy * step) / steps);
-  }
-}
-
 test("a free handle drags live; a fixed one falls back to a recompile", async ({}, testInfo) => {
   test.setTimeout(240_000);
-  const opened = await openViewer();
+  const opened = await openViewer({ width: 1200, height: 800, timeout: COMPILE_TIMEOUT });
   test.skip(opened === null, "No WebGPU adapter in this browser build");
   if (!opened) return;
   const { browser, page, errors } = opened;
 
-  await recompile(page, readFileSync(resolve(SCENES, "starter.py"), "utf8"));
+  await recompile(page, readFileSync(resolve(SCENES, "starter.py"), "utf8"), COMPILE_TIMEOUT);
   const loaded = await stats(page);
   expect(loaded!.hasParameterBuffer, "the starter's shader reads a parameter buffer").toBe(true);
 
@@ -212,7 +99,7 @@ test("a free handle drags live; a fixed one falls back to a recompile", async ({
   // The release patches the source; the compile it triggers emits the same
   // shader with different numbers, so it takes the values-only path too.
   await page.mouse.up();
-  await waitForCompile(page);
+  await waitForCompile(page, COMPILE_TIMEOUT);
   const afterLive = await stats(page);
   expect(afterLive!.pipelineBuilds, "committing a free parameter builds no pipeline").toBe(
     beforeLive!.pipelineBuilds,
@@ -233,7 +120,7 @@ test("a free handle drags live; a fixed one falls back to a recompile", async ({
   );
 
   await page.mouse.up();
-  await waitForCompile(page);
+  await waitForCompile(page, COMPILE_TIMEOUT);
   const afterPinned = await stats(page);
   // A literal's cost is the recompile itself: the release patches the source
   // and the program is executed again. The direct shader form gives literal
@@ -262,18 +149,18 @@ test("a free handle drags live; a fixed one falls back to a recompile", async ({
 /**
  * Switching scenes must not draw through a destroyed buffer.
  *
- * The regression this pins: installing the new program and its parameter
- * buffer at the *top* of `setShaders` destroyed the buffer that the cached
- * `previewParameterGroup` and `pathParameterGroup` were still holding, and
- * then spent tens of milliseconds — 745 ms on `scenes/motor_shield.py` —
- * building modules and pipelines before replacing them. Any frame drawn in
- * that window failed validation with "Buffer with 'SDF parameters' label has
- * been destroyed", which on a big scene is every frame the user causes by
+ * Installing the new program and its parameter buffer at the *top* of
+ * `setShaders` would destroy the buffer that the cached
+ * `previewParameterGroup` and `pathParameterGroup` still hold, while modules
+ * and pipelines take up to hundreds of milliseconds to build (745 ms on
+ * `scenes/motor_shield.py`). Any frame drawn in that window would fail
+ * validation with "Buffer with 'SDF parameters' label has been destroyed",
+ * which on a big scene is every frame the user causes by
  * touching the mouse while they wait.
  *
  * So the test needs three things at once, and the assertion is worthless
  * without all three: a scene whose buffer is a *different size* from the one
- * installed (an equal size took an early return and hid the bug), a shader
+ * installed (an equal size takes an early return and would hide the fault), a shader
  * big enough that its pipelines take real time to build, and frames actually
  * being drawn while that happens. `scenes/end_cap.py` supplies the first two
  * — 11 free parameters against the first scene's one, 1.7 MB of WGSL — and
@@ -281,7 +168,7 @@ test("a free handle drags live; a fixed one falls back to a recompile", async ({
  */
 test("switching to a differently sized scene draws no destroyed buffer", async ({}, testInfo) => {
   test.setTimeout(240_000);
-  const opened = await openViewer();
+  const opened = await openViewer({ width: 1200, height: 800, timeout: COMPILE_TIMEOUT });
   test.skip(opened === null, "No WebGPU adapter in this browser build");
   if (!opened) return;
   const { browser, page, errors } = opened;
@@ -294,21 +181,13 @@ test("switching to a differently sized scene draws no destroyed buffer", async (
     "scene = Union((Sphere(radius=radius), Box(size=[0.9, 0.5, 0.2])), smoothness=0.05)",
     "",
   ].join("\n");
-  await recompile(page, small);
+  await recompile(page, small, COMPILE_TIMEOUT);
   expect((await stats(page))!.hasParameterBuffer).toBe(true);
 
   // The switch, with the viewport busy. The wheel loop redraws every frame:
   // `onWheel` zooms and invalidates, so each tick is a real submitted frame
   // through whatever bind groups the renderer holds at that instant.
-  await page.evaluate((text) => {
-    type EditorLike = { view?: { state: { doc: { length: number } }; dispatch: (s: unknown) => void } };
-    const content = document.querySelector("[data-testid=editor] .cm-content") as
-      | (HTMLElement & { cmView?: EditorLike; cmTile?: EditorLike })
-      | null;
-    const view = content?.cmView?.view ?? content?.cmTile?.view;
-    if (!view) throw new Error("no CodeMirror view");
-    view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: text } });
-  }, readFileSync(resolve(SCENES, "end_cap.py"), "utf8"));
+  await setEditorText(page, readFileSync(resolve(SCENES, "end_cap.py"), "utf8"));
 
   const running = page.getByTestId("run").click();
   await page.evaluate(() => {
@@ -329,7 +208,7 @@ test("switching to a differently sized scene draws no destroyed buffer", async (
     });
   });
   await running;
-  await waitForCompile(page);
+  await waitForCompile(page, COMPILE_TIMEOUT);
 
   // Two witnesses: the renderer forwards every uncaptured GPU error to the
   // viewport's error banner, and Chromium logs it to the console as well.
@@ -365,12 +244,12 @@ test("switching to a differently sized scene draws no destroyed buffer", async (
  */
 test("a gizmo translate writes the buffer instead of rebuilding", async ({}, testInfo) => {
   test.setTimeout(240_000);
-  const opened = await openViewer();
+  const opened = await openViewer({ width: 1200, height: 800, timeout: COMPILE_TIMEOUT });
   test.skip(opened === null, "No WebGPU adapter in this browser build");
   if (!opened) return;
   const { browser, page, errors } = opened;
 
-  await recompile(page, readFileSync(resolve(SCENES, "starter.py"), "utf8"));
+  await recompile(page, readFileSync(resolve(SCENES, "starter.py"), "utf8"), COMPILE_TIMEOUT);
 
   // `head_a`: a screw head whose position, radius and height are all free.
   await page.getByTestId("tree-row-cylinder_6").click();
@@ -404,7 +283,7 @@ test("a gizmo translate writes the buffer instead of rebuilding", async ({}, tes
   await dragFrom(page, arrow!.x, arrow!.y, 30, -15, 15);
   const during = await stats(page);
   await page.mouse.up();
-  await waitForCompile(page);
+  await waitForCompile(page, COMPILE_TIMEOUT);
 
   expect(during!.pipelineBuilds, "a gizmo drag builds no pipeline").toBe(before!.pipelineBuilds);
   expect(during!.misses, "and compiles no module").toBe(before!.misses);

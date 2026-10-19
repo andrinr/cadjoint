@@ -16,18 +16,10 @@
 import { nodeBounds, rotationMatrix, type Bounds } from "./bounds.ts";
 import { DEFAULT_MATERIAL, sceneRoot, type SceneGraph, type SceneNode, type Vec } from "./graph.ts";
 import { formatG9 } from "./pyformat.ts";
+import { SHADER_PARAMETERS } from "../../../cadjoint/viewer/schema/constants.ts";
 
-/** `codegen.DEFAULT_PARAMETER_GROUP` / `_BINDING`. */
-export const DEFAULT_PARAMETER_GROUP = 3;
-export const DEFAULT_PARAMETER_BINDING = 0;
-/** `codegen.PARAMETER_ADDRESS_SPACE`. */
-export const PARAMETER_ADDRESS_SPACE = "storage, read";
-/** `codegen.PARAMETER_SLOT_BYTES`. */
-export const PARAMETER_SLOT_BYTES = 16;
-/** `codegen.RESERVED_PARAMETER_SLOTS`: the NaN slot and the cull margin. */
-export const RESERVED_PARAMETER_SLOTS = 2;
-/** `_culling.CULL_MARGIN`. */
-export const CULL_MARGIN = 1e-4;
+const { group: PARAMETER_GROUP, binding: PARAMETER_BINDING, addressSpace, slotBytes, reservedSlots, cullMargin } =
+  SHADER_PARAMETERS;
 
 export class UnsupportedNode extends Error {}
 
@@ -744,16 +736,16 @@ function uniformBlock(slots: Slot[]): string {
   const pad = (n: number) => String(n).padStart(6, " ");
   const lines = [`// ${slots.length} free parameters, one vec4<f32> slot each.`];
   slots.forEach(([name, components], index) => {
-    lines.push(`// ${pad(index * PARAMETER_SLOT_BYTES)}  ${components}f  free   ${name}`);
+    lines.push(`// ${pad(index * slotBytes)}  ${components}f  free   ${name}`);
   });
-  lines.push(`// ${pad(slots.length * PARAMETER_SLOT_BYTES)}  1f  reserved  NaN (unread)`);
-  lines.push(`// ${pad((slots.length + 1) * PARAMETER_SLOT_BYTES)}  1f  reserved  cull margin`);
+  lines.push(`// ${pad(slots.length * slotBytes)}  1f  reserved  NaN (unread)`);
+  lines.push(`// ${pad((slots.length + 1) * slotBytes)}  1f  reserved  cull margin`);
   lines.push("struct SdfParameters {");
-  lines.push(`    values: array<vec4<f32>, ${slots.length + RESERVED_PARAMETER_SLOTS}>,`);
+  lines.push(`    values: array<vec4<f32>, ${slots.length + reservedSlots}>,`);
   lines.push("};");
   lines.push(
-    `@group(${DEFAULT_PARAMETER_GROUP}) @binding(${DEFAULT_PARAMETER_BINDING}) ` +
-      `var<${PARAMETER_ADDRESS_SPACE}> sdf_parameters: SdfParameters;`,
+    `@group(${PARAMETER_GROUP}) @binding(${PARAMETER_BINDING}) ` +
+      `var<${addressSpace}> sdf_parameters: SdfParameters;`,
   );
   return lines.join("\n");
 }
@@ -779,7 +771,7 @@ export function compileGraphDirect(graph: SceneGraph, options: DirectOptions = {
   } else if (emitter.vertices.length) {
     sections.unshift(PROFILE_BUFFER);
   }
-  const margin = uniforms ? `sdf_parameters.values[${emitter.slots.length + 1}].x` : formatG9(CULL_MARGIN);
+  const margin = uniforms ? `sdf_parameters.values[${emitter.slots.length + 1}].x` : formatG9(cullMargin);
   return {
     wgsl: [...sections, entry].join("\n\n").replaceAll(MARGIN_TOKEN, margin),
     vertices: emitter.vertices,

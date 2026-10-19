@@ -4,8 +4,9 @@
 
 Add an optional progressive path-tracing mode to the browser playground while
 preserving the existing fast deterministic preview. Geometry and material
-selection use the same JAX → StableHLO → WGSL scene compiler; the renderer is a
-hand-written WGSL transport runtime around those generated functions.
+selection use the scene's generated WGSL (the direct emitter; StableHLO with
+`CADJOINT_SHADER_FORM=traced`); the renderer is a hand-written WGSL transport
+runtime around those generated functions.
 
 ## Primary references
 

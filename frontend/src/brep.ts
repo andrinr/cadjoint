@@ -29,6 +29,7 @@ import {
   hexToRgb,
   type Rgb,
 } from "./tokens";
+import { pointSegmentDistance } from "./viewer/hittest";
 import { projectPoint, type View } from "./viewer/math";
 
 export type BrepPayload = BRepInspectionPayload;
@@ -296,21 +297,6 @@ export function packBrepVertices(model: BrepModel, hover: BrepHover): Float32Arr
 /** Pixels within which a vertex or an edge wins over the face under it. */
 export const PICK_RADIUS = { vertex: 8, edge: 6 };
 
-function segmentDistance(
-  px: number,
-  py: number,
-  ax: number,
-  ay: number,
-  bx: number,
-  by: number,
-): number {
-  const dx = bx - ax;
-  const dy = by - ay;
-  const length = dx * dx + dy * dy;
-  const t = length < 1e-12 ? 0 : Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / length));
-  return Math.hypot(px - (ax + t * dx), py - (ay + t * dy));
-}
-
 /**
  * What is under pixel (x, y): a vertex, else an edge, else a face.
  *
@@ -358,7 +344,7 @@ export function pickBrep(
         current.visible &&
         Math.min(previous.viewDepth, current.viewDepth) <= limit
       ) {
-        const distance = segmentDistance(x, y, previous.x, previous.y, current.x, current.y);
+        const distance = pointSegmentDistance(x, y, previous.x, previous.y, current.x, current.y);
         if (distance <= PICK_RADIUS.edge && (!edge || distance < edge.distance)) {
           edge = { id: e.id, distance };
         }

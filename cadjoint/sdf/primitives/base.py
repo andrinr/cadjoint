@@ -14,7 +14,7 @@ def safe_norm(v: Array, axis: int = -1) -> Array:
     ``jnp.linalg.norm`` has a NaN gradient where its argument is zero, and a
     NaN gradient survives a ``max``/``where`` even when its branch is not
     selected, so one primitive evaluated at such a point poisons every
-    boolean around it (issue #57).  The double ``where`` keeps the values --
+    boolean around it.  The double ``where`` keeps the values --
     bit for bit under ``jit`` -- and makes the gradient there 0, a valid
     subgradient: the same guard ``Box.sdf`` and the polygon distance use.
     """
@@ -33,7 +33,6 @@ class Primitive(SDF):
     Subclasses must implement:
     - @staticmethod def sdf(p: Array, **params) -> Array
     - __call__(self, p: Array) -> Array
-    - to_functional(self) -> Callable
     """
 
     def children(self) -> list:

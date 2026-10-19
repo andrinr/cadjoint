@@ -58,20 +58,12 @@ export class ApiVersionMismatch extends Error {
   }
 }
 
-/**
- * Why this page cannot talk to a server reporting `serverVersion`, or null.
- *
- * A server older than the versioned contract reports nothing at all, which is
- * a mismatch too: every type this page was built with may be wrong for it.
- */
-export function apiVersionMismatch(serverVersion: unknown): string | null {
+/** Why this page cannot talk to a server reporting `serverVersion`, or null. */
+export function apiVersionMismatch(serverVersion: number): string | null {
   if (serverVersion === CLIENT_API_VERSION) return null;
-  const server =
-    typeof serverVersion === "number"
-      ? `the server speaks version ${serverVersion}`
-      : "the server does not report a version (it predates the versioned API)";
   return (
-    `This page was built for playground API version ${CLIENT_API_VERSION}, but ${server}. ` +
+    `This page was built for playground API version ${CLIENT_API_VERSION}, ` +
+    `but the server speaks version ${serverVersion}. ` +
     "The page and the server come from different cadjoint builds: restart the playground " +
     "(`cadjoint-playground` or `python -m cadjoint.viewer.playground`) from the install " +
     "that served this page, or rebuild the frontend (`npm run build` in frontend/) to " +
@@ -105,11 +97,6 @@ let markSessionReady: () => void = () => {};
 const sessionReady = new Promise<void>((resolve) => {
   markSessionReady = resolve;
 });
-
-/** Await the session token; every job endpoint below does. */
-export function whenSessionReady(): Promise<void> {
-  return sessionReady;
-}
 
 async function readJson<T>(response: Response): Promise<T> {
   const text = await response.text();
@@ -186,7 +173,7 @@ export async function patch(body: PatchRequest): Promise<PatchResponse> {
 /**
  * Extract the dual-contour mesh edges for the current program.
  *
- * Split out of `/compile` because it dominates the compile round-trip; the
+ * Split out of `/api/compile` because it dominates the compile round-trip; the
  * viewer only asks while a mesh overlay is actually displayed.
  */
 export async function mesh(
@@ -260,10 +247,10 @@ export async function meshInspect(
 /**
  * Run a declared optimization through the differentiable pipeline.
  *
- * The endpoint may stream chunked NDJSON — per-step `progress` lines, then
- * one `done` line carrying the classic response; `onProgress` fires per
- * step. A non-streaming server (or an error body) ships a single JSON
- * document, which the reader falls back to parsing whole. On success the
+ * The endpoint streams NDJSON — per-step `progress` lines, then one `done`
+ * line carrying the response; `onProgress` fires per step. A request the
+ * server refuses up front answers a single JSON document instead, which the
+ * reader parses whole when no `done` line arrived. On success the
  * response's `source` carries the optimized parameter literals written
  * back — the caller adopts it exactly like a patch response.
  */

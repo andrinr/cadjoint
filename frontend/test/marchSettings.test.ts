@@ -34,6 +34,7 @@ import {
   RENDER_PRESET_STORAGE_KEY,
   loadRenderPresetState,
 } from "../src/renderPresets";
+import { memoryStorage } from "./helpers";
 
 describe("the defaults reproduce the image the viewer has always drawn", () => {
   it("follows the quality tier's step budget", () => {
@@ -42,9 +43,8 @@ describe("the defaults reproduce the image the viewer has always drawn", () => {
   });
 
   it("gives every tier the same budget, because it costs the same on each", () => {
-    // Measured on end_cap at three resolutions: 64 against 384 is inside the
-    // noise at all of them, so a ladder here bought nothing and cost Draft a
-    // broken silhouette. What separates the tiers is the pixel budget.
+    // On end_cap, 64 against 384 is inside the noise at every resolution, so
+    // a ladder here buys nothing and costs Draft a broken silhouette. What separates the tiers is the pixel budget.
     for (const tier of Object.values(QUALITY_PRESETS)) {
       expect(tier.marchSteps).toBe(MARCH_STEPS_TIER);
     }
@@ -170,7 +170,7 @@ describe("the cull margin in the parameter buffer", () => {
 
   it("leaves a program without the slot alone", () => {
     // Absent and explicitly null both mean "no margin slot": a literal-form
-    // shader, or one built before the toggle existed. Writing on that basis
+    // shader, or one without the cull toggle. Writing on that basis
     // would land on a real parameter.
     const { cull_margin_offset: _absent, ...older } = program;
     expect(packParameters(older, undefined, CULL_MARGIN_OFF)[0]).toBeCloseTo(0.6, 6);
@@ -187,16 +187,6 @@ describe("the cull margin in the parameter buffer", () => {
 });
 
 describe("persisted presets", () => {
-  const storage = (value: string | null) => {
-    let held = value;
-    return {
-      getItem: () => held,
-      setItem: (_key: string, next: string) => {
-        held = next;
-      },
-    };
-  };
-
   it("discards an entry from before the march settings existed", () => {
     // v3 presets have no marchSteps/refineHit/cullBounds, so they validate as
     // incomplete and the shipped preset is used instead — a half-applied
@@ -205,14 +195,14 @@ describe("persisted presets", () => {
       activeId: "studio",
       presets: [{ id: "xray", pathTracing: false, quality: "ultra", display: {} }],
     });
-    const state = loadRenderPresetState(storage(stale));
+    const state = loadRenderPresetState(memoryStorage({ [RENDER_PRESET_STORAGE_KEY]: stale }));
     expect(state.presets[0].display.marchSteps).toBeNull();
     expect(state.presets[0].display.cullBounds).toBe(true);
     expect(state.presets[0].display.section).toBe(false);
   });
 
   it("round-trips a customised budget", () => {
-    const store = storage(null);
+    const store = memoryStorage();
     const saved = JSON.stringify({
       activeId: "xray",
       presets: DEFAULT_RENDER_PRESETS.map((preset) => ({

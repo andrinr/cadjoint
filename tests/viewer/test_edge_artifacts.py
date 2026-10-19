@@ -644,13 +644,7 @@ def _the_lattice_path():
     """
     from cadjoint import tier
 
-    real = tier.component
-
-    def public_only(kind, *, default=None):
-        return default if kind == PluginKind.FEATURE_EDGES.value else real(kind, default=default)
-
-    with pytest.MonkeyPatch.context() as patch:
-        patch.setattr(tier, "component", public_only)
+    with tier.absent([PluginKind.FEATURE_EDGES]):
         yield
 
 
@@ -777,7 +771,7 @@ def test_batched_seam_projection_matches_the_per_group_reference(name, monkeypat
     382 sharp segments, identical.  It is not run here because the starter
     costs minutes per extraction on a cold XLA cache.)
     """
-    from cadjoint.viewer import _edge_overlay
+    from cadjoint.viewer import _lattice_edges
 
     built = SEAM_CONFIGS[name]()
     scene = built[0] if isinstance(built, tuple) else built
@@ -787,7 +781,7 @@ def test_batched_seam_projection_matches_the_per_group_reference(name, monkeypat
     assert batched["sharp"], f"{name}: no sharp links at all"
 
     monkeypatch.setattr(
-        _edge_overlay, "_project_seam_groups", _edge_overlay._project_seam_groups_reference
+        _lattice_edges, "_project_seam_groups", _lattice_edges._project_seam_groups_reference
     )
     reference = _mesh_edge_payload(scene)
 
@@ -805,7 +799,8 @@ def test_leaf_ownership_ties_are_decided_by_geometry_not_noise():
     equidistant (mid-gap) by the lowest-numbered; a real difference still
     decides.
     """
-    from cadjoint.viewer._edge_overlay import _nearest_leaves, _overlay_grid
+    from cadjoint.viewer._edge_overlay import _overlay_grid
+    from cadjoint.viewer._lattice_edges import _nearest_leaves
 
     grid = _overlay_grid()
     columns = {
@@ -842,7 +837,7 @@ def _design_and_scenery():
 
 
 def test_the_design_subtree_is_the_construction_owned_leaves():
-    from cadjoint.viewer._edge_overlay import _design_leaves, _world_frame_leaves
+    from cadjoint.viewer._design_leaves import _design_leaves, _world_frame_leaves
 
     leaves = _world_frame_leaves(_design_and_scenery())
     assert len(leaves) == 2
@@ -851,7 +846,7 @@ def test_the_design_subtree_is_the_construction_owned_leaves():
 
 
 def test_a_scene_with_no_construction_mirror_falls_back_to_the_whole_scene():
-    from cadjoint.viewer._edge_overlay import _design_leaves, _world_frame_leaves
+    from cadjoint.viewer._design_leaves import _design_leaves, _world_frame_leaves
 
     scene, _curves = _staggered_slabs_config()
     leaves = _world_frame_leaves(scene)

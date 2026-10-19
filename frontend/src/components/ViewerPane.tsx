@@ -4,7 +4,7 @@
  * Pointer priority: a press that lands on a sketch handle starts an edit (drag
  * or select); anything else orbits the camera. In "add vertex" mode a click is
  * intersected with the sketch plane instead. Edits are applied to the Python
- * source through `/patch`, never to a private scene graph.
+ * source through `/api/patch`, never to a private scene graph.
  *
  * What stays here is the dispatch: which gesture a press begins, how a move
  * advances it, and what a release commits. Everything a gesture then *does*
@@ -490,7 +490,7 @@ export function ViewerPane(props: ViewerPaneProps) {
     // Selecting a sketch point auto-enters sketch mode, the dock rearranges
     // its panels for that mode, and the canvas holding the pointer capture is
     // re-parented mid-gesture — so the `pointerup` lands on a detached node
-    // and `finishGesture` never runs. Measured: a plain click on a handle
+    // and `finishGesture` never runs. A plain click on a handle then
     // delivers `pointerdown` and no `pointerup` at all, after which the
     // cursor stays `grabbing`, every further move keeps calling `setDrag`,
     // and the point follows the mouse untouched until the next press, which

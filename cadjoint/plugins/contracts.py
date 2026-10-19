@@ -494,12 +494,12 @@ class Drag(Protocol):
 
 
 #: kind -> (Protocol, the method a plugin's ``apply``/``as_jax`` bind to).
-KIND_CONTRACTS: dict[str, tuple[type, str]] = {
-    PluginKind.NODE_MAP.value: (NodeMap, "positions"),
-    PluginKind.FEATURE_EDGES.value: (FeatureEdges, "feature_edges"),
-    PluginKind.BREP.value: (BRepExtractor, "extract"),
-    PluginKind.STEP_EXPORT.value: (StepExporter, "step_export"),
-    PluginKind.DRAG.value: (Drag, "drag"),
+KIND_CONTRACTS: dict[PluginKind, tuple[type, str]] = {
+    PluginKind.NODE_MAP: (NodeMap, "positions"),
+    PluginKind.FEATURE_EDGES: (FeatureEdges, "feature_edges"),
+    PluginKind.BREP: (BRepExtractor, "extract"),
+    PluginKind.STEP_EXPORT: (StepExporter, "step_export"),
+    PluginKind.DRAG: (Drag, "drag"),
 }
 
 

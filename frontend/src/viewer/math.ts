@@ -83,17 +83,18 @@ export interface DepthRange {
  * is projected through it, and the half of the world on the camera's own side
  * of that plane is exactly as visible as the other half. Measuring the near
  * plane from the camera therefore throws that half away: at the default framing
- * everything more than 4.55 units in front of the target was clipped, and
- * zoomed in to `MIN_DISTANCE` the budget was 0.35 units — a third of the frame.
+ * everything more than 4.55 units in front of the target would be clipped, and
+ * zoomed in to `MIN_DISTANCE` the budget would be 0.35 units — a third of the
+ * frame.
  *
  * So the slab is hung about the *orbit target* instead, half a slab either
  * side, and its half-depth is `MAX_TRACE_DISTANCE`: the distance at which a
  * primary ray gives up, and hence the furthest anything the scene pass can draw
  * ever is from the camera plane, in either direction. Nothing that could be on
  * screen falls outside it. The slab is `2 × MAX_TRACE_DISTANCE = DEPTH_FAR`
- * deep — exactly the perspective range, so the depth buffer is no coarser than
- * it already was, and being linear in distance rather than in 1/distance it is
- * uniformly finer than the perspective one it replaces.
+ * deep — exactly the perspective range, so the depth buffer is no coarser, and
+ * being linear in distance rather than in 1/distance it is uniformly finer
+ * than the perspective one.
  *
  * `near` comes out negative for every reachable orbit distance, which is legal
  * and ordinary in a parallel projection: it is the statement that the camera
@@ -159,8 +160,7 @@ export function normalize(a: Vec3): Vec3 {
  *
  * The world is Z-up, because the library is: `SketchPlane`'s default normal is
  * +Z, so a sketch lies on the XY floor, and the starter's FEM boundary
- * conditions select its die side and fin field by `z`. The viewer used to
- * assume +Y and drew every part standing on its edge.
+ * conditions select its die side and fin field by `z`.
  *
  * Azimuth is measured about +Z from −Y, so yaw 0 / pitch 0 puts the camera at
  * −Y looking toward +Y — the Front view — and the preset angles keep the
@@ -253,8 +253,8 @@ export function projectPoint(world: Vec3, view: View): Projected {
   // Behind the camera plane is off screen only when there is a camera *point*
   // to be behind. A parallel projection has none: the pixel a point lands in
   // does not depend on its depth at all, so the sign of that depth cannot make
-  // it invisible, and rejecting it here is how hit testing stopped being able
-  // to click the near half of an orthographic scene.
+  // it invisible, and rejecting it here would make the near half of an
+  // orthographic scene unclickable.
   if (!isOrthographic(view) && viewDepth <= 1e-6) {
     return { x: NaN, y: NaN, viewDepth, visible: false };
   }

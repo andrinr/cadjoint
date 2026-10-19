@@ -11,14 +11,10 @@
 
 import type { ExportFormat, ExportRequest } from "./types";
 
-/**
- * The lattice budget, mirrored from `cadjoint/viewer/_limits.py`.
- *
- * The server refuses a request outside the bracket with a message the dialog
- * shows, so these only have to keep the control honest — a number box whose
- * range says the same thing the validator does.
- */
-export const EXPORT_RESOLUTION = { min: 8, max: 256, default: 64 } as const;
+import { EXPORT_RESOLUTION } from "../../cadjoint/viewer/schema/constants";
+
+/** The lattice budget the server enforces (generated from `cadjoint/viewer/_limits.py`). */
+export { EXPORT_RESOLUTION };
 
 /** What a format takes: an SDF variable of the program, or a declared study. */
 export type ExportTarget = "object" | "study";

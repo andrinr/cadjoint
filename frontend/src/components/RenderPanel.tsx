@@ -1,7 +1,6 @@
 /**
  * The full render settings, hosted in the eye-icon popover in the top bar
- * (usable from any editing mode; formerly a dock panel of the retired
- * Render mode).
+ * (usable from any editing mode).
  *
  * Mutually exclusive choices (shading, shadows, quality) are segmented
  * controls rather than checkboxes, so the current state reads at a glance and
@@ -15,7 +14,7 @@ import {
   type RenderPreset,
   type RenderPresetId,
 } from "../renderPresets";
-import type { DisplaySettings, SdfView, ShadowMode } from "../viewer/renderer";
+import type { DisplaySettings, SdfView, ShadowMode } from "../viewer/display";
 import {
   MARCH_STEPS_MAX,
   MARCH_STEPS_MIN,
@@ -24,7 +23,7 @@ import {
   effectiveMarchSteps,
   isSliceView,
   slicePosition,
-} from "../viewer/renderer";
+} from "../viewer/display";
 import { sdfRampCss } from "../viewer/sdfRamp";
 import { brepMessage, brepStatus } from "../state";
 import { MM_PER_UNIT, formatDistance } from "../viewer/graticule";
