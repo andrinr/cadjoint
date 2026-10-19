@@ -3227,9 +3227,9 @@ less one short fragment of the r ≈ 0.49 arc at z = 0.6 that `main` drew
 without its symmetric twins. Eager against compiled on the new code: Hermite
 `t` within 5e-7 and unit normals within 4e-4 on both scenes (before: 10
 edges at Δt = 1.0); the starter overlay is identical; on end_cap three wire
-vertices still move by up to 0.028 — inputs that agree to 5e-7, amplified
-downstream of `edge_hermite_data` (QEF and feature classification), which
-is the next fragility to chase.
+vertices still moved by up to 0.028 — inputs that agree to 5e-7, amplified
+downstream of `edge_hermite_data`; the last paragraph of this section has
+where, and the fix.
 
 Then the refinement runs as one program through `call_jit` (eagerly under an
 outer transformation), with the bracket ends and midpoint in one walk, the
@@ -3252,6 +3252,44 @@ flat there.
 
 The per-push suite (`-m "not slow" -n 4`, cache off) fails the same five
 tests as in §19.5 and nothing else (3 426 passed).
+
+**The end_cap residue was leaf ownership, not the QEF.** Staged eager
+against compiled: `sharp_qef_vertices` agrees to 1.3e-7 and
+`classify_feature_cells` exactly. The amplifier is the overlay's seam
+test, `argmin` of `|f|` over the world-frame leaves at each dual vertex.
+Vertices 954 and 955 sit midway in the 0.007 gap between the bearing race
+(a `RevolvedPolygon`, leaf 14) and the wall around it (leaf 8), both
+3.5e-3 away, and the argmin flipped on a 3e-8 difference. That moved
+three vertices between seam groups, and a vertex projected in another
+group lands elsewhere. A second, smaller instance was row 1074: it sat
+exactly on the race's boundary, where the polygon's sqrt guard returns a
+zero gradient. The seam projection's transversality test then refused it
+in one arm and not in the other, 2.5e-9 away.
+
+`_nearest_leaves` reads values within 1e-5 of a cell as equal and decides
+the tie by geometry. A vertex *on* its tied leaves (within 1e-3 of a
+cell: a crease) is owned by all of them, so its seam is theirs. A vertex
+merely equidistant from them is owned by the lowest-numbered one. Both
+halves were needed. Lowest-index alone broke starter crease vertices
+(|f| = 0 for two leaves), whose (1, 5) seam only existed because noise
+split them, and moved a vertex 0.18 onto a buried triple point. Owning
+every tied leaf, alone, put far leaves into end_cap's operand sets (a vertex 0.0225
+from two concentric leaves), and the projection there failed.
+
+Result: end_cap and starter overlays are identical eager against
+compiled, both layers. Against the previous commit, starter is the same
+picture (sharp identical as a set, 3 of 3 052 wire segments shifted by
+under 0.007, mean scene |f| over wire vertices 1.467e-3 → 1.466e-3).
+end_cap wire mean |f| is 6.26e-3 → 6.30e-3. Sharp goes 295 → 298: the
+race/bore seam at z = 0, r = 0.3 was three disjoint pieces, one a chord
+at r ≈ 0.39 off the curve. It is now one continuous arc on the circle
+over about half of it. In both, which instances of the 8-fold pattern
+draw that seam is decided by the sub-resolution gap, not by symmetry.
+Left alone: the transversality refusal on a zero polygon gradient. It no
+longer differs between the arms on either scene. Exempting such a member from the test
+(as padding is) projected two starter vertices onto a (0, 7) seam that
+lies 0.0096 off the surface, and it would part the batched projection
+from its per-group reference.
 
 ## 19.9 Reproducing
 

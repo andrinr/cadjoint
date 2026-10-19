@@ -795,6 +795,32 @@ def test_batched_seam_projection_matches_the_per_group_reference(name, monkeypat
     assert batched["sharp"] == reference["sharp"]
 
 
+def test_leaf_ownership_ties_are_decided_by_geometry_not_noise():
+    """Equal ``|f|`` must give the same owners however float noise tips it.
+
+    On end_cap the compiled and eager Hermite paths agree to 1e-7, yet a
+    plain ``argmin`` over two leaves exactly equidistant from a vertex
+    flipped between them and moved three seam vertices by 0.028.  A vertex
+    on its nearest leaves (a crease) is owned by all of them; one merely
+    equidistant (mid-gap) by the lowest-numbered; a real difference still
+    decides.
+    """
+    from cadjoint.viewer._edge_overlay import _nearest_leaves, _overlay_grid
+
+    grid = _overlay_grid()
+    columns = {
+        "crease": [1e-8, 0.0, 0.3],
+        "mid-gap": [0.0035, 0.0035, 0.3],
+        "distinct": [0.004, 0.0035, 0.3],
+    }
+    magnitudes = np.asarray(list(columns.values()), dtype=np.float64).T
+    expected = np.array([[True, True, False], [True, False, False], [False, True, False]]).T
+    for noise in (-3e-8, 0.0, 3e-8):
+        tipped = magnitudes.copy()
+        tipped[0] += noise
+        np.testing.assert_array_equal(_nearest_leaves(np.abs(tipped), grid), expected)
+
+
 # --------------------------------------------------------------------------
 # The design-subtree rule for the sharp layer
 # --------------------------------------------------------------------------

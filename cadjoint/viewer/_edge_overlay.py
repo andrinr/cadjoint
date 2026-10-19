@@ -318,6 +318,56 @@ def _project_seam_groups(
     return results
 
 
+#: Leaves whose ``|f|`` at a dual vertex is within this fraction of a cell
+#: of the smallest are all nearest to it (see :func:`_nearest_leaves`).
+#: Float32 leaf values carry ~1e-7 of noise; geometry that is only *nearly*
+#: symmetric differs by far more than 1e-5 cell.
+_OWNER_TIE = 1e-5
+
+#: A vertex within this fraction of a cell of its nearest leaves lies *on*
+#: them (see :func:`_nearest_leaves`).  Crease vertices sit at the QEF's
+#: float32 floor, ~1e-6 cell; vertices merely equidistant from two walls
+#: sit at half their gap, a few hundredths of a cell and up.
+_ON_SURFACE = 1e-3
+
+
+def _nearest_leaves(magnitudes: np.ndarray, grid: Any) -> np.ndarray:
+    """Which leaves own each dual vertex, with ties decided by geometry, not noise.
+
+    Ownership used to be one ``argmin``, and an argmin between equal values
+    is decided by float noise.  Geometry produces equal values all the
+    time: a crease vertex of ``min(a, b)`` lies on both operands at once,
+    a vertex in a gap below the grid's resolution sits midway between its
+    two walls, and coincident faces are equally far from both.  The seam
+    test compares owners across quad edges, so a flipped tie added or
+    removed a seam edge, changed which group its vertices were projected
+    in, and moved them by up to 0.028 between two evaluations of end_cap
+    whose Hermite data agree to 1e-7.
+
+    Values within :data:`_OWNER_TIE` of a cell are therefore read as
+    equal, and what a tie means depends on where it is.  A vertex *on* its
+    nearest leaves (within :data:`_ON_SURFACE` of a cell) belongs to all
+    of them: it sits on their crease, and its seam is theirs.  A vertex
+    merely equidistant from several belongs to the lowest-numbered one:
+    it is on none of them, and putting every one into its seam's operand
+    set asks the projection for a point on surfaces it is nowhere near.
+
+    Args:
+        magnitudes: ``|f|`` of every leaf at every vertex, ``(leaves, vertices)``.
+        grid: The extraction grid (its spacing scales the tolerance).
+
+    Returns:
+        A ``(leaves, vertices)`` mask of each vertex's owners; every column
+            holds at least one.
+    """
+    tolerance = _OWNER_TIE * float(max(grid.spacing))
+    nearest = magnitudes.min(axis=0, keepdims=True)
+    tied = magnitudes <= nearest + tolerance
+    on_surface = nearest <= _ON_SURFACE * float(max(grid.spacing))
+    lowest = np.arange(magnitudes.shape[0])[:, None] == np.argmax(tied, axis=0)[None, :]
+    return np.where(on_surface, tied, lowest)
+
+
 def _lattice_layers(scene: Any, grid: Any) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """The overlay's two layers read off the lattice — the public fallback.
 
@@ -459,7 +509,11 @@ def _lattice_layers(scene: Any, grid: Any) -> tuple[np.ndarray, np.ndarray, np.n
                 dtype=np.float64,
             )
         )
-        owners = np.argmin(magnitudes, axis=0)
+        nearest = _nearest_leaves(magnitudes, grid)
+        # One owner per vertex for the design filter and the geometric
+        # groups: the lowest-numbered of its owners, a choice that does not
+        # depend on noise.  The seam test below reads the whole set.
+        owners = np.argmax(nearest, axis=0)
         # The sharp layer is the DESIGN's feature curves: a dual vertex
         # belongs to the design when the operand owning it does (see
         # _design_leaves for the rule and why it needs no new flag).
@@ -473,7 +527,12 @@ def _lattice_layers(scene: Any, grid: Any) -> tuple[np.ndarray, np.ndarray, np.n
             designed = np.isin(owners, design)
             geometric_mask &= designed
             junctions &= designed
-        mismatched = quad_edge_list[owners[quad_edge_list[:, 0]] != owners[quad_edge_list[:, 1]]]
+        # A seam edge joins vertices with different owners; a vertex on a
+        # crease, owned by both leaves meeting there, differs from each
+        # side's.
+        mismatched = quad_edge_list[
+            np.any(nearest[:, quad_edge_list[:, 0]] != nearest[:, quad_edge_list[:, 1]], axis=0)
+        ]
         seam_rows = np.unique(mismatched)
         structural = np.zeros_like(geometric_mask)
         # Seam vertices are Newton-projected onto the exact common zero
@@ -497,8 +556,9 @@ def _lattice_layers(scene: Any, grid: Any) -> tuple[np.ndarray, np.ndarray, np.n
         if seam_rows.size:
             incident: dict[int, set[int]] = {}
             for u, v in mismatched:
+                meeting = np.flatnonzero(nearest[:, u] | nearest[:, v]).tolist()
                 for row in (int(u), int(v)):
-                    incident.setdefault(row, set()).update((int(owners[u]), int(owners[v])))
+                    incident.setdefault(row, set()).update(meeting)
             by_operands: dict[frozenset[int], list[int]] = {}
             for row, operand_set in incident.items():
                 by_operands.setdefault(frozenset(operand_set), []).append(row)
