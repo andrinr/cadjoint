@@ -197,6 +197,8 @@ export const [brepMessage, setBrepMessage] = createSignal<string | null>(null);
 export const [brepHover, setBrepHover] = createSignal<BrepHover>(null);
 export const [brepHiddenKinds, setBrepHiddenKinds] = createSignal<ReadonlySet<string>>(new Set());
 export const [brepOffSurfaceOnly, setBrepOffSurfaceOnly] = createSignal(false);
+/** Outline every triangle of the B-rep's tessellation under its edges. */
+export const [brepShowTriangles, setBrepShowTriangles] = createSignal(false);
 
 /**
  * The analytic face under the pointer while the face tool is armed.

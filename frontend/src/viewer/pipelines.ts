@@ -16,6 +16,7 @@
 
 import {
   EDGE_STRIDE,
+  BREP_FACE_STRIDE,
   FACE_STRIDE,
   GIZMO_STRIDE,
   HANDLE_STRIDE,
@@ -222,11 +223,12 @@ export function createOverlayPipelines(
       entryPoint: "vs_brep",
       buffers: [
         {
-          arrayStride: FACE_STRIDE,
+          arrayStride: BREP_FACE_STRIDE,
           stepMode: "vertex",
           attributes: [
             { shaderLocation: 0, offset: 0, format: "float32x3" },
             { shaderLocation: 1, offset: 12, format: "float32x4" },
+            { shaderLocation: 2, offset: 28, format: "float32x3" },
           ],
         },
       ],

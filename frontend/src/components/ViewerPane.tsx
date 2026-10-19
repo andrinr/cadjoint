@@ -54,6 +54,7 @@ import {
   brepHiddenKinds,
   brepHover,
   brepOffSurfaceOnly,
+  brepShowTriangles,
   brepPayload,
   setBrepHover,
 } from "../state";
@@ -797,6 +798,7 @@ export function ViewerPane(props: ViewerPaneProps) {
     const style = {
       hiddenKinds: brepHiddenKinds(),
       offSurfaceOnly: brepOffSurfaceOnly(),
+      showTriangles: brepShowTriangles(),
       hover: brepHover(),
     };
     renderer.setBrep({

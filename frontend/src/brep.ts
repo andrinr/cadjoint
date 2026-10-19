@@ -39,6 +39,8 @@ export interface BrepModel {
   positions: number[];
   triangles: number[];
   triangleFace: number[];
+  /** Flat x, y, z per triangle corner, or null to shade the facets flat. */
+  cornerNormals: number[] | null;
   faces: NonNullable<BRepInspectionPayload["faces"]>;
   edges: BRepEdgePayload[];
   vertices: BRepVertexPayload[];
@@ -56,6 +58,10 @@ export function brepModel(payload: BrepPayload | null | undefined): BrepModel | 
     positions,
     triangles,
     triangleFace: triangle_face,
+    cornerNormals:
+      payload.corner_normals && payload.corner_normals.length === triangles.length * 3
+        ? payload.corner_normals
+        : null,
     faces,
     edges,
     vertices,
@@ -179,6 +185,8 @@ export interface BrepStyle {
   hiddenKinds: ReadonlySet<string>;
   /** Draw the off-surface edges at full strength and dim the rest. */
   offSurfaceOnly: boolean;
+  /** Outline every triangle of the tessellation, faint, under the edges. */
+  showTriangles?: boolean;
   hover: BrepHover;
 }
 
@@ -186,6 +194,36 @@ export interface BrepStyle {
 const HOVER_LIFT = 0.45;
 /** Edges that are not the point of the off-surface view, at this alpha. */
 const DIMMED_ALPHA = 0.18;
+/** The tessellation's own triangle outlines, at this alpha of the ink. */
+const TRIANGLE_ALPHA = 0.3;
+
+/**
+ * Every distinct edge of the tessellation's triangles, as segment
+ * instances (`EDGE_STRIDE`): the polygons the extraction actually produced,
+ * shown on demand so a face's triangulation can be judged.
+ */
+export function packBrepTriangleOutlines(model: BrepModel): number[] {
+  const ink = hexToRgb(CHROME.ink);
+  const seen = new Set<number>();
+  const count = model.positions.length / 3;
+  const out: number[] = [];
+  for (let t = 0; t < model.triangles.length; t += 3) {
+    for (let k = 0; k < 3; k++) {
+      const a = model.triangles[t + k];
+      const b = model.triangles[t + ((k + 1) % 3)];
+      if (a === b) continue;
+      const key = Math.min(a, b) * count + Math.max(a, b);
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push(
+        model.positions[a * 3], model.positions[a * 3 + 1], model.positions[a * 3 + 2],
+        model.positions[b * 3], model.positions[b * 3 + 1], model.positions[b * 3 + 2],
+        ink[0], ink[1], ink[2], TRIANGLE_ALPHA,
+      );
+    }
+  }
+  return out;
+}
 
 const lift = (rgb: Rgb, amount: number): Rgb => [
   rgb[0] + (1 - rgb[0]) * amount,
@@ -194,9 +232,11 @@ const lift = (rgb: Rgb, amount: number): Rgb => [
 ];
 
 /**
- * Triangle-list vertices for the face pass: position + rgba, 7 floats each
- * (`FACE_STRIDE`). Faces do not share vertices — a corner of two faces is
- * two vertices in two colours.
+ * Triangle-list vertices for the face pass: position + rgba + normal, 10
+ * floats each (`BREP_FACE_STRIDE`). Faces do not share vertices — a corner
+ * of two faces is two vertices in two colours, each with its own face's
+ * normal. Without corner normals the normal is zero and the shader shades
+ * the facet flat.
  */
 export function packBrepFaces(
   model: BrepModel,
@@ -204,7 +244,8 @@ export function packBrepFaces(
   hover: BrepHover,
 ): Float32Array {
   const count = model.triangleFace.length;
-  const out = new Float32Array(count * 3 * 7);
+  const out = new Float32Array(count * 3 * 10);
+  const normals = model.cornerNormals;
   const hoveredFace = hover?.kind === "face" ? hover.id : null;
   let cursor = 0;
   for (let t = 0; t < count; t++) {
@@ -220,6 +261,10 @@ export function packBrepFaces(
       out[cursor++] = rgb[1];
       out[cursor++] = rgb[2];
       out[cursor++] = 1;
+      const n = (t * 3 + k) * 3;
+      out[cursor++] = normals ? normals[n] : 0;
+      out[cursor++] = normals ? normals[n + 1] : 0;
+      out[cursor++] = normals ? normals[n + 2] : 0;
     }
   }
   return out;
@@ -248,7 +293,8 @@ export function edgeRgba(
  * so it lands on top of whatever crosses it.
  */
 export function packBrepEdges(model: BrepModel, style: BrepStyle): Float32Array {
-  const segments: number[] = [];
+  // The triangle outlines go first, so every graph edge is drawn over them.
+  const segments: number[] = style.showTriangles ? packBrepTriangleOutlines(model) : [];
   const push = (edge: BRepEdgePayload, rgba: readonly number[]) => {
     const points = edge.points;
     const n = Math.floor(points.length / 3);

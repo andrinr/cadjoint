@@ -411,29 +411,39 @@ fn fs_face(input: FaceVertex) -> @location(0) vec4<f32> {
 // facet, one categorical colour per face. Opaque and depth-writing, with no
 // camera nudge — it is the surface, not something drawn on one — so the
 // B-rep's edges and vertices that follow land on it like overlays on the
-// solid. Flat-shaded from screen-space derivatives, the simulation surface's
-// trick: the facets are the finding, so they should show.
+// solid. Shaded with the surface's own normal at every triangle corner when
+// the private tier supplies one, so a smooth blend shades smooth and a
+// crease stays sharp (each face carries its own normal there); without one,
+// flat from screen-space derivatives, the simulation surface's trick.
 
 struct BrepVertex {
   @builtin(position) position : vec4<f32>,
   @location(0)       color    : vec4<f32>,
   @location(1)       world    : vec3<f32>,
+  @location(2)       normal   : vec3<f32>,
 };
 
 @vertex
-fn vs_brep(@location(0) point: vec3<f32>, @location(1) color: vec4<f32>) -> BrepVertex {
+fn vs_brep(
+  @location(0) point: vec3<f32>,
+  @location(1) color: vec4<f32>,
+  @location(2) normal: vec3<f32>,
+) -> BrepVertex {
   var out: BrepVertex;
   var clip = o.view_proj * vec4<f32>(point, 1.0);
   clip.w = max(clip.w, 1e-4);
   out.position = clip;
   out.color = color;
   out.world = point;
+  out.normal = normal;
   return out;
 }
 
 @fragment
 fn fs_brep(input: BrepVertex) -> @location(0) vec4<f32> {
-  let normal = normalize(cross(dpdx(input.world), dpdy(input.world)));
+  let facet = normalize(cross(dpdx(input.world), dpdy(input.world)));
+  // A zero normal means none was supplied: fall back to the facet's.
+  let normal = select(facet, normalize(input.normal), dot(input.normal, input.normal) > 0.25);
   let eye = normalize(o.camera_pos.xyz - input.world);
   // Facing ratio, sign-free: a triangle wound either way shades the same,
   // so a face the tessellation turned inside out is still readable.

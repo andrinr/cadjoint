@@ -7,6 +7,7 @@ import {
   edgeTone,
   packBrepEdges,
   packBrepFaces,
+  packBrepTriangleOutlines,
   packBrepVertices,
   pickBrep,
   pickFace,
@@ -170,12 +171,44 @@ describe("packing", () => {
     const m = model();
     const colours = colourFaces(m);
     const faces = packBrepFaces(m, colours, null);
-    expect(faces.length).toBe(6 * 3 * 7);
-    const rgbOf = (triangle: number) => Array.from(faces.slice(triangle * 21 + 3, triangle * 21 + 6));
+    expect(faces.length).toBe(6 * 3 * 10);
+    const rgbOf = (triangle: number) => Array.from(faces.slice(triangle * 30 + 3, triangle * 30 + 6));
     expect(rgbOf(0)).toEqual(rgbOf(1));
     expect(rgbOf(0)).not.toEqual(rgbOf(2));
     const hovered = packBrepFaces(m, colours, { kind: "face", id: 0 });
     expect(hovered[3]).toBeGreaterThan(faces[3] - 1e-9);
+  });
+
+  it("carries each corner's normal, or zeros so the facet is shaded flat", () => {
+    const flat = packBrepFaces(model(), new Map(), null);
+    expect(Array.from(flat.slice(7, 10))).toEqual([0, 0, 0]);
+    const triangles = payload().triangles!.length;
+    const normals = Array.from({ length: triangles * 3 }, (_, i) => (i % 3 === 2 ? 1 : 0));
+    const smooth = brepModel({ ...payload(), corner_normals: normals })!;
+    expect(smooth.cornerNormals).toHaveLength(triangles * 3);
+    const packed = packBrepFaces(smooth, new Map(), null);
+    expect(Array.from(packed.slice(7, 10))).toEqual([0, 0, 1]);
+    // A normal list of the wrong length is not trusted.
+    expect(brepModel({ ...payload(), corner_normals: [0, 0, 1] })!.cornerNormals).toBeNull();
+  });
+
+  it("outlines each distinct triangle edge once, under the graph's edges", () => {
+    const m = model();
+    const triangles = m.triangles;
+    const keys = new Set<string>();
+    for (let t = 0; t < triangles.length; t += 3) {
+      for (let k = 0; k < 3; k++) {
+        const a = triangles[t + k];
+        const b = triangles[t + ((k + 1) % 3)];
+        if (a !== b) keys.add(`${Math.min(a, b)}-${Math.max(a, b)}`);
+      }
+    }
+    expect(packBrepTriangleOutlines(m).length).toBe(keys.size * 10);
+    const plain = packBrepEdges(m, style());
+    const outlined = packBrepEdges(m, style({ showTriangles: true }));
+    expect(outlined.length).toBe(plain.length + keys.size * 10);
+    // The graph's edges come last, so they draw over the outlines.
+    expect(Array.from(outlined.slice(-plain.length))).toEqual(Array.from(plain));
   });
 
   it("strokes each polyline as segments, and the hovered edge once more on top", () => {

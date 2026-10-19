@@ -5,7 +5,7 @@
  */
 
 import { GrowableVertexBuffer } from "./gpuBuffers";
-import { EDGE_STRIDE, FACE_STRIDE, HANDLE_STRIDE } from "./overlayGeometry";
+import { BREP_FACE_STRIDE, EDGE_STRIDE, HANDLE_STRIDE } from "./overlayGeometry";
 import type { OverlayPipelines } from "./pipelines";
 
 /** The packed arrays the inspector hands the renderer. */
@@ -17,7 +17,7 @@ export interface BrepGeometry {
 
 export class BrepLayer {
   private pipelines: OverlayPipelines | null = null;
-  private faces = new GrowableVertexBuffer("B-rep faces", FACE_STRIDE);
+  private faces = new GrowableVertexBuffer("B-rep faces", BREP_FACE_STRIDE);
   private edges = new GrowableVertexBuffer("B-rep edges", EDGE_STRIDE);
   private vertices = new GrowableVertexBuffer("B-rep vertices", HANDLE_STRIDE);
 

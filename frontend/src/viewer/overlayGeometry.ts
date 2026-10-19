@@ -39,6 +39,8 @@ export const HANDLE_STRIDE = 36;
 export const GIZMO_STRIDE = 44;
 /** Bytes per *vertex* of the face highlight: position + rgba. */
 export const FACE_STRIDE = 28;
+/** Bytes per *vertex* of the B-rep inspector's faces: position + rgba + normal. */
+export const BREP_FACE_STRIDE = 40;
 
 export type Rgba = readonly [number, number, number, number];
 

@@ -713,6 +713,11 @@ class BRepInspectionPayload(Strict):
     positions: list[float] | None = None
     triangles: list[int] | None = None
     triangle_face: list[int] | None = None
+    # The exact surface normal at every triangle corner, flat ``x, y, z``
+    # per corner in triangle order, when the private tier supplies them: the
+    # viewer shades with these rather than with the facets, so a smooth blend
+    # does not read as ripples.  Absent, the faces are shaded flat.
+    corner_normals: list[float] | None = None
     faces: list[BRepFacePayload] | None = None
     edges: list[BRepEdgePayload] | None = None
     vertices: list[BRepVertexPayload] | None = None

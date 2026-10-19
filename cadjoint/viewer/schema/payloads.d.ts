@@ -559,6 +559,7 @@ export interface BRepInspectionPayload {
   positions?: number[] | null;
   triangles?: number[] | null;
   triangle_face?: number[] | null;
+  corner_normals?: number[] | null;
   faces?: BRepFacePayload[] | null;
   edges?: BRepEdgePayload[] | null;
   vertices?: BRepVertexPayload[] | null;
