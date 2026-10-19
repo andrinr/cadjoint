@@ -1,5 +1,6 @@
 /** Editable, browser-local render presets for the viewer settings panel. */
 
+import { browserStorage, type KeyValueStorage } from "./storage";
 import {
   DEFAULT_DISPLAY,
   DEFAULT_QUALITY,
@@ -21,11 +22,6 @@ export interface RenderPreset {
 export interface RenderPresetState {
   presets: RenderPreset[];
   activeId: RenderPresetId;
-}
-
-interface PresetStorage {
-  getItem(key: string): string | null;
-  setItem(key: string, value: string): void;
 }
 
 /**
@@ -140,13 +136,9 @@ function isDisplaySettings(value: unknown): value is DisplaySettings {
   );
 }
 
-function browserStorage(): PresetStorage | undefined {
-  return typeof window === "undefined" ? undefined : window.localStorage;
-}
-
 /** Load only complete, valid settings; stale or damaged entries fall back safely. */
 export function loadRenderPresetState(
-  storage: PresetStorage | undefined = browserStorage(),
+  storage: KeyValueStorage | null = browserStorage(),
 ): RenderPresetState {
   const fallback = { presets: defaultRenderPresets(), activeId: "xray" as const };
   if (!storage) return fallback;
@@ -202,7 +194,7 @@ export function loadRenderPresetState(
 
 export function persistRenderPresetState(
   state: RenderPresetState,
-  storage: PresetStorage | undefined = browserStorage(),
+  storage: KeyValueStorage | null = browserStorage(),
 ): void {
   if (!storage) return;
   try {

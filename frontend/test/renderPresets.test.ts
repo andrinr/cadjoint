@@ -5,17 +5,7 @@ import {
   persistRenderPresetState,
   renderPresetMatches,
 } from "../src/renderPresets";
-
-function memoryStorage(initial: string | null = null) {
-  let value = initial;
-  return {
-    getItem: () => value,
-    setItem: (_key: string, next: string) => {
-      value = next;
-    },
-    value: () => value,
-  };
-}
+import { memoryStorage } from "./helpers";
 
 describe("render presets", () => {
   it("ships three distinct presets with X-Ray as the default", () => {
@@ -49,7 +39,7 @@ describe("render presets", () => {
     );
     const loaded = loadRenderPresetState(storage);
 
-    expect(storage.value()).toContain("studio");
+    expect([...storage.data.values()].join()).toContain("studio");
     expect(loaded.activeId).toBe("studio");
     expect(loaded.presets[1].display.shadows).toBe("off");
     expect(loaded.presets[1].quality).toBe("draft");

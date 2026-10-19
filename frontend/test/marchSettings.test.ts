@@ -34,6 +34,7 @@ import {
   RENDER_PRESET_STORAGE_KEY,
   loadRenderPresetState,
 } from "../src/renderPresets";
+import { memoryStorage } from "./helpers";
 
 describe("the defaults reproduce the image the viewer has always drawn", () => {
   it("follows the quality tier's step budget", () => {
@@ -187,16 +188,6 @@ describe("the cull margin in the parameter buffer", () => {
 });
 
 describe("persisted presets", () => {
-  const storage = (value: string | null) => {
-    let held = value;
-    return {
-      getItem: () => held,
-      setItem: (_key: string, next: string) => {
-        held = next;
-      },
-    };
-  };
-
   it("discards an entry from before the march settings existed", () => {
     // v3 presets have no marchSteps/refineHit/cullBounds, so they validate as
     // incomplete and the shipped preset is used instead — a half-applied
@@ -205,14 +196,14 @@ describe("persisted presets", () => {
       activeId: "studio",
       presets: [{ id: "xray", pathTracing: false, quality: "ultra", display: {} }],
     });
-    const state = loadRenderPresetState(storage(stale));
+    const state = loadRenderPresetState(memoryStorage({ [RENDER_PRESET_STORAGE_KEY]: stale }));
     expect(state.presets[0].display.marchSteps).toBeNull();
     expect(state.presets[0].display.cullBounds).toBe(true);
     expect(state.presets[0].display.section).toBe(false);
   });
 
   it("round-trips a customised budget", () => {
-    const store = storage(null);
+    const store = memoryStorage();
     const saved = JSON.stringify({
       activeId: "xray",
       presets: DEFAULT_RENDER_PRESETS.map((preset) => ({

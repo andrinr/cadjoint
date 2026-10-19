@@ -15,7 +15,12 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { DEFAULT_DISPLAY, DEFAULT_QUALITY, QUALITY_PRESETS } from "../src/viewer/display";
-import { DEFAULT_RENDER_PRESETS, loadRenderPresetState } from "../src/renderPresets";
+import {
+  DEFAULT_RENDER_PRESETS,
+  RENDER_PRESET_STORAGE_KEY,
+  loadRenderPresetState,
+} from "../src/renderPresets";
+import { memoryStorage } from "./helpers";
 
 const VIEWER = join(
   dirname(fileURLToPath(import.meta.url)),
@@ -35,11 +40,13 @@ describe("the default quality tier", () => {
   });
 
   it("is what a missing or damaged persisted setting falls back to", () => {
-    const empty = { getItem: () => null, setItem: () => {} };
+    const empty = memoryStorage();
     for (const preset of loadRenderPresetState(empty).presets) {
       expect(preset.quality, preset.id).toBe(DEFAULT_QUALITY);
     }
-    const damaged = { getItem: () => "{\"presets\":[{\"id\":\"xray\"}]}", setItem: () => {} };
+    const damaged = memoryStorage({
+      [RENDER_PRESET_STORAGE_KEY]: "{\"presets\":[{\"id\":\"xray\"}]}",
+    });
     for (const preset of loadRenderPresetState(damaged).presets) {
       expect(preset.quality, preset.id).toBe(DEFAULT_QUALITY);
     }
@@ -103,18 +110,12 @@ describe("the distance-field settings", () => {
   });
 
   it("survives a round trip through the preset store", () => {
-    let written = "";
-    const storage = {
-      getItem: () => written,
-      setItem: (_key: string, value: string) => {
-        written = value;
-      },
-    };
+    const storage = memoryStorage();
     const state = loadRenderPresetState(storage);
     state.presets[0].display.sdfView = "gradient";
     state.presets[0].display.isoOffset = 0.125;
     storage.setItem(
-      "",
+      RENDER_PRESET_STORAGE_KEY,
       JSON.stringify({ activeId: "xray", presets: state.presets }),
     );
     const back = loadRenderPresetState(storage);

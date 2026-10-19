@@ -54,16 +54,14 @@ import {
   FACETS,
   TRIAD,
   cameraBasisFor,
-  dot,
   facetVisible,
   frontFacet,
   project,
   type Basis,
   type Facet,
-  type Vec3,
 } from "../viewer/navCube";
 import { VIEW_PRESETS, sameView } from "../viewer/display";
-import type { Projection } from "../viewer/math";
+import { dot, type Projection, type Vec3 } from "../viewer/math";
 import { VIEW_KEYS, typingTarget } from "../shortcuts";
 import { PITCH_LIMIT } from "./viewer/camera";
 import { OrthographicIcon, SkeletonIcon, PerspectiveIcon } from "./icons";

@@ -34,6 +34,7 @@ import {
   type JobRef,
   type JobSummary,
 } from "../src/jobs";
+import { failingStorage, memoryStorage } from "./helpers";
 
 const REF: JobRef = {
   job_id: "job-000007",
@@ -101,13 +102,7 @@ describe("the stored record", () => {
   });
 
   it("round-trips through storage", () => {
-    const store: Record<string, string> = {};
-    const storage = {
-      getItem: (key: string) => store[key] ?? null,
-      setItem: (key: string, value: string) => {
-        store[key] = value;
-      },
-    };
+    const storage = memoryStorage();
     writeJobRefs(storage, rememberJobRef(emptyJobRefs(), "part.py", REF));
     expect(jobRefFor(readJobRefs(storage), "part.py", "simulate")).toEqual(REF);
   });
@@ -166,17 +161,10 @@ describe("the stored record", () => {
   });
 
   it("survives storage that refuses to answer", () => {
-    const broken = {
-      getItem: () => {
-        throw new Error("private mode");
-      },
-      setItem: () => {
-        throw new Error("quota");
-      },
-    };
+    const broken = failingStorage();
     expect(readJobRefs(broken)).toEqual(emptyJobRefs());
     expect(() => writeJobRefs(broken, emptyJobRefs())).not.toThrow();
-    expect(readJobRefs(undefined)).toEqual(emptyJobRefs());
+    expect(readJobRefs(null)).toEqual(emptyJobRefs());
   });
 });
 

@@ -423,6 +423,17 @@ export function hexToRgb(hex: string): Rgb {
   ) as unknown as Rgb;
 }
 
+/** A normalized triple as a `#rrggbb` string, channels clamped to 0…1. */
+export function rgbToHex(rgb: readonly number[]): string {
+  return `#${rgb
+    .map((channel) =>
+      Math.round(Math.min(1, Math.max(0, channel)) * 255)
+        .toString(16)
+        .padStart(2, "0"),
+    )
+    .join("")}`;
+}
+
 /** WCAG contrast between two chrome tokens. */
 export const chromeContrast = (a: ChromeToken, b: ChromeToken): number =>
   contrastRatio(hexToRgb(CHROME[a]), hexToRgb(CHROME[b]));

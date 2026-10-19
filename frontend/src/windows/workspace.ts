@@ -14,6 +14,7 @@
  */
 
 import { EDITING_MODES, type EditingMode } from "../editingMode";
+import type { KeyValueStorage } from "../storage";
 import { isWindowId, WINDOW_IDS, type WindowId } from "./panels";
 import {
   defaultModeWindows,
@@ -129,14 +130,7 @@ export function normaliseWorkspace(workspace: Workspace): Workspace {
   return parseWorkspace(serializeWorkspace(workspace));
 }
 
-/** The minimal storage surface, so tests can pass a plain object. */
-export interface WorkspaceStorage {
-  getItem(key: string): string | null;
-  setItem(key: string, value: string): void;
-  removeItem(key: string): void;
-}
-
-export function readWorkspace(storage: WorkspaceStorage | undefined): Workspace {
+export function readWorkspace(storage: KeyValueStorage | null): Workspace {
   if (!storage) return emptyWorkspace();
   try {
     return parseWorkspace(storage.getItem(WORKSPACE_STORAGE_KEY));
@@ -147,7 +141,7 @@ export function readWorkspace(storage: WorkspaceStorage | undefined): Workspace 
 }
 
 export function writeWorkspace(
-  storage: WorkspaceStorage | undefined,
+  storage: KeyValueStorage | null,
   workspace: Workspace,
 ): void {
   if (!storage) return;
@@ -158,7 +152,7 @@ export function writeWorkspace(
   }
 }
 
-export function clearWorkspace(storage: WorkspaceStorage | undefined): void {
+export function clearWorkspace(storage: KeyValueStorage | null): void {
   if (!storage) return;
   try {
     storage.removeItem(WORKSPACE_STORAGE_KEY);

@@ -37,6 +37,7 @@ import { NumberInput } from "./ui";
 import { physicalRows, type PhysicalRow } from "../materialProperties";
 import type { MaterialDefinition, SetMaterialPropertyRequest } from "../types";
 import { materialPreviewUrl } from "./materialPreview";
+import { hexToRgb, rgbToHex } from "../tokens";
 
 export const MATERIAL_DRAG_TYPE = "application/x-cadjoint-material";
 
@@ -86,28 +87,6 @@ const SEED_VALUE: Record<string, number> = {
   thermal_expansion: 1e-5,
   yield_strength: 1e8,
 };
-
-function colorHex(color: readonly number[]): string {
-  return (
-    "#" +
-    color
-      .map((value) =>
-        Math.round(Math.max(0, Math.min(1, value)) * 255)
-          .toString(16)
-          .padStart(2, "0"),
-      )
-      .join("")
-  );
-}
-
-function colorRgb(hex: string): [number, number, number] {
-  const value = hex.replace("#", "");
-  return [0, 2, 4].map((offset) => Number.parseInt(value.slice(offset, offset + 2), 16) / 255) as [
-    number,
-    number,
-    number,
-  ];
-}
 
 export function MaterialPanel(props: MaterialPanelProps) {
   const [activeId, setActiveId] = createSignal<string | null>(null);
@@ -265,13 +244,13 @@ export function MaterialPanel(props: MaterialPanelProps) {
                   <span>Color</span>
                   <input
                     type="color"
-                    value={colorHex(material().color)}
+                    value={rgbToHex(material().color)}
                     disabled={busy() || !material().editable}
                     onChange={(event) =>
                       void props.onSetValue(
                         material().line,
                         "color",
-                        colorRgb(event.currentTarget.value),
+                        [...hexToRgb(event.currentTarget.value)],
                       )
                     }
                     data-testid="material-color"

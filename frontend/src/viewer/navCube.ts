@@ -27,6 +27,7 @@
  */
 
 import { VIEW_PRESETS, viewPresetName } from "./display";
+import { add, cross, dot, scale, type Vec3 } from "./math";
 
 /**
  * How much of each half-edge the chamfer cuts away.
@@ -42,8 +43,6 @@ export const CHAMFER = 0.22;
 const OUTER = 1;
 /** How far a facet's own corners sit from the axis it is cut back along. */
 const INNER = 1 - 2 * CHAMFER;
-
-export type Vec3 = readonly [number, number, number];
 
 /** Face, bevel, or corner — how many axes the direction commits to. */
 export type FacetRank = "face" | "edge" | "corner";
@@ -86,15 +85,12 @@ const FACE_LABELS: Record<string, string> = {
   bottom: "BOTTOM",
 };
 
-const scale = (v: Vec3, k: number): Vec3 => [v[0] * k, v[1] * k, v[2] * k];
-const add = (a: Vec3, b: Vec3): Vec3 => [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
-export const dot = (a: Vec3, b: Vec3): number => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
-export const cross = (a: Vec3, b: Vec3): Vec3 => [
-  a[1] * b[2] - a[2] * b[1],
-  a[2] * b[0] - a[0] * b[2],
-  a[0] * b[1] - a[1] * b[0],
-];
-export const normalize = (v: Vec3): Vec3 => {
+/**
+ * Unit vector by `Math.hypot` and a reciprocal scale; the zero vector maps to
+ * itself. Not `math.ts`'s `normalize`, which divides by a dot-product root:
+ * the cube's facet geometry is built with this one.
+ */
+const normalize = (v: Vec3): Vec3 => {
   const length = Math.hypot(v[0], v[1], v[2]) || 1;
   return scale(v, 1 / length);
 };

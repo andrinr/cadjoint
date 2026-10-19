@@ -66,8 +66,8 @@ export const qualityRamp = (t: number): [number, number, number] =>
 export const cssColor = (rgb: Rgb): string =>
   `rgb(${rgb.map((channel) => Math.round(Math.min(1, Math.max(0, channel)) * 255)).join(", ")})`;
 
-/** CSS linear-gradient sampling one of the ramps, for legends. */
-function rampGradient(ramp: (t: number) => [number, number, number], stops = 12): string {
+/** CSS linear-gradient sampling a ramp over t ∈ [0, 1], for legends. */
+export function rampGradient(ramp: (t: number) => [number, number, number], stops = 12): string {
   const colors: string[] = [];
   for (let index = 0; index <= stops; index++) {
     colors.push(cssColor(ramp(index / stops)));

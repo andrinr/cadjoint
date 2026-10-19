@@ -25,6 +25,7 @@
 
 import { createSignal } from "solid-js";
 import * as api from "./api";
+import { browserStorage, type KeyValueStorage } from "./storage";
 import type { JobProgress, JobsSnapshot, JobSummary } from "./types";
 
 export type {
@@ -164,13 +165,7 @@ export function jobRefFor(refs: JobRefs, scene: string, kind: JobKind): JobRef |
   return refs.scenes[scene]?.[kind] ?? null;
 }
 
-/** The minimal storage surface, so tests can pass a plain object. */
-export interface RefStorage {
-  getItem(key: string): string | null;
-  setItem(key: string, value: string): void;
-}
-
-export function readJobRefs(storage: RefStorage | undefined): JobRefs {
+export function readJobRefs(storage: KeyValueStorage | null): JobRefs {
   if (!storage) return emptyJobRefs();
   try {
     return parseJobRefs(storage.getItem(JOB_REFS_STORAGE_KEY));
@@ -179,7 +174,7 @@ export function readJobRefs(storage: RefStorage | undefined): JobRefs {
   }
 }
 
-export function writeJobRefs(storage: RefStorage | undefined, refs: JobRefs): void {
+export function writeJobRefs(storage: KeyValueStorage | null, refs: JobRefs): void {
   if (!storage) return;
   try {
     storage.setItem(JOB_REFS_STORAGE_KEY, JSON.stringify(refs));
@@ -188,26 +183,21 @@ export function writeJobRefs(storage: RefStorage | undefined, refs: JobRefs): vo
   }
 }
 
-/** The browser's storage, or nothing when it is unavailable (private mode). */
-export function refStorage(): RefStorage | undefined {
-  return typeof localStorage === "undefined" ? undefined : localStorage;
-}
-
 /** Store one job reference for a scene, in one call. */
 export function saveJobRef(scene: string, ref: JobRef): void {
-  const storage = refStorage();
+  const storage = browserStorage();
   writeJobRefs(storage, rememberJobRef(readJobRefs(storage), scene, ref));
 }
 
 /** Drop one job reference for a scene, in one call. */
 export function dropJobRef(scene: string, kind: JobKind): void {
-  const storage = refStorage();
+  const storage = browserStorage();
   writeJobRefs(storage, forgetJobRef(readJobRefs(storage), scene, kind));
 }
 
 /** Read one job reference for a scene, in one call. */
 export function loadJobRef(scene: string, kind: JobKind): JobRef | null {
-  return jobRefFor(readJobRefs(refStorage()), scene, kind);
+  return jobRefFor(readJobRefs(browserStorage()), scene, kind);
 }
 
 // ── matching a job to the document ─────────────────────────────────────────

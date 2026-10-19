@@ -23,6 +23,7 @@ import { createEffect, createSignal, For, on, onCleanup, onMount, Show } from "s
 import type { JSX } from "solid-js";
 import type { EditingMode } from "../editingMode";
 import { editingMode } from "../state";
+import { browserStorage } from "../storage";
 import { ProcessesPanel } from "../components/ProcessesPanel";
 import { createDock, type Dock } from "./dock";
 import { publishWindowManager, type WindowManager } from "./manager";
@@ -62,7 +63,7 @@ export function WindowLayout(props: WindowLayoutProps) {
   /** Guards the reconciliation that runs while we are rebuilding the dock. */
   let rebuilding = false;
 
-  const storage = typeof localStorage === "undefined" ? undefined : localStorage;
+  const storage = browserStorage();
   let workspace: Workspace = readWorkspace(storage);
 
   const [states, setStates] = createSignal<WindowStates>(workspace.windows);

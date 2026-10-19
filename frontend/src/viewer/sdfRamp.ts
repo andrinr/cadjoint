@@ -39,6 +39,7 @@
  * file and holds the two copies to the same numbers.
  */
 
+import { rampGradient } from "../simColors";
 import { SDF_CENTRE, SDF_INSIDE, SDF_OUTSIDE } from "../tokens";
 
 export { SDF_CENTRE, SDF_INSIDE, SDF_OUTSIDE };
@@ -62,12 +63,5 @@ export function sdfRamp(t: number): [number, number, number] {
 
 /** CSS `linear-gradient` across the whole ramp, for the legend. */
 export function sdfRampCss(stops = 16): string {
-  const colors: string[] = [];
-  for (let index = 0; index <= stops; index++) {
-    const [r, g, b] = sdfRamp((index / stops) * 2 - 1);
-    colors.push(
-      `rgb(${[r, g, b].map((channel) => Math.round(channel * 255)).join(", ")})`,
-    );
-  }
-  return `linear-gradient(to right, ${colors.join(", ")})`;
+  return rampGradient((t) => sdfRamp(t * 2 - 1), stops);
 }

@@ -12,6 +12,7 @@
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createRoot, createSignal } from "solid-js";
+import { deferred, settle } from "./helpers";
 
 const compile = vi.fn();
 const mesh = vi.fn();
@@ -87,16 +88,6 @@ function answer(name: string) {
   };
 }
 
-/** A promise the test resolves when it wants the "worker" to answer. */
-function deferred<T>() {
-  let resolve!: (value: T) => void;
-  const promise = new Promise<T>((settle) => {
-    resolve = settle;
-  });
-  return { promise, resolve };
-}
-
-const settle = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const DEBOUNCE = 20;
 

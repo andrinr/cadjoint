@@ -12,7 +12,7 @@
  */
 
 import { For, Show, createMemo, createSignal, onMount } from "solid-js";
-import { CHROME, contrastRatio, hexToRgb } from "../tokens";
+import { CHROME, contrastRatio, hexToRgb, rgbToHex } from "../tokens";
 
 type Vars = Record<string, string>;
 
@@ -33,10 +33,8 @@ interface Axis {
 
 // ── colour helpers ────────────────────────────────────────────────────────
 
-const toHex = (rgb: readonly number[]) =>
-  `#${rgb.map((c) => Math.round(Math.min(1, Math.max(0, c)) * 255).toString(16).padStart(2, "0")).join("")}`;
 const triple = (hex: string) => hexToRgb(hex).map((c) => Math.round(c * 255)).join(", ");
-const darken = (hex: string, by: number) => toHex(hexToRgb(hex).map((c) => c * (1 - by)));
+const darken = (hex: string, by: number) => rgbToHex(hexToRgb(hex).map((c) => c * (1 - by)));
 const DARK_INK = "#0a0a0c";
 const LIGHT_INK = "#ffffff";
 const inkOn = (hex: string) =>

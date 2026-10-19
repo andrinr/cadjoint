@@ -1,11 +1,9 @@
 /**
  * "The newest edit wins": the ordering rule the compile cycle is built on.
  *
- * The bug this answers was reported as *"there is a fundamental problem with
- * chaining operations"*: a second drag arriving mid-compile used to be latched
- * and run **after** the first finished, so two edits of a twenty-five-second
- * scene were a fifty-second wait showing geometry two edits old. What is
- * asserted here is the replacement, in the three properties it has to have:
+ * A second edit arriving mid-compile replaces the first rather than queueing
+ * behind it, so a slow scene never shows geometry two edits old. What is
+ * asserted here is that rule, in the three properties it has to have:
  *
  * - a superseded run can never write anything (`current()` is false for it),
  *   which holds with no server and no cancellation at all;
@@ -22,6 +20,7 @@
 
 import { describe, expect, it } from "vitest";
 import { createSuperseding, type RunToken, type Timers } from "../src/shell/supersede";
+import { deferred, settle } from "./helpers";
 
 /** A clock the test advances by hand. */
 function fakeTimers(): Timers & { flush: () => void; armed: () => number } {
@@ -43,17 +42,6 @@ function fakeTimers(): Timers & { flush: () => void; armed: () => number } {
   };
 }
 
-/** A promise a test resolves when it likes, standing in for a compile. */
-function deferred<T>(): { promise: Promise<T>; resolve: (value: T) => void } {
-  let resolve!: (value: T) => void;
-  const promise = new Promise<T>((settle) => {
-    resolve = settle;
-  });
-  return { promise, resolve };
-}
-
-/** Let every already-resolved promise callback run. */
-const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
 
 describe("the revision guard", () => {
   it("keeps a run current while nothing newer has been asked for", async () => {

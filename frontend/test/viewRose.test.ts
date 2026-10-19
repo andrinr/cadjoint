@@ -25,13 +25,11 @@ import {
   CHAMFER,
   FACETS,
   cameraBasisFor,
-  cross,
-  dot,
   facetVisible,
   frontFacet,
   project,
-  type Vec3,
 } from "../src/viewer/navCube";
+import { cross, dot, type Vec3 } from "../src/viewer/math";
 import { octant } from "../src/viewer/graticule";
 
 /** The camera offset the app builds from a yaw/pitch, in a Z-up world. */

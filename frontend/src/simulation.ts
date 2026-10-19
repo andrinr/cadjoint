@@ -161,3 +161,34 @@ export function slicePlane(
   const offset = low - margin + fraction * (high - low + 2 * margin);
   return { normal, offset };
 }
+
+/**
+ * The boundary of a face group, as line-list index pairs.
+ *
+ * `indices[start, start + count)` is the group's triangle list. An edge two
+ * of its triangles share is interior — including the diagonal that splits
+ * each hex face in two — and an edge only one of them has is the group's
+ * outline, which is all the hover draws.
+ */
+export function groupOutline(
+  indices: ArrayLike<number>,
+  start: number,
+  count: number,
+): Uint32Array<ArrayBuffer> {
+  const seen = new Map<string, [number, number, number]>();
+  const end = Math.min(start + count, indices.length);
+  for (let base = start; base + 2 < end; base += 3) {
+    const corners = [indices[base], indices[base + 1], indices[base + 2]];
+    for (let side = 0; side < 3; side++) {
+      const a = corners[side];
+      const b = corners[(side + 1) % 3];
+      const key = a < b ? `${a},${b}` : `${b},${a}`;
+      const entry = seen.get(key);
+      if (entry) entry[2] += 1;
+      else seen.set(key, [a, b, 1]);
+    }
+  }
+  const pairs: number[] = [];
+  for (const [a, b, uses] of seen.values()) if (uses === 1) pairs.push(a, b);
+  return new Uint32Array(pairs);
+}

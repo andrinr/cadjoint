@@ -54,6 +54,7 @@ import {
   type ChromeToken,
 } from "../src/tokens";
 import { EDITING_MODES } from "../src/editingMode";
+import { distance } from "./helpers";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const css = readFileSync(join(here, "../src/styles.css"), "utf8");
@@ -324,9 +325,6 @@ describe("the construction skeleton", () => {
     }
   });
 });
-
-const distance = (a: Rgb, b: Rgb): number =>
-  Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
 
 describe("chrome stays clear of the data palette", () => {
   const chromeAccents: ChromeToken[] = [
