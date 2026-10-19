@@ -372,3 +372,73 @@ class TestGradientFallback:
         # Every sample carries a usable normal; allow a tiny residue for
         # roots landing exactly on profile corners.
         assert degenerate.mean() < 0.005
+
+
+class TestInPlaneEdges:
+    """Walls coplanar with lattice planes: every crossing on them is float noise.
+
+    The profile's x and y walls sit exactly on lattice planes, and a 1e-8
+    wobble stands in for the rounding of a constraint-solved sketch: whole
+    lattice edges lie inside a face with endpoint values of either sign,
+    and the crossings of the edges through those walls land on dead polygon
+    subgradients.  Neither may depend on the sign of the noise.
+    """
+
+    GRID = GridSpec.from_bounds((-1.5, -1.5, -1.5), (3.0, 3.0, 3.0), 32)
+
+    @staticmethod
+    def field(wobble):
+        from cadjoint.sdf.primitives.polygon import ExtrudedPolygon
+
+        profile = [
+            jnp.array([-0.75, -0.375]),
+            jnp.array([0.75, -0.375]),
+            jnp.array([0.75, 0.375]),
+            jnp.array([-0.75, 0.375]),
+        ]
+
+        def sdf(p):
+            # `wobble` sets the noise without moving the surface.
+            value = ExtrudedPolygon.sdf(
+                p, jnp.float32(1.0), **{f"v{i}": v for i, v in enumerate(profile)}
+            )
+            return value + wobble * jnp.sin(1e3 * jnp.sum(p))
+
+        return sdf
+
+    def test_in_plane_edges_take_the_midpoint_and_the_face_normal(self):
+        sdf = self.field(1e-8)
+        values = sample_grid(sdf, self.GRID)
+        edges = find_crossing_edges(values)
+        oh = np.eye(3, dtype=int)[edges.axis]
+        both = np.maximum(
+            np.abs(values[tuple(edges.index.T)]), np.abs(values[tuple((edges.index + oh).T)])
+        )
+        in_plane = both < 1e-6
+        assert in_plane.sum() > 10
+        hermite = edge_hermite_data(sdf, self.GRID, edges)
+        np.testing.assert_array_equal(np.asarray(hermite.t)[in_plane], 0.5)
+        points = np.asarray(hermite.points)[in_plane]
+        normals = np.asarray(hermite.unit_normals())[in_plane]
+        # Each lies on an x wall, a y wall, or the vertical crease where they
+        # meet; its normal is its wall's, or on the crease their bisector.
+        on_x = np.isclose(np.abs(points[:, 0]), 0.75)
+        on_y = np.isclose(np.abs(points[:, 1]), 0.375)
+        expected = np.zeros_like(points)
+        expected[:, 0] = np.where(on_x, np.sign(points[:, 0]), 0.0)
+        expected[:, 1] = np.where(on_y, np.sign(points[:, 1]), 0.0)
+        expected /= np.linalg.norm(expected, axis=1, keepdims=True)
+        assert (on_x & on_y).any()
+        np.testing.assert_allclose(normals, expected, atol=1e-3)
+
+    def test_noise_does_not_move_crossings_or_normals(self):
+        # Flipping the wobble flips every noise sign but moves no geometry:
+        # the Hermite data must stay put, where before it could jump an edge.
+        one, other = self.field(1e-8), self.field(-1e-8)
+        edges = find_crossing_edges(sample_grid(one, self.GRID))
+        a = edge_hermite_data(one, self.GRID, edges)
+        b = edge_hermite_data(other, self.GRID, edges)
+        np.testing.assert_allclose(np.asarray(a.points), np.asarray(b.points), atol=1e-5)
+        np.testing.assert_allclose(
+            np.asarray(a.unit_normals()), np.asarray(b.unit_normals()), atol=1e-3
+        )
