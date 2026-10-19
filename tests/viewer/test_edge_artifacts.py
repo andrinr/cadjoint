@@ -647,7 +647,7 @@ def _the_lattice_path():
     real = tier.component
 
     def public_only(kind, *, default=None):
-        return default if kind == PluginKind.FEATURE_EDGES.value else real(kind, default=default)
+        return default if kind == PluginKind.FEATURE_EDGES else real(kind, default=default)
 
     with pytest.MonkeyPatch.context() as patch:
         patch.setattr(tier, "component", public_only)

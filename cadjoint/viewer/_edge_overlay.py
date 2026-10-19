@@ -134,7 +134,7 @@ def _mesh_edge_layers(scene: Any) -> tuple[np.ndarray, np.ndarray, np.ndarray, s
     from cadjoint import tier
 
     grid = _overlay_grid()
-    component = tier.component(PluginKind.FEATURE_EDGES.value)
+    component = tier.component(PluginKind.FEATURE_EDGES)
     source = "lattice" if component is None else "graph"
     if component is None:
         vertices, quad_edges, sharp = _lattice_layers(scene, grid)

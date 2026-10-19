@@ -540,7 +540,7 @@ class Optimization:
         mesh = getattr(self.study, "mesh", None)
         if not isinstance(mesh, SimMesh) or not mesh.frozen_geometry:
             return
-        raise tier.TierUnavailable(PluginKind.NODE_MAP.value, "not registered")
+        raise tier.TierUnavailable(PluginKind.NODE_MAP, "not registered")
 
     def _study_kind(self) -> StudyKind:
         from cadjoint.fem.study import ThermalStudy

@@ -290,7 +290,7 @@ class SimMesh:
 
         if self.method == MeshMethod.HEX or self.mesher != TetMesher.GMSH:
             return False
-        return not tier.available(PluginKind.NODE_MAP.value)
+        return not tier.available(PluginKind.NODE_MAP)
 
     def _parameters(self) -> tuple:
         return (

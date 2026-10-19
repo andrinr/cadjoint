@@ -246,7 +246,7 @@ class TetMesh:
                     "a Gmsh mesh moves through the node map, which needs design=(target, params)"
                 )
             target, params = design
-            node_map = tier.require(PluginKind.NODE_MAP.value).component
+            node_map = tier.require(PluginKind.NODE_MAP).component
             return node_map.positions(target, params, owned, smooth_passes=smooth_passes)
         if self.table is None or design is None:
             return recompute_tet_points(field, self, smooth_passes=smooth_passes)

@@ -207,7 +207,7 @@ class TestWorker:
             result, path = _export(tmp_path, BOX_SOURCE, format="step")
             assert result["ok"] is True, result
             assert result["report"]["path"] == "mesh"
-            assert result["report"]["tier"] == tier.message(PluginKind.STEP_EXPORT.value)
+            assert result["report"]["tier"] == tier.message(PluginKind.STEP_EXPORT)
         text = path.read_text()
         assert text.startswith("ISO-10303-21;")
         assert "MANIFOLD_SOLID_BREP(" in text

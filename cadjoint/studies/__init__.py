@@ -27,7 +27,7 @@ study classes, the meshes and the solvers all stay in their own packages.
 from __future__ import annotations
 
 from cadjoint.studies._validate import require_triplet
-from cadjoint.studies.capture import capture_studies, declared_studies, register_study
+from cadjoint.studies.capture import Study, capture_studies, declared_studies, register_study
 from cadjoint.studies.selection import (
     BoundaryMesh,
     Nodes,
@@ -42,6 +42,7 @@ __all__ = [
     "Nodes",
     "boundary_node_mask",
     "capture_studies",
+    "Study",
     "declared_studies",
     "register_study",
     "require_triplet",

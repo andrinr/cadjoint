@@ -270,9 +270,9 @@ def _write_geometry(obj: Any, request: ExportRequest, path: Path) -> dict[str, A
         # see the module docstring.
         from cadjoint import tier
 
-        exporter = tier.component(PluginKind.STEP_EXPORT.value)
+        exporter = tier.component(PluginKind.STEP_EXPORT)
         if exporter is None:
-            report["tier"] = tier.message(PluginKind.STEP_EXPORT.value)
+            report["tier"] = tier.message(PluginKind.STEP_EXPORT)
         else:
             try:
                 written = exporter.step_export(obj, grid, path)

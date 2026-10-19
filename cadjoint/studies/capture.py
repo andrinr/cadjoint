@@ -14,17 +14,32 @@ constraint-solve registries.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from contextlib import AbstractContextManager
-from typing import Any
+from typing import Any, Protocol
 
 from cadjoint.capture import Capture
+from cadjoint.descriptions import StudyDescription
 
-__all__ = ["capture_studies", "declared_studies", "register_study"]
-
-_STUDIES: Capture[Any] = Capture("cadjoint_captured_studies")
+__all__ = ["Study", "capture_studies", "declared_studies", "register_study"]
 
 
-def capture_studies() -> AbstractContextManager[list[Any]]:
+class Study(Protocol):
+    """What every study is, whatever it solves."""
+
+    name: str
+    bcs: Sequence[Any]
+    last_result: Any
+
+    def describe(self) -> StudyDescription: ...
+
+    def solve(self, sdf: Any = None) -> Any: ...
+
+
+_STUDIES: Capture[Study] = Capture("cadjoint_captured_studies")
+
+
+def capture_studies() -> AbstractContextManager[list[Study]]:
     """Collect every study constructed inside this context.
 
     Yields:
@@ -33,7 +48,7 @@ def capture_studies() -> AbstractContextManager[list[Any]]:
     return _STUDIES.collect()
 
 
-def declared_studies() -> list[Any]:
+def declared_studies() -> list[Study]:
     """The studies declared so far in the active capture context.
 
     How a declaration resolves a *name* to the study it refers to — an
@@ -47,7 +62,7 @@ def declared_studies() -> list[Any]:
     return _STUDIES.declared()
 
 
-def register_study(study: Any) -> None:
+def register_study(study: Study) -> None:
     """Add a study to the active :func:`capture_studies` context, if any.
 
     The registration hook the study classes call from ``__post_init__``.
