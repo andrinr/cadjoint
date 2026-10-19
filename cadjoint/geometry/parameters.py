@@ -72,17 +72,6 @@ class Parameter:
         """Whether this parameter is fixed (non-optimizable)."""
         return not self.free
 
-    def extract_value(self) -> Union[float, Array]:
-        """Extract raw numeric value for computation.
-
-        Base implementation returns .value.
-        Subclasses like Vector override to return .xyz.
-
-        Returns:
-            Raw numeric value (float or Array)
-        """
-        return self.value
-
     def __repr__(self):
         status = "FIXED" if self.fixed else "FREE"
         if self.name:

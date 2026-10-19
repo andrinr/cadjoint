@@ -46,10 +46,6 @@ class Torus(Primitive):
         """Evaluate SDF at point(s) p."""
         return Torus.sdf(p, self.params["major_radius"].value, self.params["minor_radius"].value)
 
-    def to_functional(self):
-        """Return pure function for compilation."""
-        return Torus.sdf
-
     def patch_fields(self):
         """Single smooth patch: the torus surface has no feature edges."""
         major = self.params["major_radius"].value

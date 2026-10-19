@@ -45,10 +45,6 @@ class RoundBox(Primitive):
         """Evaluate SDF at point(s) p."""
         return RoundBox.sdf(p, self.params["size"].xyz, self.params["radius"].value)
 
-    def to_functional(self):
-        """Return pure function for compilation."""
-        return RoundBox.sdf
-
     def patch_fields(self):
         """Single smooth patch: rounding erases the box's sharp edges."""
         size = self.params["size"].xyz

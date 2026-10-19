@@ -303,9 +303,6 @@ class LoftedPolygon(Primitive):
         values = {k: v.value for k, v in self.params.items() if k != "height"}
         return LoftedPolygon.sdf(p, self.params["height"].value, **values)
 
-    def to_functional(self):
-        return LoftedPolygon.sdf
-
     def patch_fields(self):
         """Wall planes plus the two caps — but only when every wall is flat.
 

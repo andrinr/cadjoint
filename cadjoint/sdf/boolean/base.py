@@ -144,7 +144,6 @@ class BooleanOp(SDF):
     Subclasses must implement:
     - @staticmethod def sdf(child_sdfs: tuple, p: Array, **params) -> Array
     - __call__(self, p: Array) -> Array
-    - to_functional(self) -> Callable
 
     Subclasses should store:
     - self.sdfs: Tuple of child SDFs

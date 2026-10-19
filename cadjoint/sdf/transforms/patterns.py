@@ -281,9 +281,6 @@ class LinearPattern(_Operation):
             for field in child_fields
         ]
 
-    def to_functional(self):
-        return LinearPattern.sdf
-
 
 class PolarPattern(_Operation):
     """Union of ``count`` copies rotated evenly around an axis.
@@ -445,9 +442,6 @@ class PolarPattern(_Operation):
                 for field in child_fields
             )
         return fields
-
-    def to_functional(self):
-        return PolarPattern.sdf
 
 
 def linear_pattern(

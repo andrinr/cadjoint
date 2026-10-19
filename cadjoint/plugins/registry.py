@@ -402,15 +402,6 @@ class PluginRegistry:
         defaults = {kind: name for kind, name in self._defaults.items() if kind not in excluded}
         return PluginRegistry(specs, defaults, source=self.source)
 
-    def set_default(self, kind: str, name: str) -> None:
-        """Point ``kind`` at the plugin registered as ``name``.
-
-        Raises:
-            KeyError: If ``name`` is not registered.
-        """
-        self.spec(name)
-        self._defaults[kind] = name
-
     def plugin(self, name: str) -> Plugin:
         """The (cached) plugin instance registered under ``name``."""
         with self._lock:

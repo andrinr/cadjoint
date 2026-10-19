@@ -82,7 +82,3 @@ class Scale(Transform):
             (lambda p, f=field: f(Scale._transform_point(p, scale)) * factor)
             for field in child_fields
         ]
-
-    def to_functional(self):
-        """Return pure function for compilation."""
-        return Scale.sdf

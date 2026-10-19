@@ -69,14 +69,6 @@ class Sphere(Primitive):
         """
         return Sphere.sdf(p, self.params["radius"].value)
 
-    def to_functional(self):
-        """Return pure function for compilation.
-
-        Returns:
-            Pure function: Sphere.sdf(p, radius) -> sdf_value
-        """
-        return Sphere.sdf
-
     def patch_fields(self):
         """Single smooth patch: the sphere surface has no feature edges."""
         radius = self.params["radius"].value

@@ -115,9 +115,6 @@ class Shell(_Operation):
             fields.append(lambda p, f=field: -(f(p) + half))
         return fields
 
-    def to_functional(self):
-        return Shell.sdf
-
 
 class Offset(_Operation):
     """Offset (grow/shrink) a shape's surface: ``f(p) - distance``.
@@ -144,9 +141,6 @@ class Offset(_Operation):
 
     def __call__(self, p: Array) -> Array:
         return Offset.sdf(self.sdf, p, self.params["distance"].value)
-
-    def to_functional(self):
-        return Offset.sdf
 
 
 class Mirror(_Operation):
@@ -212,9 +206,6 @@ class Mirror(_Operation):
             (lambda p, f=field: f(Mirror._transform_point(p, origin, normal)))
             for field in child_fields
         ]
-
-    def to_functional(self):
-        return Mirror.sdf
 
 
 def shell(shape, thickness: float | Scalar) -> Shell:

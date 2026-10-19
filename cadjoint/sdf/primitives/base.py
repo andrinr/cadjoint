@@ -33,7 +33,6 @@ class Primitive(SDF):
     Subclasses must implement:
     - @staticmethod def sdf(p: Array, **params) -> Array
     - __call__(self, p: Array) -> Array
-    - to_functional(self) -> Callable
     """
 
     def children(self) -> list:

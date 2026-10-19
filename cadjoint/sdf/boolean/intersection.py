@@ -92,7 +92,3 @@ class Intersection(BooleanOp):
         boundary probe, and a missing patch it could not recover.
         """
         return _operand_patch_fields(self)
-
-    def to_functional(self):
-        """Return pure function for compilation."""
-        return Intersection.sdf

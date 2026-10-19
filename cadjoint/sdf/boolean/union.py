@@ -88,7 +88,3 @@ class Union(BooleanOp):
         else, such as a pattern of a two-cylinder tool.
         """
         return _operand_patch_fields(self)
-
-    def to_functional(self):
-        """Return pure function for compilation."""
-        return Union.sdf

@@ -91,7 +91,3 @@ class Rotate(Transform):
             (lambda p, f=field: f(Rotate._transform_point(p, axis, angle)))
             for field in child_fields
         ]
-
-    def to_functional(self):
-        """Return pure function for compilation."""
-        return Rotate.sdf

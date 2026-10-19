@@ -62,7 +62,3 @@ class Translate(Transform):
         return [
             (lambda p, f=field: f(Translate._transform_point(p, offset))) for field in child_fields
         ]
-
-    def to_functional(self):
-        """Return pure function for compilation."""
-        return Translate.sdf

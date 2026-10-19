@@ -52,7 +52,6 @@ class SDF(Fluent):
     Subclasses must implement:
     - @staticmethod def sdf(...): Pure function for computation (CONVENTION)
     - __call__(p): Evaluate SDF (delegates to sdf())
-    - to_functional(): Return the static sdf method
 
     Pattern for primitives:
         @staticmethod
@@ -62,9 +61,6 @@ class SDF(Fluent):
         def __call__(self, p: Array) -> Array:
             return ClassName.sdf(p, self.params['param1'].value, self.params['param2'].value)
 
-        def to_functional(self):
-            return ClassName.sdf
-
     Pattern for transforms:
         @staticmethod
         def sdf(child_sdf: Callable, p: Array, param: float) -> Array:
@@ -72,9 +68,6 @@ class SDF(Fluent):
 
         def __call__(self, p: Array) -> Array:
             return ClassName.sdf(self.child_sdf, p, self.params['param'].value)
-
-        def to_functional(self):
-            return ClassName.sdf
     """
 
     # Set to False on approximate SDFs (e.g. non-isometric deformations like
@@ -157,30 +150,11 @@ class SDF(Fluent):
     def __call__(self, p: Array) -> Array:
         """Evaluate the signed distance at point(s) p.
 
-        This is for direct use only. During compilation, this is replaced
-        by the pure function from to_functional().
-
         Args:
             p: Point(s) to evaluate, shape (..., 3) for 3D or (..., 2) for 2D
 
         Returns:
             Signed distance value(s), shape (...)
-        """
-        pass
-
-    @abstractmethod
-    def to_functional(self) -> Callable:
-        """Return pure function for JAX tracing and compilation.
-
-        Returns:
-            Pure function with signature: (p: Array, **params) -> Array
-            where params are the primitive/transform parameters.
-
-        Example:
-            ```python
-            sphere = Sphere(radius=1.0)
-            func = sphere.to_functional()
-            ```
         """
         pass
 

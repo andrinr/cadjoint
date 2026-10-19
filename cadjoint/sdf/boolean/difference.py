@@ -100,7 +100,3 @@ class Difference(BooleanOp):
         order's guarantees and why a ``smoothness > 0`` difference declines.
         """
         return _operand_patch_fields(self, negate_tools=True)
-
-    def to_functional(self):
-        """Return pure function for compilation."""
-        return Difference.sdf
