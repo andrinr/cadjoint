@@ -10,8 +10,6 @@ through :mod:`cadjoint.viewer.worker.payloads`.
 
 from __future__ import annotations
 
-import contextlib
-import io
 from typing import Any
 
 import numpy as np
@@ -25,6 +23,7 @@ from cadjoint.viewer.worker.payloads import (
 from cadjoint.viewer.worker.scene import (
     _FEM_UNAVAILABLE_MESSAGE,
     _execute_scene,
+    captured_output,
 )
 
 
@@ -64,11 +63,10 @@ def _simulate_study(scene: Any, studies: list[Any], request: dict[str, Any]) -> 
 
 def _simulate_source(request: dict[str, Any]) -> dict[str, Any]:
     """Run the FEM simulation mode: exec scene -> declared study -> payload."""
-    captured = io.StringIO()
-    with contextlib.redirect_stdout(captured), contextlib.redirect_stderr(captured):
+    with captured_output() as output:
         namespace = _execute_scene(request["source"])
         result = _simulate_study(namespace["scene"], namespace["__studies__"], request)
-    result["output"] = captured.getvalue()[-8_000:]
+    result["output"] = output()
     return result
 
 
@@ -156,11 +154,10 @@ def _inspect_mesh(
 
 def _mesh_inspect_source(request: dict[str, Any]) -> dict[str, Any]:
     """Run the mesh-inspection mode: exec scene -> build SimMesh -> payload."""
-    captured = io.StringIO()
-    with contextlib.redirect_stdout(captured), contextlib.redirect_stderr(captured):
+    with captured_output() as output:
         namespace = _execute_scene(request["source"])
         result = _inspect_mesh(
             namespace["scene"], namespace["__sim_meshes__"], namespace["__studies__"], request
         )
-    result["output"] = captured.getvalue()[-8_000:]
+    result["output"] = output()
     return result

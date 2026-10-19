@@ -40,7 +40,12 @@ from typing import Any
 
 from cadjoint.viewer._jobs import REGISTRY, attach_process, current_job
 from cadjoint.viewer._limits import OVERSIZED_SOURCE_ERROR, exceeds_source_limit
-from cadjoint.viewer.schema.worker import checked_progress, checked_reply, checked_request
+from cadjoint.viewer.schema.worker import (
+    WorkerMode,
+    checked_progress,
+    checked_reply,
+    checked_request,
+)
 from cadjoint.viewer.worker.protocol import MODULE, RETIRE_FLAG
 
 # The edit round-trip budget. It used to be 20 s, which the gearbox end-cap's
@@ -63,20 +68,20 @@ BREP_TIMEOUT_SECONDS = 180
 
 
 #: How each worker mode names itself in a timeout message.
-_MODE_NOUNS = {
+_MODE_NOUNS: dict[WorkerMode, str] = {
     "compile": "Compilation",
     "mesh": "Meshing",
     "mesh_inspect": "Mesh inspection",
     "brep": "B-rep inspection",
     "simulate": "Simulation",
+    "optimize": "Optimization",
     "export": "Export",
-    "lint": "Linting",
 }
 
 
 def _run_worker(
     source: str,
-    mode: str,
+    mode: WorkerMode,
     timeout: float,
     extra: dict[str, Any] | None = None,
     *,
@@ -124,7 +129,7 @@ def _run_worker(
         process.communicate()
         return {
             "ok": False,
-            "error": f"{_MODE_NOUNS.get(mode, 'Compilation')} exceeded the {timeout:g}-second timeout.",
+            "error": f"{_MODE_NOUNS[mode]} exceeded the {timeout:g}-second timeout.",
         }
 
     if process.returncode != 0:

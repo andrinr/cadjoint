@@ -21,13 +21,12 @@ get.  The other modes live beside it:
 
 from __future__ import annotations
 
-import contextlib
 import hashlib
-import io
 import json
 import os
 import sys
 import traceback
+from collections.abc import Callable
 from typing import Any
 
 from cadjoint.backends.wgsl import compile_scene_to_wgsl
@@ -45,6 +44,7 @@ from cadjoint.viewer._pathtracer import (
 )
 from cadjoint.viewer._webgpu import build_viewer_shader
 from cadjoint.viewer.schema.payloads import BRepInspectionPayload, validate_compile_payload
+from cadjoint.viewer.schema.worker import WorkerMode
 from cadjoint.viewer.source_map import (
     PLAYGROUND_FILENAME,
     build_construction_payload,
@@ -69,7 +69,7 @@ from cadjoint.viewer.worker.fem import (  # noqa: F401 - re-exported for callers
 )
 from cadjoint.viewer.worker.optimize import _optimize_source
 from cadjoint.viewer.worker.protocol import RETIRE_FLAG
-from cadjoint.viewer.worker.scene import _execute_scene
+from cadjoint.viewer.worker.scene import _execute_scene, captured_output
 
 
 def _mesh_source(source: str) -> dict[str, Any]:
@@ -79,8 +79,7 @@ def _mesh_source(source: str) -> dict[str, Any]:
     dense grid), so the playground requests it lazily through ``/api/mesh``
     instead of paying for it on every compile.
     """
-    captured = io.StringIO()
-    with contextlib.redirect_stdout(captured), contextlib.redirect_stderr(captured):
+    with captured_output() as output:
         namespace = _execute_scene(source)
         mesh_edges, refresh = _mesh_edge_result(namespace["scene"])
     return {
@@ -89,7 +88,7 @@ def _mesh_source(source: str) -> dict[str, Any]:
         # Server state, not payload: the playground takes it out of the answer
         # and keeps it to re-solve the overlay at a new design (`/api/mesh_refresh`).
         "refresh": refresh,
-        "output": captured.getvalue()[-8_000:],
+        "output": output(),
     }
 
 
@@ -102,12 +101,11 @@ def _brep_source(source: str) -> dict[str, Any]:
     """
     from cadjoint.viewer._brep_inspector import brep_inspection
 
-    captured = io.StringIO()
-    with contextlib.redirect_stdout(captured), contextlib.redirect_stderr(captured):
+    with captured_output() as output:
         namespace = _execute_scene(source)
         brep = brep_inspection(namespace["scene"])
     BRepInspectionPayload.model_validate(brep)
-    return {"ok": True, "brep": brep, "output": captured.getvalue()[-8_000:]}
+    return {"ok": True, "brep": brep, "output": output()}
 
 
 def _shader_options() -> tuple[bool, bool, str]:
@@ -251,8 +249,7 @@ def _table_hash(scene: Any) -> str | None:
 
 
 def _compile_source(source: str) -> dict[str, Any]:
-    captured = io.StringIO()
-    with contextlib.redirect_stdout(captured), contextlib.redirect_stderr(captured):
+    with captured_output() as output:
         namespace = _execute_scene(
             source,
             capture=(
@@ -331,7 +328,7 @@ def _compile_source(source: str) -> dict[str, Any]:
             # than the frontend guessing (:mod:`cadjoint.tier`).
             "tier": _tier_flags(),
             "solver_runs": solver_runs,
-            "output": captured.getvalue()[-8_000:],
+            "output": output(),
         }
     )
 
@@ -357,30 +354,35 @@ def _tier_flags() -> dict[str, bool] | None:
 SERVE_REQUEST_LIMIT = 64
 
 
+def _export(request: dict[str, Any]) -> dict[str, Any]:
+    from cadjoint.viewer.worker.export import export_scene
+
+    return export_scene(request)
+
+
+#: The function answering each worker mode
+#: (:data:`cadjoint.viewer.schema.worker.MODES` is what each takes and returns).
+HANDLERS: dict[WorkerMode, Callable[[dict[str, Any]], dict[str, Any]]] = {
+    "compile": lambda request: _compile_source(request["source"]),
+    "mesh": lambda request: _mesh_source(request["source"]),
+    "brep": lambda request: _brep_source(request["source"]),
+    "simulate": _simulate_source,
+    "mesh_inspect": _mesh_inspect_source,
+    "optimize": _optimize_source,
+    "export": _export,
+}
+
+
 def _answer(request: dict[str, Any]) -> dict[str, Any]:
     """Run one request, turning any exception into an error response."""
     try:
-        source = request.get("source")
-        if not isinstance(source, str):
+        if not isinstance(request.get("source"), str):
             raise TypeError("The compile request must contain a string `source` field.")
         mode = request.get("mode", "compile")
-        if mode == "mesh":
-            return _mesh_source(source)
-        if mode == "brep":
-            return _brep_source(source)
-        if mode == "simulate":
-            return _simulate_source(request)
-        if mode == "mesh_inspect":
-            return _mesh_inspect_source(request)
-        if mode == "optimize":
-            return _optimize_source(request)
-        if mode == "export":
-            from cadjoint.viewer.worker.export import export_scene
-
-            return export_scene(request)
-        if mode == "compile":
-            return _compile_source(source)
-        raise ValueError(f"Unknown compile worker mode: {mode!r}.")
+        handler = HANDLERS.get(mode)
+        if handler is None:
+            raise ValueError(f"Unknown compile worker mode: {mode!r}.")
+        return handler(request)
     except Exception:
         return {"ok": False, "error": traceback.format_exc()}
 

@@ -46,8 +46,6 @@ comparison baseline the tests use.
 
 from __future__ import annotations
 
-import contextlib
-import io
 import tempfile
 from pathlib import Path
 from typing import Any
@@ -351,15 +349,14 @@ def export_scene(request: dict[str, Any]) -> dict[str, Any]:
     if not path.name:
         return {"ok": False, "error": "The export worker was given no path to write to."}
 
-    from cadjoint.viewer.worker.scene import _execute_scene
+    from cadjoint.viewer.worker.scene import _execute_scene, captured_output
 
-    captured = io.StringIO()
-    with contextlib.redirect_stdout(captured), contextlib.redirect_stderr(captured):
+    with captured_output() as output:
         namespace = _execute_scene(parsed.source)
         if parsed.format is ExportFormat.VTK:
             result = _write_result(namespace["scene"], namespace["__studies__"], parsed, path)
         else:
             report = _write_geometry(_named_object(namespace, parsed.name), parsed, path)
             result = {"ok": True, "report": report}
-    result["output"] = captured.getvalue()[-8_000:]
+    result["output"] = output()
     return result

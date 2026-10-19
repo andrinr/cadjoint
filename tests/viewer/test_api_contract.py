@@ -193,9 +193,14 @@ def test_an_invalid_optimize_request_streams_a_done_line_within_the_contract(liv
 # ── the worker boundary ─────────────────────────────────────────────────────
 
 
-def test_every_worker_mode_has_a_request_and_a_reply_model():
-    assert set(worker.WORKER_REQUESTS) == set(worker.WORKER_REPLIES)
-    assert set(worker.WORKER_REQUESTS) == set(worker.WorkerMode.__args__)
+def test_every_worker_mode_has_a_contract_a_handler_and_a_timeout_message():
+    from cadjoint.viewer import _worker_client
+    from cadjoint.viewer.worker import main
+
+    modes = set(worker.WorkerMode.__args__)
+    assert set(worker.MODES) == modes
+    assert set(main.HANDLERS) == modes
+    assert set(_worker_client._MODE_NOUNS) == modes
 
 
 def test_a_reply_outside_its_model_becomes_a_contract_failure():

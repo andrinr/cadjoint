@@ -14,7 +14,8 @@ needs the optional solver extra reports when the import fails.
 from __future__ import annotations
 
 import contextlib
-from collections.abc import Callable
+import io
+from collections.abc import Callable, Iterator
 from typing import Any
 
 from cadjoint.viewer.source_map import PLAYGROUND_FILENAME
@@ -65,3 +66,15 @@ def _execute_scene(
 _FEM_UNAVAILABLE_MESSAGE = (
     "FEM simulation needs the 'fem' extra (jax-fem). Install it with: pip install cadjoint[fem]"
 )
+
+
+#: How much of a mode's captured stdout/stderr its reply carries (the tail).
+OUTPUT_TAIL = 8_000
+
+
+@contextlib.contextmanager
+def captured_output() -> Iterator[Callable[[], str]]:
+    """Capture stdout and stderr; yields a function returning the tail so far."""
+    buffer = io.StringIO()
+    with contextlib.redirect_stdout(buffer), contextlib.redirect_stderr(buffer):
+        yield lambda: buffer.getvalue()[-OUTPUT_TAIL:]

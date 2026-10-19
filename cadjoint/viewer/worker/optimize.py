@@ -13,8 +13,6 @@ The step caps that bound one HTTP-sized run live here.
 
 from __future__ import annotations
 
-import contextlib
-import io
 import json
 import sys
 from typing import Any
@@ -24,6 +22,7 @@ from cadjoint.viewer.worker.payloads import _study_payload
 from cadjoint.viewer.worker.scene import (
     _FEM_UNAVAILABLE_MESSAGE,
     _execute_scene,
+    captured_output,
 )
 
 # The server validates requested step counts, but the declaration itself may
@@ -149,9 +148,8 @@ def _optimize_source(request: dict[str, Any]) -> dict[str, Any]:
     pipe.
     """
     progress_out = sys.stdout
-    captured = io.StringIO()
-    with contextlib.redirect_stdout(captured), contextlib.redirect_stderr(captured):
+    with captured_output() as output:
         namespace = _execute_scene(request["source"])
         result = _run_optimization(request["source"], namespace, request, progress_out)
-    result["output"] = captured.getvalue()[-8_000:]
+    result["output"] = output()
     return result
