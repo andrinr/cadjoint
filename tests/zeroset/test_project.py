@@ -12,23 +12,14 @@ from cadjoint.sdf.primitives import Box, Sphere
 from cadjoint.zeroset import lower
 from cadjoint.zeroset.evaluate import surfaces
 from cadjoint.zeroset.project import classify, project, project_groups, project_table
+from tests.helpers import x64
 
 
 @pytest.fixture(autouse=True)
 def _x64():
-    """Double precision for this module only, restored on the way out.
-
-    The projection's convergence is asserted to tolerances float32 cannot
-    reach.  ``jax_enable_x64`` is process-global, though, so setting it at
-    import leaks into every module that runs afterwards in the same session:
-    every array becomes float64, and the WGSL emitter — which has no 64-bit
-    numeric type — then refuses scenes it should accept.  That is invisible
-    when this file is run alone and breaks the suite when it is not.
-    """
-    previous = jax.config.jax_enable_x64
-    jax.config.update("jax_enable_x64", True)
-    yield
-    jax.config.update("jax_enable_x64", previous)
+    """The projection's convergence is asserted to tolerances float32 cannot reach."""
+    with x64():
+        yield
 
 
 def _sphere(center, radius):

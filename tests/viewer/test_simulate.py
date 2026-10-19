@@ -9,15 +9,14 @@ study's implicit mesh) and reports it with a quality heatmap.
 from __future__ import annotations
 
 import json
-import threading
-from contextlib import contextmanager
 from urllib.error import HTTPError
-from urllib.request import Request, urlopen
+from urllib.request import urlopen
 
 import pytest
 
-from cadjoint.viewer.playground import create_server, mesh_inspect_source, simulate_source
+from cadjoint.viewer.playground import mesh_inspect_source, simulate_source
 from cadjoint.viewer.worker import main as worker
+from tests.helpers import post, running_server, session_token
 
 BOX_SOURCE = """
 from cadjoint.geometry import Vector
@@ -85,33 +84,12 @@ def _bar_study():
 # ── HTTP layer ──────────────────────────────────────────────────────────────
 
 
-@contextmanager
-def _running_server():
-    server = create_server(0)
-    thread = threading.Thread(target=server.serve_forever, daemon=True)
-    thread.start()
-    try:
-        host, port = server.server_address
-        yield f"http://{host}:{port}"
-    finally:
-        server.shutdown()
-        server.server_close()
-        thread.join(timeout=2)
-
-
-def _post(base: str, path: str, payload: dict, token: str | None = None) -> Request:
-    headers = {"Content-Type": "application/json"}
-    if token is not None:
-        headers["X-Cadjoint-Token"] = token
-    return Request(base + path, data=json.dumps(payload).encode(), headers=headers, method="POST")
-
-
 class TestHttp:
     @pytest.mark.parametrize("path", ["/api/simulate", "/api/mesh_inspect"])
     def test_fem_endpoints_require_the_session_token(self, path):
-        with _running_server() as base:
+        with running_server() as base:
             with pytest.raises(HTTPError) as error:
-                urlopen(_post(base, path, {"source": BOX_SOURCE, "kind": "study", "name": "b"}))
+                urlopen(post(base, path, {"source": BOX_SOURCE, "kind": "study", "name": "b"}))
             assert error.value.code == 403
 
     def test_fem_unavailable_maps_to_501(self, monkeypatch):
@@ -123,12 +101,11 @@ class TestHttp:
         # Patch the handler table's target: simulate_source is looked up on the
         # module at request time.
         monkeypatch.setattr(playground, "simulate_source", unavailable)
-        with _running_server() as base:
-            with urlopen(f"{base}/api/session") as response:
-                token = json.loads(response.read())["token"]
+        with running_server() as base:
+            token = session_token(base)
             with pytest.raises(HTTPError) as error:
                 urlopen(
-                    _post(
+                    post(
                         base,
                         "/api/simulate",
                         {"source": BOX_SOURCE, "kind": "study", "name": "bar"},
@@ -140,12 +117,11 @@ class TestHttp:
             assert body["error_kind"] == "fem_unavailable"
 
     def test_validation_error_maps_to_422(self):
-        with _running_server() as base:
-            with urlopen(f"{base}/api/session") as response:
-                token = json.loads(response.read())["token"]
+        with running_server() as base:
+            token = session_token(base)
             with pytest.raises(HTTPError) as error:
                 urlopen(
-                    _post(
+                    post(
                         base,
                         "/api/simulate",
                         {"source": BOX_SOURCE, "kind": "thermal"},
@@ -400,11 +376,10 @@ class TestMeshInspect:
             worker._mesh_inspect_source({"source": BOX_SOURCE})
 
     def test_endpoint_round_trips_over_http(self):
-        with _running_server() as base:
-            with urlopen(f"{base}/api/session") as response:
-                token = json.loads(response.read())["token"]
+        with running_server() as base:
+            token = session_token(base)
             with urlopen(
-                _post(base, "/api/mesh_inspect", {"source": MESH_SOURCE, "name": "grid"}, token)
+                post(base, "/api/mesh_inspect", {"source": MESH_SOURCE, "name": "grid"}, token)
             ) as response:
                 result = json.loads(response.read())
         assert result["ok"] is True

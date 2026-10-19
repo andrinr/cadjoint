@@ -11,9 +11,7 @@ worker boundary refuses a reply its model does not allow.
 from __future__ import annotations
 
 import json
-import threading
 from collections.abc import Iterator
-from contextlib import contextmanager
 from typing import Any
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
@@ -28,32 +26,16 @@ from cadjoint.viewer._example_scene import EXAMPLE_SOURCE
 from cadjoint.viewer.schema import api, payloads, worker
 from cadjoint.viewer.schema.emit import typescript_source
 from cadjoint.viewer.source_map.constraints import CONSTRAINT_CLASS_KINDS
+from tests.helpers import running_server, session_token
 
 ROUTES = {route.path: route for route in api.ROUTES}
 
 
-@contextmanager
-def serving() -> Iterator[tuple[str, str]]:
-    """A live playground on a free port, and its session token."""
-    server = playground.create_server(0)
-    thread = threading.Thread(target=server.serve_forever, daemon=True)
-    thread.start()
-    try:
-        host, port = server.server_address
-        base = f"http://{host}:{port}"
-        with urlopen(f"{base}/api/session") as response:
-            token = json.loads(response.read())["token"]
-        yield base, token
-    finally:
-        server.shutdown()
-        server.server_close()
-        thread.join(timeout=2)
-
-
 @pytest.fixture(scope="module")
 def live() -> Iterator[tuple[str, str]]:
-    with serving() as pair:
-        yield pair
+    """A live playground on a free port, and its session token."""
+    with running_server() as base:
+        yield base, session_token(base)
 
 
 def call(
