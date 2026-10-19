@@ -777,7 +777,7 @@ def test_batched_seam_projection_matches_the_per_group_reference(name, monkeypat
     382 sharp segments, identical.  It is not run here because the starter
     costs minutes per extraction on a cold XLA cache.)
     """
-    from cadjoint.viewer import _edge_overlay
+    from cadjoint.viewer import _lattice_edges
 
     built = SEAM_CONFIGS[name]()
     scene = built[0] if isinstance(built, tuple) else built
@@ -787,7 +787,7 @@ def test_batched_seam_projection_matches_the_per_group_reference(name, monkeypat
     assert batched["sharp"], f"{name}: no sharp links at all"
 
     monkeypatch.setattr(
-        _edge_overlay, "_project_seam_groups", _edge_overlay._project_seam_groups_reference
+        _lattice_edges, "_project_seam_groups", _lattice_edges._project_seam_groups_reference
     )
     reference = _mesh_edge_payload(scene)
 
@@ -805,7 +805,8 @@ def test_leaf_ownership_ties_are_decided_by_geometry_not_noise():
     equidistant (mid-gap) by the lowest-numbered; a real difference still
     decides.
     """
-    from cadjoint.viewer._edge_overlay import _nearest_leaves, _overlay_grid
+    from cadjoint.viewer._edge_overlay import _overlay_grid
+    from cadjoint.viewer._lattice_edges import _nearest_leaves
 
     grid = _overlay_grid()
     columns = {
