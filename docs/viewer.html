@@ -3526,7 +3526,7 @@ Warning
 </tr>
 <tr class="even">
 <td>Effects</td>
-<td>Path tracing, X-ray, Reflections, Hide solid, Feature edges, Mesh wireframe</td>
+<td>Path tracing, X-ray, Reflections, Hide solid, Feature edges, Mesh wireframe, B-rep inspector</td>
 </tr>
 <tr class="odd">
 <td>Annotations</td>
@@ -3588,6 +3588,12 @@ Warning
 <figcaption>Feature edges drawn over the heat sink’s creases and seams, with a mesh job counting in the toolbar’s job chip</figcaption>
 </figure>
 </div>
+</section>
+<section id="b-rep-inspector" class="level3">
+<h3 class="anchored" data-anchor-id="b-rep-inspector">B-rep inspector</h3>
+<p><strong>B-rep inspector</strong> replaces the solid with the B-rep the private tier derived (the <code>brep</code> <a href="../docs/plugins.html#the-five-in-process-kinds">plugin kind</a>), on the same 64³ grid, so an extraction can be judged by eye. Each face is drawn from the extraction’s own tessellation in a categorical colour that no neighbour shares. Edges are stroked by kind: <code>traced</code> and <code>sampled</code> are the curves the feature-edge overlay draws, and every other boundary chain the graph built keeps its own state (<code>blend</code>, <code>tangent</code>, <code>coincident</code>, …, or <code>undrawn</code> for a crossing the overlay dropped). A kind the viewer has no tone for is drawn in grey under its own name. Vertices are dots.</p>
+<p>The card in the top-left corner gives the counts and the path. That is <code>Exact · analytic</code>, or the dual-contouring fallback with the reason the exact path refused. Hovering a face shows its id, surface type (plane, cylinder, sphere, cone, blend or faceted) and owning patch. Hovering an edge shows its faces and how far it lies off the solid. Hovering a vertex shows its position. <strong>Highlight off-surface</strong> marks the edges whose points sit more than a tenth of a cell off the scene’s zero set, which is how a curve under a smooth blend gives itself away. Each legend row is a switch that hides its kind.</p>
+<p>The B-rep is requested lazily through <code>POST /api/brep</code> and only while the inspector is on. Without diff-brep the switch is greyed out with the reason; when the extraction raises, the card prints the exception and the frame it came from, and the solid stays on screen.</p>
 </section>
 <section id="quality-and-path-tracing" class="level3">
 <h3 class="anchored" data-anchor-id="quality-and-path-tracing">Quality and path tracing</h3>
