@@ -11,7 +11,7 @@ from cadjoint.geometry.parameters import Scalar, Vector
 from cadjoint.sdf.primitives import Box, Sphere
 from cadjoint.zeroset import lower
 from cadjoint.zeroset.evaluate import surfaces
-from cadjoint.zeroset.project import classify, project, project_table
+from cadjoint.zeroset.project import classify, project, project_groups, project_table
 
 
 @pytest.fixture(autouse=True)
@@ -162,3 +162,44 @@ def test_a_relowered_scene_reuses_the_table_program():
     other = lower(Box(size=Vector([0.5, 0.4, 0.3])))  # literals in the table, not θ
     project_table(other, jnp.asarray(other.theta), seeds, incidence)
     assert len(project_module._TABLE_PROGRAMS) == 2, "a different table gets its own"
+
+
+@pytest.mark.slow
+def test_padded_groups_are_the_per_group_projection_in_one_program():
+    """``project_groups`` is ``project`` per group, whatever the groups' widths.
+
+    One, two and three fields in one padded program, plus a tangency that
+    must be refused in its own group and not in the others: padding must
+    neither change a step nor the transversality verdict.
+    """
+    a, b = _sphere([0, 0, 0], 0.7), _sphere([0.6, 0, 0], 0.7)
+    c = _sphere([0.3, 0.5, 0.2], 0.7)
+    left, right = _sphere([0.5, 0, 0], 0.5), _sphere([-0.5, 0, 0], 0.5)
+    fields = [a, b, c, left, right]
+    rng = np.random.default_rng(2)
+    points = np.concatenate(
+        [
+            rng.normal(size=(12, 3)) * 0.2 + [0.3, 0.0, 0.5],
+            np.array([[0.0, 0.01, 0.0], [0.0, -0.02, 0.01]]),
+        ]
+    )
+    groups = [
+        (np.arange(0, 4), (0,)),
+        (np.arange(4, 8), (0, 1)),
+        (np.arange(8, 12), (0, 1, 2)),
+        (np.arange(12, 14), (3, 4)),
+    ]
+    results = project_groups(fields, groups, points, steps=8)
+    assert len(results) == len(groups)
+    for (rows, ids), (projected, residual) in zip(groups, results):
+        expected = np.asarray(project([fields[i] for i in ids], points[rows]))
+        np.testing.assert_allclose(projected, expected, atol=1e-12)
+        own = np.max(np.abs([[float(fields[i](q)) for i in ids] for q in projected]), axis=1)
+        np.testing.assert_allclose(residual, own, atol=1e-12)
+    # The tangent pair is refused and stays; everything else landed.
+    np.testing.assert_array_equal(results[3][0], points[12:14])
+    assert max(float(r.max()) for _p, r in results[:3]) < 1e-9
+
+
+def test_no_groups_is_no_work():
+    assert project_groups([_sphere([0, 0, 0], 1.0)], [], np.zeros((0, 3))) == []

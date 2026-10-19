@@ -5,10 +5,12 @@ from __future__ import annotations
 import jax.numpy as jnp
 from jax import Array
 
+from cadjoint.provenance import records_construction
 from cadjoint.sdf.boolean.base import BooleanOp, _operand_patch_fields
 from cadjoint.sdf.boolean.smooth import smooth_max
 
 
+@records_construction
 class Difference(BooleanOp):
     """Difference of SDFs (subtract all subsequent from first).
 

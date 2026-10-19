@@ -74,11 +74,13 @@ UNITS: dict[str, str] = {
     "yield_strength": "Pa",
 }
 
-# Per-property bounds enforced when free=True.  The physical bounds are wide
-# engineering brackets (aerogel-to-tungsten), not tight priors: they exist to
-# keep an optimizer inside physically meaningful territory, not to encode a
-# material choice.
-_BOUNDS: dict[str, tuple] = {
+#: Per-property bounds enforced when ``free=True`` — the one table of what a
+#: material property may hold.  The physical bounds are wide engineering
+#: brackets (aerogel-to-tungsten), not tight priors: they exist to keep an
+#: optimizer inside physically meaningful territory, not to encode a
+#: material choice.  Editors that accept property values check against this
+#: table so they never accept a value the optimizer would refuse.
+BOUNDS: dict[str, tuple] = {
     "color": (0.0, 1.0),
     "roughness": (0.0, 1.0),
     "metallic": (0.0, 1.0),
@@ -97,7 +99,7 @@ _BOUNDS: dict[str, tuple] = {
 _NAN = float("nan")
 
 
-def _display(value: float | None, digits: int = 6) -> float | None:
+def display_value(value: float | None, digits: int = 6) -> float | None:
     """Round a property to ``digits`` significant figures for display.
 
     Parameters are stored as JAX scalars, which are float32 unless x64 is on,
@@ -105,8 +107,10 @@ def _display(value: float | None, digits: int = 6) -> float | None:
     artefact of the storage precision, not a different number — six
     significant figures is well past what any material datasheet claims, so
     rounding there makes the payload legible without losing anything real.
-    Only :meth:`Material.describe` rounds; :meth:`Material.get` and
-    :meth:`Material.as_dict` hand back the stored value untouched.
+    Of the material's own methods only :meth:`Material.describe` rounds;
+    :meth:`Material.get` and :meth:`Material.as_dict` hand back the stored
+    value untouched.  Editors call this too, so a value they print reads
+    the same as the one ``describe`` reports.
     """
     if value is None or value == 0.0 or not math.isfinite(value):
         return value
@@ -291,7 +295,7 @@ class Material(Fluent):
                         f"(needed to name the '{key}' parameter)."
                     )
                 param_name = f"{name}_{key}"
-                bounds = _BOUNDS[key]
+                bounds = BOUNDS[key]
                 if key == "color":
                     self.params[key] = Vector(list(val), free=True, name=param_name, bounds=bounds)
                 else:
@@ -358,7 +362,7 @@ class Material(Fluent):
         return {
             "color": self.get("color"),
             **{key: self.get(key) for key in OPTICAL_PROPERTIES if key != "color"},
-            "physical": {key: _display(self.get(key)) for key in PHYSICAL_PROPERTIES},
+            "physical": {key: display_value(self.get(key)) for key in PHYSICAL_PROPERTIES},
             "units": dict(UNITS),
             "free": {key: bool(self.params[key].free) for key in self.params},
         }

@@ -62,6 +62,7 @@ from jax import Array
 from cadjoint.fluent import Fluent
 from cadjoint.geometry.parameters import Parameter, Vector, Vector2, as_parameter
 from cadjoint.geometry.vectors import unit
+from cadjoint.provenance import records_construction
 
 # Below this squared length a direction carries no orientation; the guarded
 # norm keeps value and derivative finite where a bare norm would give 0/0.
@@ -547,6 +548,7 @@ def _refuse_zero_length_edges(vertices: list[Vector2], name: str) -> None:
         )
 
 
+@records_construction
 class PolygonProfile(Fluent):
     """Closed polygon profile in a sketch plane — a construction-tree node.
 

@@ -93,16 +93,10 @@ def _inspect_mesh(
     """
     import jax.numpy as jnp
 
-    from cadjoint.fem.study import _solve_mesh
+    from cadjoint.fem.study import study_mesh
 
     sdf = lambda p: jnp.asarray(scene(p))  # noqa: E731
     name = request.get("name")
-
-    def implicit(study: Any) -> Any:
-        if study.mesh is not None:
-            return study.mesh
-        sim_mesh, _ = _solve_mesh(study, sdf, None)
-        return sim_mesh
 
     declared = ", ".join(repr(mesh.name) for mesh in sim_meshes) or "none"
     if name is not None:
@@ -121,11 +115,11 @@ def _inspect_mesh(
                     f"No declared mesh or study named {name!r} "
                     f"(meshes: {declared}; studies: {studies_declared})."
                 )
-            target = implicit(study_matches[0])
+            target = study_mesh(study_matches[0])
     elif len(sim_meshes) == 1:
         target = sim_meshes[0]
     elif not sim_meshes and len(studies) == 1:
-        target = implicit(studies[0])
+        target = study_mesh(studies[0])
     else:
         raise ValueError(
             f"Pass `name` to pick a mesh: the program declares meshes {declared} "

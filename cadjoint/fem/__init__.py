@@ -92,6 +92,7 @@ from cadjoint.fem.study import (  # noqa: E402
     ThermalStudy,
     Traction,
     capture_studies,
+    study_mesh,
 )
 
 __all__ += [
@@ -104,4 +105,5 @@ __all__ += [
     "ThermalStudy",
     "Traction",
     "capture_studies",
+    "study_mesh",
 ]

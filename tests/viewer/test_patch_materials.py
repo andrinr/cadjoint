@@ -574,8 +574,8 @@ class TestTheRegistry:
         assert direct == through
 
     def test_the_bounds_are_the_ones_material_itself_enforces(self):
-        from cadjoint.render.material import _BOUNDS
+        from cadjoint.render.material import BOUNDS
 
         for key, bracket in PROPERTY_BOUNDS.items():
-            assert bracket == pytest.approx(_BOUNDS[key])
+            assert bracket == pytest.approx(BOUNDS[key])
         assert set(PROPERTY_BOUNDS) == set(EDITABLE_PROPERTIES)

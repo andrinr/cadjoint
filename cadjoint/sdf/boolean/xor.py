@@ -5,9 +5,11 @@ from __future__ import annotations
 import jax.numpy as jnp
 from jax import Array
 
+from cadjoint.provenance import records_construction
 from cadjoint.sdf.boolean.base import BooleanOp
 
 
+@records_construction
 class Xor(BooleanOp):
     """XOR of two SDFs (symmetric difference).
 

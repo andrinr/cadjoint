@@ -2,10 +2,10 @@
 
 Half of the source map is recovered by parsing (see the ``locate_*`` modules);
 this is the other half, collected while the user's program actually runs.  The
-construction classes' initialisers are wrapped for the duration of the block
-so every object — including ones passed straight into ``extrude()`` or
-``Union()`` and never bound to a variable — is paired with the playground line
-that created it.
+construction classes report their own construction through core's capture
+hook (:mod:`cadjoint.provenance`), so every object — including ones passed
+straight into ``extrude()`` or ``Union()`` and never bound to a variable — is
+paired with the playground line that created it.
 
 Only runtime instrumentation belongs here.  Anything that reads the program
 text goes in a locator module; anything that turns captured objects into
@@ -14,29 +14,24 @@ viewer JSON goes in :mod:`cadjoint.viewer.source_map.payload`.
 
 from __future__ import annotations
 
-import sys
+from collections.abc import Iterator
 from contextlib import contextmanager
+from typing import Any
+
+from cadjoint.provenance import Site, capture_constructions
 
 PLAYGROUND_FILENAME = "<cadjoint-playground>"
 
 
-def _caller_line(filename: str) -> int | None:
-    """Line number of the nearest frame executing *filename*."""
-    frame = sys._getframe(1)
-    while frame is not None:
-        if frame.f_code.co_filename == filename:
-            return frame.f_lineno
-        frame = frame.f_back
-    return None
-
-
 @contextmanager
-def capture_profiles(filename: str = PLAYGROUND_FILENAME):
+def capture_profiles(
+    filename: str = PLAYGROUND_FILENAME,
+) -> Iterator[list[tuple[object, int | None]]]:
     """Record every construction object built inside the block, with its line.
 
-    Wraps the construction classes' initialisers for the duration, so objects
-    are captured wherever they are built — including ones passed straight into
-    ``extrude()`` or ``Union()`` that never get bound to a variable.
+    Objects are captured wherever they are built — including ones passed
+    straight into ``extrude()`` or ``Union()`` that never get bound to a
+    variable.
 
     Yields:
         A list of ``(object, line)`` pairs in construction order. ``line`` is
@@ -46,26 +41,17 @@ def capture_profiles(filename: str = PLAYGROUND_FILENAME):
     from cadjoint.construction.solid import ConstructionPrimitive
 
     captured: list[tuple[object, int | None]] = []
-    originals = {cls: cls.__init__ for cls in (PolygonProfile, ConstructionPrimitive)}
 
-    def wrap(cls, original):
-        def patched_init(self, *args, **kwargs):
-            original(self, *args, **kwargs)
-            captured.append((self, _caller_line(filename)))
+    def constructed(obj: Any, site: Site) -> None:
+        if isinstance(obj, (PolygonProfile, ConstructionPrimitive)):
+            captured.append((obj, site.line))
 
-        cls.__init__ = patched_init
-
-    for cls, original in originals.items():
-        wrap(cls, original)
-    try:
+    with capture_constructions(filename, constructed=constructed):
         yield captured
-    finally:
-        for cls, original in originals.items():
-            cls.__init__ = original
 
 
 @contextmanager
-def capture_scene_graph(filename: str = PLAYGROUND_FILENAME):
+def capture_scene_graph(filename: str = PLAYGROUND_FILENAME) -> Iterator[dict[str, list]]:
     """Record what the scene tree needs to name the SDF graph the program builds.
 
     Two things the SDF objects do not carry themselves: the playground line
@@ -82,36 +68,19 @@ def capture_scene_graph(filename: str = PLAYGROUND_FILENAME):
         ``(primitive, placed_sdf)`` pairs.  Both hold the objects themselves,
         so their ``id()`` stays valid while the dict is alive.
     """
-    from cadjoint.construction.solid import ConstructionPrimitive
     from cadjoint.sdf.boolean import Difference, Intersection, Union, Xor
 
     graph: dict[str, list] = {"booleans": [], "primitives": []}
-    initialisers = {cls: cls.__init__ for cls in (Union, Difference, Intersection, Xor)}
-    original_sdf = ConstructionPrimitive.sdf
 
-    def wrap(cls, original):
-        def patched_init(self, *args, **kwargs):
-            original(self, *args, **kwargs)
+    def constructed(obj: Any, site: Site) -> None:
+        if isinstance(obj, (Union, Difference, Intersection, Xor)):
             # Only a boolean the program *called* has a call in the source to
             # pair with: one built by ``a | b`` or inside the library is
             # constructed from a cadjoint frame, and gets no line.
-            caller = sys._getframe(1)
-            line = caller.f_lineno if caller.f_code.co_filename == filename else None
-            graph["booleans"].append((self, line))
+            graph["booleans"].append((obj, site.line if site.direct else None))
 
-        cls.__init__ = patched_init
+    def placed(primitive: Any, sdf: Any) -> None:
+        graph["primitives"].append((primitive, sdf))
 
-    def patched_sdf(self):
-        placed = original_sdf(self)
-        graph["primitives"].append((self, placed))
-        return placed
-
-    for cls, original in initialisers.items():
-        wrap(cls, original)
-    ConstructionPrimitive.sdf = patched_sdf
-    try:
+    with capture_constructions(filename, constructed=constructed, placed=placed):
         yield graph
-    finally:
-        for cls, original in initialisers.items():
-            cls.__init__ = original
-        ConstructionPrimitive.sdf = original_sdf
