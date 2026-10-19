@@ -240,6 +240,13 @@ export interface DisplaySettings {
   showAllPlanes: boolean;
   showMeshEdges: boolean;
   showMeshWireframe: boolean;
+  /**
+   * The B-rep inspector: the private tier's derived B-rep drawn in place of
+   * the solid — faces in categorical colours, edges by kind, vertices — so an
+   * extraction can be judged by eye (src/brep.ts). Like `showAllPlanes`, a
+   * preset stored before it existed lacks it, so it is read as `=== true`.
+   */
+  showBrep: boolean;
   showConstraints: boolean;
   showFixedConstraints: boolean;
   showDistanceConstraints: boolean;
@@ -329,6 +336,7 @@ export const DEFAULT_DISPLAY: DisplaySettings = {
   showAllPlanes: false,
   showMeshEdges: false,
   showMeshWireframe: false,
+  showBrep: false,
   showConstraints: true,
   showFixedConstraints: true,
   showDistanceConstraints: true,

@@ -49,12 +49,18 @@ COMPILE_TIMEOUT_SECONDS = 90
 # so a cold cache cannot make the overlay silently vanish.
 MESH_TIMEOUT_SECONDS = 90
 
+# The B-rep inspector runs the full extraction (surface certification
+# included) and then the feature curves on top: two extractions where the
+# overlay runs one, so twice its budget.
+BREP_TIMEOUT_SECONDS = 180
+
 
 #: How each worker mode names itself in a timeout message.
 _MODE_NOUNS = {
     "compile": "Compilation",
     "mesh": "Meshing",
     "mesh_inspect": "Mesh inspection",
+    "brep": "B-rep inspection",
     "simulate": "Simulation",
     "export": "Export",
     "lint": "Linting",
@@ -365,6 +371,15 @@ def mesh_source(source: str, timeout: float = MESH_TIMEOUT_SECONDS) -> dict[str,
     through this path only while a mesh overlay is actually turned on.
     """
     return _run_worker(source, "mesh", timeout)
+
+
+def brep_source(source: str, timeout: float = BREP_TIMEOUT_SECONDS) -> dict[str, Any]:
+    """Derive the B-rep and serve it for the inspector, in a disposable child process.
+
+    Requested lazily, only while the inspector is on; see
+    :mod:`cadjoint.viewer._brep_inspector`.
+    """
+    return _run_worker(source, "brep", timeout)
 
 
 # FEM solves cover meshing plus the assembled solve, which can far exceed the

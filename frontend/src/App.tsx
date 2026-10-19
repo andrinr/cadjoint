@@ -35,6 +35,7 @@ import { removalLabel } from "./shell/removal";
 import "./shell/layoutGrid.css";
 import { RenderSettingsButton } from "./components/viewer/RenderSettingsButton";
 import { ViewerPane } from "./components/ViewerPane";
+import { createBrepCycle } from "./shell/brepCycle";
 import { createCompileCycle } from "./shell/compileCycle";
 import { createPatchOperations } from "./shell/patchOperations";
 import { createRenderState } from "./shell/renderState";
@@ -159,6 +160,11 @@ export function App() {
     renderer,
     history,
     display: render.display,
+  });
+  createBrepCycle({
+    display: render.display,
+    compiledSource: compile.compiledSource,
+    disable: () => render.applyDisplay({ showBrep: false }),
   });
   /**
    * The last removal, while the source is still the one it produced (F7).

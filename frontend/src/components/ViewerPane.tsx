@@ -51,6 +51,11 @@ import {
   setStatus,
   simView,
   tool,
+  brepHiddenKinds,
+  brepHover,
+  brepOffSurfaceOnly,
+  brepPayload,
+  setBrepHover,
 } from "../state";
 import { rectAabbProposal } from "../bcPick";
 import { overridesFor, vertexState } from "../viewer/dragBinding";
@@ -78,6 +83,16 @@ import { createSimInteraction } from "./viewer/simInteraction";
 import { createViewerKeyboard } from "./viewer/keyboard";
 import { createViewerTools } from "./viewer/tools";
 import { ViewerHint } from "./viewer/ViewerHint";
+import { BrepInspector } from "./viewer/BrepInspector";
+import {
+  brepModel,
+  colourFaces,
+  packBrepEdges,
+  packBrepFaces,
+  packBrepVertices,
+  pickBrep,
+  type BrepHover,
+} from "../brep";
 import { ViewerOverlays, type PickRect } from "./viewer/ViewerOverlays";
 import type { Gesture, PendingConstraint } from "./viewer/gestures";
 import type { Selection } from "../types";
@@ -257,6 +272,7 @@ export function ViewerPane(props: ViewerPaneProps) {
    * selects, and the default arrow means "nothing here" — dragging there orbits.
    */
   const updateHover = (x: number, y: number) => {
+    scheduleBrepPick(x, y);
     if (panHeld) {
       canvas.style.cursor = "move";
       return;
@@ -765,6 +781,56 @@ export function ViewerPane(props: ViewerPaneProps) {
     renderer.setMeshEdges(meshEdges());
   });
 
+  // The B-rep inspector. The colouring is per B-rep; the packing follows the
+  // hover and the legend, which re-pack the arrays but never re-colour.
+  const brep = createMemo(() => brepModel(brepPayload()));
+  const brepColours = createMemo(() => {
+    const model = brep();
+    return model ? colourFaces(model) : new Map<number, number>();
+  });
+  createEffect(() => {
+    const model = brep();
+    if (!props.display.showBrep || !model) {
+      renderer.setBrep(null);
+      return;
+    }
+    const style = {
+      hiddenKinds: brepHiddenKinds(),
+      offSurfaceOnly: brepOffSurfaceOnly(),
+      hover: brepHover(),
+    };
+    renderer.setBrep({
+      faces: packBrepFaces(model, brepColours(), style.hover),
+      edges: packBrepEdges(model, style),
+      vertices: packBrepVertices(model, style.hover),
+    });
+  });
+
+  /**
+   * Pick what the pointer is on in the inspector, once per frame at most.
+   *
+   * Picking projects every tessellation point, which on a large B-rep is a
+   * few milliseconds — fine once a frame, wasteful once per pointer event.
+   */
+  let brepPickAt: [number, number] | null = null;
+  let brepPickFrame = 0;
+  const sameHover = (a: BrepHover, b: BrepHover) =>
+    a === b || (a !== null && b !== null && a.kind === b.kind && a.id === b.id);
+  const scheduleBrepPick = (x: number, y: number) => {
+    if (!props.display.showBrep || !brep()) return;
+    brepPickAt = [x, y];
+    if (brepPickFrame) return;
+    brepPickFrame = requestAnimationFrame(() => {
+      brepPickFrame = 0;
+      const model = brep();
+      const at = brepPickAt;
+      if (!model || !at) return;
+      const next = pickBrep(model, at[0], at[1], pickView(), brepHiddenKinds());
+      if (!sameHover(next, brepHover())) setBrepHover(next);
+    });
+  };
+  onCleanup(() => cancelAnimationFrame(brepPickFrame));
+
   // The placement ghost belongs to the sketch tool and leaves with it.
   createEffect(() => {
     if (tool() !== "sketch" && planePreview() !== null) setPlanePreview(null);
@@ -895,6 +961,7 @@ export function ViewerPane(props: ViewerPaneProps) {
         sdfFraction={props.display.sdfFraction}
       />
       <PerfReadout renderer={props.renderer} show={props.display.showGraticule} />
+      <BrepInspector show={props.display.showBrep === true} />
       <PlaneLabels show={props.display.showOverlays} geometry={planeMarks()} />
       <ViewerOverlays pickRect={props.display.showOverlays ? pickRect() : null} />
       <ViewerHint

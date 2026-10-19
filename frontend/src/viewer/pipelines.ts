@@ -113,6 +113,8 @@ export interface OverlayPipelines {
   /** Filled polygon of the face under the pointer. */
   facePipeline: DepthPair;
   handlePipeline: DepthPair;
+  /** The B-rep inspector's faces: opaque, depth-writing, the solid's stand-in. */
+  brepFacePipeline: GPURenderPipeline;
   gizmoEdgePipeline: GPURenderPipeline;
   gizmoArrowPipeline: GPURenderPipeline;
   gizmoScalePipeline: GPURenderPipeline;
@@ -233,6 +235,28 @@ export function createOverlayPipelines(
     { format: DEPTH_FORMAT, depthWriteEnabled: false, depthCompare: "less-equal" },
   );
 
+  const brepFacePipeline = device.createRenderPipeline({
+    label: "B-rep inspector faces",
+    layout: pipelineLayout,
+    vertex: {
+      module,
+      entryPoint: "vs_brep",
+      buffers: [
+        {
+          arrayStride: FACE_STRIDE,
+          stepMode: "vertex",
+          attributes: [
+            { shaderLocation: 0, offset: 0, format: "float32x3" },
+            { shaderLocation: 1, offset: 12, format: "float32x4" },
+          ],
+        },
+      ],
+    },
+    fragment: { module, entryPoint: "fs_brep", targets: [{ format }] },
+    primitive: { topology: "triangle-list" },
+    depthStencil: depthStencil,
+  });
+
   const handlePipeline = depthPair(
     {
       label: "Overlay handles",
@@ -336,6 +360,7 @@ export function createOverlayPipelines(
     edgePipeline,
     facePipeline,
     handlePipeline,
+    brepFacePipeline,
     gizmoEdgePipeline,
     gizmoArrowPipeline,
     gizmoScalePipeline,

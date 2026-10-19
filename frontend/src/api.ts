@@ -12,6 +12,7 @@ import {
   type OptimizeProgress,
 } from "./optimize";
 import type {
+  BrepResponse,
   CompileResponse,
   CompleteResponse,
   ExportRequest,
@@ -134,6 +135,24 @@ export async function mesh(
 ): Promise<MeshResponse & JobStamped> {
   return post<MeshResponse & JobStamped>(
     "/api/mesh",
+    { source, ...(options.clientId ? { client_id: options.clientId } : {}) },
+    options.signal,
+  );
+}
+
+/**
+ * Derive the scene's B-rep through the private tier, for the inspector.
+ *
+ * A registered job like `mesh`: lazy, cancellable by `clientId`, and only
+ * asked for while the inspector is on. Without the private tier the answer
+ * is still `ok`, with `brep.available` false and `brep.reason` saying why.
+ */
+export async function brep(
+  source: string,
+  options: RequestOptions = {},
+): Promise<BrepResponse & JobStamped> {
+  return post<BrepResponse & JobStamped>(
+    "/api/brep",
     { source, ...(options.clientId ? { client_id: options.clientId } : {}) },
     options.signal,
   );
