@@ -393,7 +393,7 @@ class TestStudyFormValidation:
 
         with capture_studies():
             _bar_study("named-bar")
-            with pytest.raises(ValueError, match="No declared study named 'nope'"):
+            with pytest.raises(ValueError, match="declares no study named 'nope'"):
                 Optimization("o", study="nope", metric="mean")
 
     def test_study_must_be_a_study_or_name(self):

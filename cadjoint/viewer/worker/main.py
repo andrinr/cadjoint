@@ -292,10 +292,10 @@ def _compile_source(source: str) -> dict[str, Any]:
         }
         solver_runs = [
             {
-                "node": node_ids.get(report["target_id"]),
-                "method": report["method"],
-                "iterations": report["iterations"],
-                "losses": report["losses"],
+                "node": node_ids.get(report.target_id),
+                "method": report.method,
+                "iterations": report.iterations,
+                "losses": report.losses,
             }
             for report in solver_reports
         ]

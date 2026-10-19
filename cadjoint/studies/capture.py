@@ -8,38 +8,29 @@ construction order.  Nothing here knows what a study is beyond a name and a
 :class:`cadjoint.flow.FlowStudy` fills a lattice, and both land in the same
 list.
 
-Mirrors ``capture_constraint_solves`` in :mod:`cadjoint.constraints.solve`
-and ``capture_sim_meshes`` in :mod:`cadjoint.fem.simmesh`.
+One :class:`cadjoint.capture.Capture`, like the mesh, optimization and
+constraint-solve registries.
 """
 
 from __future__ import annotations
 
-from collections.abc import Iterator
-from contextlib import contextmanager
-from contextvars import ContextVar
+from contextlib import AbstractContextManager
 from typing import Any
+
+from cadjoint.capture import Capture
 
 __all__ = ["capture_studies", "declared_studies", "register_study"]
 
-_CAPTURED_STUDIES: ContextVar[list[Any] | None] = ContextVar(
-    "cadjoint_captured_studies",
-    default=None,
-)
+_STUDIES: Capture[Any] = Capture("cadjoint_captured_studies")
 
 
-@contextmanager
-def capture_studies() -> Iterator[list[Any]]:
+def capture_studies() -> AbstractContextManager[list[Any]]:
     """Collect every study constructed inside this context.
 
     Yields:
         The list the studies land in, in construction order.
     """
-    studies: list[Any] = []
-    token = _CAPTURED_STUDIES.set(studies)
-    try:
-        yield studies
-    finally:
-        _CAPTURED_STUDIES.reset(token)
+    return _STUDIES.collect()
 
 
 def declared_studies() -> list[Any]:
@@ -53,7 +44,7 @@ def declared_studies() -> list[Any]:
         The captured studies in construction order.  A copy: appending to
         it does not register anything.
     """
-    return list(_CAPTURED_STUDIES.get() or ())
+    return _STUDIES.declared()
 
 
 def register_study(study: Any) -> None:
@@ -66,6 +57,4 @@ def register_study(study: Any) -> None:
     Args:
         study: Any object with a ``name`` and a ``describe()``.
     """
-    captured = _CAPTURED_STUDIES.get()
-    if captured is not None:
-        captured.append(study)
+    _STUDIES.record(study)

@@ -65,27 +65,3 @@ def _execute_scene(
 _FEM_UNAVAILABLE_MESSAGE = (
     "FEM simulation needs the 'fem' extra (jax-fem). Install it with: pip install cadjoint[fem]"
 )
-
-
-def _named_study(studies: list[Any], name: Any) -> Any:
-    """The one declared study called *name* (or raise, listing the others)."""
-    matches = [study for study in studies if study.name == name]
-    if not matches:
-        declared = ", ".join(repr(study.name) for study in studies) or "none"
-        raise ValueError(f"The program declares no study named {name!r} (declared: {declared}).")
-    if len(matches) > 1:
-        raise ValueError(f"The program declares more than one study named {name!r}.")
-    return matches[0]
-
-
-def _named_optimization(optimizations: list[Any], name: Any) -> Any:
-    """The one declared optimization called *name* (or raise, listing them)."""
-    matches = [optimization for optimization in optimizations if optimization.name == name]
-    if not matches:
-        declared = ", ".join(repr(optimization.name) for optimization in optimizations) or "none"
-        raise ValueError(
-            f"The program declares no optimization named {name!r} (declared: {declared})."
-        )
-    if len(matches) > 1:
-        raise ValueError(f"The program declares more than one optimization named {name!r}.")
-    return matches[0]

@@ -6,8 +6,7 @@ viewer via :meth:`Optimization.describe`, and runnable directly by scripts
 and the playground via :meth:`Optimization.run`.  Constructing an
 optimization inside a :func:`capture_optimizations` context registers it
 automatically, so the compile worker can collect the optimizations a user
-program declares — mirroring ``capture_studies`` in
-:mod:`cadjoint.fem.study`.
+program declares — mirroring :func:`cadjoint.studies.capture_studies`.
 
 The optimized variables are the FREE parameters of one scene object: the
 named :class:`~cadjoint.geometry.parameters.Scalar` /
@@ -87,13 +86,13 @@ from __future__ import annotations
 
 import math
 from collections.abc import Iterator
-from contextlib import contextmanager
-from contextvars import ContextVar
+from contextlib import AbstractContextManager, contextmanager
 from dataclasses import KW_ONLY, dataclass, field
 from typing import Any, Callable
 
 import numpy as np
 
+from cadjoint.capture import Capture, one_named
 from cadjoint.enums import (
     GradientPath,
     GradientPathLike,
@@ -123,32 +122,17 @@ PRECISIONS = values(Precision)
 GRADIENT_PATHS = values(GradientPath)
 TRAJECTORY_LIMIT = 100
 
-_CAPTURED_OPTIMIZATIONS: ContextVar[list[Optimization] | None] = ContextVar(
-    "cadjoint_captured_optimizations",
-    default=None,
-)
+_OPTIMIZATIONS: Capture[Optimization] = Capture("cadjoint_captured_optimizations")
 
 
-@contextmanager
-def capture_optimizations() -> Iterator[list[Optimization]]:
+def capture_optimizations() -> AbstractContextManager[list[Optimization]]:
     """Collect every optimization constructed inside this context.
 
     Mirrors ``capture_studies``: the compile worker wraps user program
     execution in this context and receives the declared optimizations in
     construction order.
     """
-    optimizations: list[Optimization] = []
-    token = _CAPTURED_OPTIMIZATIONS.set(optimizations)
-    try:
-        yield optimizations
-    finally:
-        _CAPTURED_OPTIMIZATIONS.reset(token)
-
-
-def _register(optimization: Optimization) -> None:
-    captured = _CAPTURED_OPTIMIZATIONS.get()
-    if captured is not None:
-        captured.append(optimization)
+    return _OPTIMIZATIONS.collect()
 
 
 def _plain(value: Any) -> float | list[float]:
@@ -188,16 +172,11 @@ def _resolve_study(study: Any) -> Any:
     if isinstance(study, (ThermalStudy, ElasticStudy)):
         return study
     if isinstance(study, str):
-        captured = declared_studies()
-        declared = [candidate for candidate in captured if candidate.name == study]
-        if len(declared) == 1:
-            return declared[0]
-        if len(declared) > 1:
-            raise ValueError(f"The program declares more than one study named {study!r}.")
-        names = ", ".join(repr(candidate.name) for candidate in captured) or "none"
-        raise ValueError(
-            f"No declared study named {study!r} (declared: {names}). "
-            "Declare one before the optimization, or pass the study instance itself."
+        return one_named(
+            declared_studies(),
+            study,
+            "study",
+            hint="Declare one before the optimization, or pass the study instance itself.",
         )
     raise ValueError(
         "study must be a ThermalStudy/ElasticStudy or the name of a declared one, "
@@ -449,7 +428,7 @@ class Optimization:
             self.precision,
             f"precision must be one of: {', '.join(PRECISIONS)} (got {self.precision!r}).",
         )
-        _register(self)
+        _OPTIMIZATIONS.record(self)
 
     def _validate_objective_form(self) -> None:
         if self.objective is None:

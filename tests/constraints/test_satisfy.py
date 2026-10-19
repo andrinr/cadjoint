@@ -33,10 +33,10 @@ def test_satisfy_constraints_records_decreasing_loss(method, steps):
         satisfy_constraints(profile, method=method, steps=steps)
 
     assert len(reports) == 1
-    assert reports[0]["method"] == method
-    assert reports[0]["iterations"] == steps
-    assert len(reports[0]["losses"]) == steps + 1
-    assert reports[0]["losses"][-1] < reports[0]["losses"][0]
+    assert reports[0].method == method
+    assert reports[0].iterations == steps
+    assert len(reports[0].losses) == steps + 1
+    assert reports[0].losses[-1] < reports[0].losses[0]
 
 
 def test_satisfy_constraints_rejects_invalid_controls():

@@ -317,9 +317,10 @@ def _write_result(
     """Solve (or reuse) the named study and write its fields as VTK."""
     import jax.numpy as jnp
 
-    from cadjoint.viewer.worker.scene import _FEM_UNAVAILABLE_MESSAGE, _named_study
+    from cadjoint.capture import one_named
+    from cadjoint.viewer.worker.scene import _FEM_UNAVAILABLE_MESSAGE
 
-    study = _named_study(studies, request.name)
+    study = one_named(studies, request.name, "study")
     try:
         import jax_fem  # noqa: F401
     except ImportError:

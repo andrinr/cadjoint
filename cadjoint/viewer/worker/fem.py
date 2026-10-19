@@ -16,6 +16,7 @@ from typing import Any
 
 import numpy as np
 
+from cadjoint.capture import one_named
 from cadjoint.viewer.worker.payloads import (
     _element_edge_pairs,
     _render_surface_payload,
@@ -24,7 +25,6 @@ from cadjoint.viewer.worker.payloads import (
 from cadjoint.viewer.worker.scene import (
     _FEM_UNAVAILABLE_MESSAGE,
     _execute_scene,
-    _named_study,
 )
 
 
@@ -44,7 +44,7 @@ def _simulate_study(scene: Any, studies: list[Any], request: dict[str, Any]) -> 
     """
     import jax.numpy as jnp
 
-    study = _named_study(studies, request.get("name"))
+    study = one_named(studies, request.get("name"), "study")
 
     try:
         import jax_fem  # noqa: F401

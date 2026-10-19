@@ -43,14 +43,13 @@ Example::
 
 from __future__ import annotations
 
-from collections.abc import Iterator
-from contextlib import contextmanager
-from contextvars import ContextVar
+from contextlib import AbstractContextManager
 from dataclasses import dataclass, field
 from typing import Any
 
 import numpy as np
 
+from cadjoint.capture import Capture
 from cadjoint.enums import (
     MeshMethod,
     MeshMethodLike,
@@ -66,7 +65,7 @@ from cadjoint.fem.tetmesh import TetMesh, sdf_to_tet_mesh, tet10_mesh
 from cadjoint.meshing import DEFAULT_BOUNDS, DEFAULT_SIZE
 from cadjoint.studies import require_triplet
 
-__all__ = ["SimMesh", "capture_sim_meshes"]
+__all__ = ["SimMesh", "capture_sim_meshes", "declared_sim_meshes"]
 
 #: Supported meshing methods (the viewer round-trips these literals).  The
 #: option set itself lives in :class:`cadjoint.enums.MeshMethod`; this is the
@@ -79,14 +78,10 @@ _MESHERS = values(TetMesher)
 
 _SCAN_CELLS = 32
 
-_CAPTURED_MESHES: ContextVar[list[SimMesh] | None] = ContextVar(
-    "cadjoint_captured_sim_meshes",
-    default=None,
-)
+_SIM_MESHES: Capture[SimMesh] = Capture("cadjoint_captured_sim_meshes")
 
 
-@contextmanager
-def capture_sim_meshes() -> Iterator[list[SimMesh]]:
+def capture_sim_meshes() -> AbstractContextManager[list[SimMesh]]:
     """Collect every :class:`SimMesh` constructed inside this context.
 
     Mirrors ``capture_studies``: the compile worker wraps user program
@@ -94,18 +89,12 @@ def capture_sim_meshes() -> Iterator[list[SimMesh]]:
     construction order.  Studies constructed inside the same context may
     refer to a captured mesh by name (``mesh="bracket-mesh"``).
     """
-    meshes: list[SimMesh] = []
-    token = _CAPTURED_MESHES.set(meshes)
-    try:
-        yield meshes
-    finally:
-        _CAPTURED_MESHES.reset(token)
+    return _SIM_MESHES.collect()
 
 
-def _register(mesh: SimMesh) -> None:
-    captured = _CAPTURED_MESHES.get()
-    if captured is not None:
-        captured.append(mesh)
+def declared_sim_meshes() -> list[SimMesh]:
+    """The meshes declared so far in the active capture context (a copy)."""
+    return _SIM_MESHES.declared()
 
 
 def _resolution_counts(resolution: Any) -> tuple[int, int, int]:
@@ -241,7 +230,7 @@ class SimMesh:
             raise TypeError(
                 f"domain must be an SDF object or a callable field, got {type(self.domain).__name__}."
             )
-        _register(self)
+        _SIM_MESHES.record(self)
 
     # ── declaration ─────────────────────────────────────────────────────────
 
@@ -472,8 +461,5 @@ def _anonymous(
     still meshes through the one :class:`SimMesh` path, but the anonymous
     mesh never shows up next to user-declared meshes.
     """
-    token = _CAPTURED_MESHES.set(None)
-    try:
+    with _SIM_MESHES.suspended():
         return SimMesh(name=name, resolution=resolution, domain=domain, bounds=bounds, size=size)
-    finally:
-        _CAPTURED_MESHES.reset(token)

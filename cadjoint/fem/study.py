@@ -58,12 +58,13 @@ from __future__ import annotations
 from dataclasses import KW_ONLY, dataclass, field
 from typing import Any
 
+from cadjoint.capture import one_named
 from cadjoint.enums import BoundaryConditionType, StudyKind
 from cadjoint.fem.cutfem import CutMesh
 from cadjoint.fem.discretization import Discretization
 from cadjoint.fem.hexmesh import HexMesh
 from cadjoint.fem.properties import FROM_MATERIAL
-from cadjoint.fem.simmesh import _CAPTURED_MESHES, SimMesh, _anonymous, _domain_entry
+from cadjoint.fem.simmesh import SimMesh, _anonymous, _domain_entry, declared_sim_meshes
 from cadjoint.fem.tetmesh import TetMesh
 from cadjoint.meshing import DEFAULT_BOUNDS, DEFAULT_SIZE
 from cadjoint.studies import NodeSelection, register_study, require_triplet
@@ -324,16 +325,11 @@ def _resolve_mesh_reference(mesh: Any) -> SimMesh:
     if isinstance(mesh, SimMesh):
         return mesh
     if isinstance(mesh, str):
-        captured = _CAPTURED_MESHES.get()
-        declared = [candidate for candidate in (captured or []) if candidate.name == mesh]
-        if len(declared) == 1:
-            return declared[0]
-        if len(declared) > 1:
-            raise ValueError(f"The program declares more than one mesh named {mesh!r}.")
-        names = ", ".join(repr(candidate.name) for candidate in (captured or [])) or "none"
-        raise ValueError(
-            f"No declared SimMesh named {mesh!r} (declared: {names}). "
-            "Declare one before the study, or pass the SimMesh instance itself."
+        return one_named(
+            declared_sim_meshes(),
+            mesh,
+            "SimMesh",
+            hint="Declare one before the study, or pass the SimMesh instance itself.",
         )
     raise ValueError(
         f"mesh must be a SimMesh or the name of a declared one, got {type(mesh).__name__}."

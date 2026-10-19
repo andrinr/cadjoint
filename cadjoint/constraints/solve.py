@@ -1,8 +1,7 @@
 """Constraint solving via Optimistix, Newton projection, and Optax."""
 
-from collections.abc import Iterator
-from contextlib import contextmanager
-from contextvars import ContextVar
+from contextlib import AbstractContextManager
+from dataclasses import dataclass
 from typing import Any
 
 import jax
@@ -13,6 +12,7 @@ import optimistix as optx
 from jax import Array
 
 from cadjoint._compiled import call_jit
+from cadjoint.capture import Capture
 from cadjoint.constraints.residual import (
     _collect_constraints,
     build_residual_fn,
@@ -24,21 +24,25 @@ from cadjoint.enums import ConstraintSolveMethod, ConstraintSolveMethodLike, lis
 from cadjoint.fluent import Fluent
 from cadjoint.geometry.parameters import Parameter
 
-_CAPTURED_SOLVES: ContextVar[list[dict[str, Any]] | None] = ContextVar(
-    "cadjoint_captured_constraint_solves",
-    default=None,
-)
+
+@dataclass(frozen=True)
+class SolveReport:
+    """What one :func:`satisfy_constraints` call did."""
+
+    target_id: int
+    """``id()`` of the object whose constraints were solved."""
+    method: ConstraintSolveMethod
+    iterations: int
+    losses: list[float]
+    """The residual loss before the first step and after each one."""
 
 
-@contextmanager
-def capture_constraint_solves() -> Iterator[list[dict[str, Any]]]:
-    """Capture diagnostics from ``satisfy_constraints`` calls in this context."""
-    reports: list[dict[str, Any]] = []
-    token = _CAPTURED_SOLVES.set(reports)
-    try:
-        yield reports
-    finally:
-        _CAPTURED_SOLVES.reset(token)
+_SOLVES: Capture[SolveReport] = Capture("cadjoint_captured_constraint_solves")
+
+
+def capture_constraint_solves() -> AbstractContextManager[list[SolveReport]]:
+    """Capture a :class:`SolveReport` for each ``satisfy_constraints`` call in this context."""
+    return _SOLVES.collect()
 
 
 def _loss(flat_fn, values: Array) -> Array:
@@ -291,16 +295,7 @@ def satisfy_constraints(
         losses = [0.0]
     apply_parameters(root, solved)
 
-    reports = _CAPTURED_SOLVES.get()
-    if reports is not None:
-        reports.append(
-            {
-                "target_id": id(root),
-                "method": method,
-                "iterations": steps,
-                "losses": losses,
-            }
-        )
+    _SOLVES.record(SolveReport(id(root), method, steps, losses))
     return solved
 
 

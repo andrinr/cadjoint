@@ -19,11 +19,11 @@ import json
 import sys
 from typing import Any
 
+from cadjoint.capture import one_named
 from cadjoint.viewer.worker.payloads import _study_payload
 from cadjoint.viewer.worker.scene import (
     _FEM_UNAVAILABLE_MESSAGE,
     _execute_scene,
-    _named_optimization,
 )
 
 # The server validates requested step counts, but the declaration itself may
@@ -70,7 +70,7 @@ def _run_optimization(
 
     from cadjoint.viewer.patch import set_parameter_values
 
-    optimization = _named_optimization(namespace["__optimizations__"], request.get("name"))
+    optimization = one_named(namespace["__optimizations__"], request.get("name"), "optimization")
     steps = request.get("steps")
     steps = optimization.steps if steps is None else int(steps)
     study_backed = optimization.study is not None
