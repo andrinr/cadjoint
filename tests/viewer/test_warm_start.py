@@ -149,7 +149,11 @@ class TestItYieldsToTheUser:
         seen: list[int] = []
 
         def record(source, mode, timeout, extra=None, *, nice=0):
-            seen.append(nice)
+            # Only this test's warm-up: a warm-up thread another test left
+            # running in the same worker process would call the patched
+            # launcher too, and did on CI (seen == [10, 10]).
+            if threading.current_thread() in threads:
+                seen.append(nice)
             return {"ok": True}
 
         monkeypatch.setattr(_worker_client, "_run_worker", record)
