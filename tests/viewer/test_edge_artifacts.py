@@ -843,7 +843,7 @@ def _design_and_scenery():
 
 
 def test_the_design_subtree_is_the_construction_owned_leaves():
-    from cadjoint.viewer._edge_overlay import _design_leaves, _world_frame_leaves
+    from cadjoint.viewer._design_leaves import _design_leaves, _world_frame_leaves
 
     leaves = _world_frame_leaves(_design_and_scenery())
     assert len(leaves) == 2
@@ -852,7 +852,7 @@ def test_the_design_subtree_is_the_construction_owned_leaves():
 
 
 def test_a_scene_with_no_construction_mirror_falls_back_to_the_whole_scene():
-    from cadjoint.viewer._edge_overlay import _design_leaves, _world_frame_leaves
+    from cadjoint.viewer._design_leaves import _design_leaves, _world_frame_leaves
 
     scene, _curves = _staggered_slabs_config()
     leaves = _world_frame_leaves(scene)

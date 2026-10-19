@@ -15,6 +15,8 @@ from typing import Any
 
 import numpy as np
 
+from cadjoint.viewer._design_leaves import _design_leaves, _world_frame_leaves
+
 # ── leaf-level seam projection ───────────────────────────────────────────────
 #
 # The lattice sharp layer finds CSG seams from the leaves: group the mesh
@@ -218,7 +220,6 @@ def _lattice_layers(scene: Any, grid: Any) -> tuple[np.ndarray, np.ndarray, np.n
         sample_grid,
         sharp_qef_vertices,
     )
-    from cadjoint.viewer._edge_overlay import _design_leaves, _world_frame_leaves
 
     sdf = lambda p: jnp.asarray(scene(p))  # noqa: E731
     values = sample_grid(sdf, grid)
