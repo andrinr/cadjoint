@@ -54,11 +54,12 @@ from cadjoint.viewer.schema.requests import (
     PatchResponse,
 )
 
-API_VERSION = 2
+API_VERSION = 3
 """The version of this contract.
 
 1 was every server before the contract carried a number; a frontend that
 finds no ``api_version`` in ``/api/session`` is talking to one of those.
+3 added ``scene_graph`` to the compile payload.
 """
 
 API_VERSION_HEADER = "X-Cadjoint-Api"

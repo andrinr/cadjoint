@@ -69,6 +69,7 @@ import { createSuperseding, type RunToken } from "./supersede";
 import type { SourceHistoryStore } from "./sourceHistory";
 import type { DisplaySettings, Renderer } from "../viewer/renderer";
 import type { PatchRequest, ShaderProgram } from "../types";
+import { payloadShaders } from "../scene/payloadShaders.ts";
 
 /** The generated shader pair, for the "Generated WGSL" dialog. */
 export interface WgslPreview {
@@ -369,15 +370,16 @@ export function createCompileCycle(options: CompileCycleOptions): CompileCycle {
       // publish above: two installs racing inside the renderer is the one way
       // an older program could still end up on screen.
       if (!token.current()) return false;
-      await options.renderer.setShaders({
-        preview: attempt.result.preview_shader,
-        path: attempt.result.path_shader,
-        present: attempt.result.present_shader,
-        // The uniform contract, when the worker emitted one: with it the
-        // renderer can tell a parameter edit from a topology edit and skip
-        // the shader module and pipelines entirely for the former.
-        program: attempt.result.program ?? null,
-      });
+      // The server's shaders, or the same ones built here from the scene
+      // graph when the page asks for that (`scene/payloadShaders.ts`). Either
+      // way they carry the uniform contract, with which the renderer tells a
+      // parameter edit from a topology edit and skips the shader module and
+      // pipelines entirely for the former.
+      const shaders = await payloadShaders(attempt.result);
+      if (!token.current()) return false;
+      // Where the installed shaders came from, for the e2e specs.
+      if (globalThis.document) document.documentElement.dataset.shaderOrigin = shaders.origin;
+      await options.renderer.setShaders(shaders);
       return true;
     } catch (error) {
       if (!token.current()) return false;

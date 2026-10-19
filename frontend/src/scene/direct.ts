@@ -345,7 +345,7 @@ class Emitter {
 
   /** Node identity: the v2 id, or object identity for a v1 graph. */
   private key(node: SceneNode): string {
-    if (node.id !== undefined) return node.id;
+    if (node.id != null) return node.id;
     let key = this.anonymous.get(node);
     if (key === undefined) {
       key = `#${this.anonymousCount++}`;

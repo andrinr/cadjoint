@@ -9,32 +9,19 @@
 export const SCENE_FORMAT = "cadjoint-scene";
 export const SCENE_VERSIONS = [1, 2] as const;
 
+import type {
+  SceneGraph as PayloadSceneGraph,
+  SceneGraphMaterial,
+  SceneGraphNode,
+} from "../../../cadjoint/viewer/schema/payloads";
+
 export type Vec = number[];
 
-export type SceneMaterial = {
-  color: (number | null)[];
-  roughness: number | null;
-  metallic: number | null;
-  opacity: number | null;
-  ior: number | null;
-  reflectivity: number | null;
-};
-
-export type SceneNode = {
-  type: string;
-  params: Record<string, number | Vec | Vec[]>;
-  children: SceneNode[];
-  /** v2: stable within the graph; a shared subtree repeats its id. */
-  id?: string;
-  /** v2: graph parameter → declared free name; per vertex for profiles. */
-  free?: Record<string, string | (string | null)[]>;
-  /** v2: parameters the node never declared, written with their default. */
-  implicit?: string[];
-  /** v2: a primitive's material. */
-  material?: SceneMaterial;
-};
-
-export type SceneGraph = { format: string; version: number; root: SceneNode };
+/** The graph types are the compile payload's (`cadjoint/viewer/schema`). */
+export type SceneMaterial = SceneGraphMaterial;
+export type SceneNode = SceneGraphNode;
+/** A graph of any version; `sceneRoot` checks the version before reading. */
+export type SceneGraph = Omit<PayloadSceneGraph, "version"> & { version: number };
 
 /** `cadjoint.render.material.Material()`'s optical properties. */
 export const DEFAULT_MATERIAL: SceneMaterial = {

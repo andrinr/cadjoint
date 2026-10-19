@@ -383,3 +383,17 @@ def test_the_frontend_fixture_is_up_to_date():
         f"{FIXTURE.relative_to(ROOT)} is stale: "
         "run `CADJOINT_WRITE_FIXTURES=1 pytest tests/backends/test_wgsl_frontend.py -k frontend_fixture`"
     )
+
+
+@needs_node
+@pytest.mark.parametrize("stem", ["duct_sink", "end_cap"])
+def test_the_compile_payload_graph_rebuilds_its_shaders(stem):
+    """End to end through the worker: the payload's ``scene_graph`` gives the
+    payload's own shaders and hash in TypeScript."""
+    from cadjoint.viewer.worker.main import _compile_source
+
+    payload = _compile_source((ROOT / "scenes" / f"{stem}.py").read_text())
+    assert payload["scene_graph"]["version"] == 2
+    shaders = _typescript({"graph": payload["scene_graph"], "mode": "shaders", "culling": True})
+    assert shaders["scene_wgsl"] == payload["scene_wgsl"]
+    assert shaders["shader_hash"] == payload["shader_hash"]

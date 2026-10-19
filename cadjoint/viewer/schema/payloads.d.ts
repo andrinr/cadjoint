@@ -29,6 +29,7 @@ export interface CompilePayload {
   present_shader: string;
   program?: ShaderProgram | null;
   shader_hash?: string;
+  scene_graph?: SceneGraph | null;
   table_hash?: string | null;
   construction: ConstructionNode[];
   identities: IdentityEntry[];
@@ -1568,6 +1569,43 @@ export type ExportFormat = "obj" | "stl" | "step" | "vtk";
  */
 export type OptimizationArgument = "steps" | "learning_rate";
 
+/** The scene as a ``cadjoint-scene`` graph, from which a client can build its own WGSL. */
+export interface SceneGraph {
+  format: "cadjoint-scene";
+  version: 1 | 2;
+  root: SceneGraphNode;
+}
+
+/**
+ * A primitive's material in the scene graph: the shader's two material rows.
+ *
+ * A non-finite value is ``null``, as everywhere JSON carries a float.
+ */
+export interface SceneGraphMaterial {
+  color: (number | null)[];
+  roughness: number | null;
+  metallic: number | null;
+  opacity: number | null;
+  ior: number | null;
+  reflectivity: number | null;
+}
+
+/**
+ * One node of a ``cadjoint-scene`` graph.
+ *
+ * The format is specified in ``cadjoint/backends/jaxjs/SCENE_FORMAT.md``;
+ * ``id``, ``free``, ``implicit`` and ``material`` are the version 2 fields.
+ */
+export interface SceneGraphNode {
+  type: string;
+  params: Record<string, number | number[] | number[][]>;
+  children: SceneGraphNode[];
+  id?: string | null;
+  free?: Record<string, string | (string | null)[]> | null;
+  implicit?: string[] | null;
+  material?: SceneGraphMaterial | null;
+}
+
 /** The evaluated composition of ``scene``: its root ids and every reachable item. */
 export interface SceneTree {
   roots: string[];
@@ -1685,7 +1723,7 @@ export type StudySelection =
  * The contract version this file was generated for (`API_VERSION`).
  * `/api/session` reports the server's; a client compares the two.
  */
-export type ApiVersion = 2;
+export type ApiVersion = 3;
 
 /** Why a request failed, when the client acts on the reason. */
 export type ErrorKind = "cancelled" | "fem_unavailable" | "contract";
