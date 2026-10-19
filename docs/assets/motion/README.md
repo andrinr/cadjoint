@@ -7,14 +7,26 @@ node research/design/motion/animate.mjs            # every clip
 node research/design/motion/animate.mjs --only a,b # some; the table covers all
 ```
 
+It needs `ffmpeg` and `img2webp` (`brew install ffmpeg webp`), Playwright in
+`frontend/node_modules`, and the committed bundle in `cadjoint/viewer/static/`,
+which it films as-is. From a git worktree it borrows the main checkout's `.venv`
+and `node_modules` and serves the worktree's own sources. It starts its own
+server unless one already answers on `--port` (default 6700); `end-cap-solve`
+must be the first solve that server sees, so record it on a fresh one.
+
+Each clip is one idea: the drawn pointer enters from off-frame, every move is
+eased, each press shows a ring, each action has a beat before and after, and
+the clip puts the state back before the pointer leaves, so the loop closes.
+Solves and optimisation runs are time-lapsed; clicks play at 1x.
+
 Captured at 1440x900 css px, device scale 2, played at 16 fps.
 Do not hand-edit anything in this directory.
 
 | clip | played | frames | delivered | bytes |
 | --- | ---: | ---: | ---: | ---: |
-| `bracket-orbit-drag.webp` | 6.3s | 101 | 1120px wide | 1164 KB |
-| `end-cap-solve.webp` | 8.8s | 141 | 1440px wide | 1168 KB |
-| `heat-sink-optimize.webp` | 6.6s | 105 | 980px wide | 275 KB |
-| `properties-window.webp` | 5.9s | 94 | 980px wide | 237 KB |
-| `sketch-planes.webp` | 11.6s | 185 | 1120px wide | 783 KB |
-| **total** | | | | **3.54 MB** |
+| `bracket-orbit-drag.webp` | 15.5s | 149 | 880px wide | 1136 KB |
+| `end-cap-solve.webp` | 10.1s | 26 | 980px wide | 86 KB |
+| `heat-sink-optimize.webp` | 13.9s | 94 | 980px wide | 252 KB |
+| `properties-window.webp` | 12.0s | 76 | 980px wide | 177 KB |
+| `sketch-planes.webp` | 12.5s | 105 | 980px wide | 603 KB |
+| **total** | | | | **2.20 MB** |
