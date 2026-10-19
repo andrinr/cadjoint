@@ -88,9 +88,10 @@ The parts underneath it:
   NDJSON streaming, static files
 - :mod:`cadjoint.viewer._worker_client` — the endpoints that run the editor's
   Python in a child process
-- :mod:`cadjoint.viewer.worker.export` — ``/api/export``: which writer, which
-  content type, and the worker half that extracts and writes
-- :mod:`cadjoint.viewer._patch_requests` — ``/patch`` request validation
+- :mod:`cadjoint.viewer._export_client` — ``/api/export``: runs the export
+  worker (:mod:`cadjoint.viewer.worker.export`, which picks the writer and
+  content type) and hands the file back
+- :mod:`cadjoint.viewer._patch_requests` — ``/api/patch`` request validation
 - :mod:`cadjoint.viewer._intelligence` — the ruff and jedi endpoints
 - :mod:`cadjoint.viewer._scenes` — saved scene files
 - :mod:`cadjoint.viewer._example_scene` — the starter program
@@ -109,6 +110,7 @@ from typing import Any
 from urllib.parse import urlsplit
 
 from cadjoint.viewer._example_scene import EXAMPLE_SOURCE
+from cadjoint.viewer._export_client import EXPORT_TIMEOUT_SECONDS, export_source
 from cadjoint.viewer._http import STATIC_ROOT, PlaygroundBase, resolve_static
 from cadjoint.viewer._intelligence import (
     complete_source,
@@ -145,7 +147,6 @@ from cadjoint.viewer._worker_client import (
     warm_start,
 )
 from cadjoint.viewer.schema.api import API_VERSION, MAX_CLIENT_ID
-from cadjoint.viewer.worker.export import EXPORT_TIMEOUT_SECONDS, export_source
 
 __all__ = [
     "API_VERSION",

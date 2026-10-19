@@ -23,6 +23,7 @@ from urllib.request import Request, urlopen
 import pytest
 
 from cadjoint.enums import ExportFormat
+from cadjoint.viewer._export_client import export_source
 from cadjoint.viewer._jobs import JOB_KINDS, RESULT_KINDS
 from cadjoint.viewer._limits import (
     EXPORT_DEFAULT_RESOLUTION,
@@ -36,7 +37,6 @@ from cadjoint.viewer.worker.export import (
     EXPORT_EXTENSIONS,
     export_filename,
     export_scene,
-    export_source,
     validate_export_request,
 )
 
