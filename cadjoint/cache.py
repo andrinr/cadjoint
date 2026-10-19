@@ -7,21 +7,10 @@ XLA compilation every time for programs that rarely change.
 
 JAX can persist compiled executables to disk, keyed by the lowered HLO
 plus the backend and JAX version, so a later process reuses them instead
-of recompiling.  Measured on the starter scene, in-process per mode
-(``benchmarks/jax_compile_profile.py``, 2026-09-05):
-
-================  ==========  ==========  ==================
-mode              cold        warm        programs
-================  ==========  ==========  ==================
-``compile``       2.1 s       1.1 s       103
-``mesh``          12.7 s      5.9 s       455
-``mesh_inspect``  6.9 s       1.9 s       436
-``simulate``      14.3 s      3.1 s       790
-``optimize`` (2)  62.1 s      19.2 s      2068
-================  ==========  ==========  ==================
-
-Nearly every one of those programs is a single eager primitive; the cache
-turns the op-by-op cold cliff into sub-second cache reads.  What it cannot
+of recompiling.  A worker mode compiles hundreds to thousands of programs
+(``benchmarks/jax_compile_profile.py`` reports them per mode), nearly every
+one a single eager primitive; the cache turns that op-by-op cold cost into
+sub-second cache reads.  What it cannot
 hold is a program with a host callback — the optimizer's jitted frozen
 objective calls its Tesseracts through one, so its ~5 s compile is paid by
 every process (``research/performance.md`` §15).
@@ -44,15 +33,12 @@ __all__ = [
 #: Cap the on-disk cache. :func:`prune_compilation_cache` removes the oldest
 #: entries above it.
 #:
-#: The cap is enforced here, not by JAX's ``jax_compilation_cache_max_size``
-#: (issue #53).  With that option set, JAX evicts on *every* write: under a
-#: file lock it globs the whole directory, stats every entry and reads a
-#: per-entry access-time file, so each new program costs O(entries).  At
-#: 75,000 entries -- a few weeks of test runs -- that measured 2-8 s per
-#: write, and a test session that compiles a few hundred new programs spent
-#: over ten minutes in ``readdir``.  The directory was 697 MB, under the 2 GB
-#: cap, so the scan had never evicted anything.  Without the option JAX
-#: writes an entry and nothing else; a torn entry read by a concurrent
+#: The cap is enforced here, not by JAX's ``jax_compilation_cache_max_size``.
+#: With that option set, JAX evicts on *every* write: under a file lock it
+#: globs the whole directory, stats every entry and reads a per-entry
+#: access-time file, so each new program costs O(entries) — seconds per
+#: write at tens of thousands of entries.  Without the option JAX writes an
+#: entry and nothing else; a torn entry read by a concurrent
 #: process is a warning and a recompile, never a wrong result.
 _MAX_BYTES = 2 * 1024**3
 
@@ -68,25 +54,17 @@ _PRUNE_STAMP = ".cadjoint-pruned"
 #: model programs; a scene compiles as hundreds of sub-second programs whose
 #: aggregate is the cost, so a per-program threshold would skip all of them.
 #:
-#: **A claim that was made here and then measured false.**  Entries are
-#: written under one lockfile in the cache directory, and under several
-#: concurrent sessions JAX does sometimes report abandoning a write:
-#: "Error writing persistent compilation cache entry ... the file lock could
-#: not be acquired".  It is tempting to conclude that concurrent sessions
-#: serialise on it, that abandoned entries never land, and that the cache
-#: stops converging.  Measured, none of that holds.  Eight concurrent pytest
-#: sessions against this cache at 135,674 entries finished in 6.9 s against
-#: 11.2 s for the same eight given private caches, with zero lock timeouts —
-#: the shared cache is faster, because it is a cache and it hits.  A separate
-#: run at five-way concurrency into one fresh directory landed every entry a
-#: private directory landed, at the same speed.  Sessions competing for CPU
-#: is what makes a run slow; this is not it.
+#: Entries are written under one lockfile in the cache directory, and under
+#: several concurrent sessions JAX sometimes reports abandoning a write
+#: ("the file lock could not be acquired").  That does not make concurrent
+#: sessions serialise or the cache stop converging: concurrent sessions
+#: sharing this cache run faster than the same sessions with private caches,
+#: because the shared cache hits.
 #:
-#: ``CADJOINT_CACHE_MIN_COMPILE_SECONDS`` raises the floor anyway, as an
-#: escape hatch for a machine where the lock does contend (JAX's own default
-#: floor is 1 s, so the knob is not exotic).  It is not a fix for a
-#: demonstrated problem, and :mod:`benchmarks.jax_compile_profile` is how to
-#: find out whether you have one before reaching for it.
+#: ``CADJOINT_CACHE_MIN_COMPILE_SECONDS`` raises the floor as an escape
+#: hatch for a machine where the lock does contend;
+#: :mod:`benchmarks.jax_compile_profile` is how to find out whether it
+#: does.
 _MIN_COMPILE_SECONDS = 0.0
 
 #: Environment override for the floor above.

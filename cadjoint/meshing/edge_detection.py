@@ -304,7 +304,7 @@ def edge_hermite_data(
     reach = jnp.asarray(1e-2 * spacing64, dtype=dtype)
     probe_offsets = jnp.concatenate([jnp.diag(reach), -jnp.diag(reach)])
     # Float noise on a surface-coincident lattice plane is a few ulps of the
-    # coordinate magnitude (measured <= 1e-7 on the starter at float32); a
+    # coordinate magnitude (<= 1e-7 on the starter at float32); a
     # transversal crossing puts at least ~|grad f| h / 2 on one endpoint.
     scale = float(np.max(np.abs([origin64, origin64 + spacing64 * np.asarray(grid.cells)])))
     tolerance = 16.0 * float(jnp.finfo(dtype).eps) * max(scale, 1.0)
@@ -313,9 +313,8 @@ def edge_hermite_data(
     # sixteen times, and an uncompiled `vmap` over a bare SDF node is
     # sixteen eager walks of the whole tree, every primitive, transform and
     # boolean dispatching its own kernels.  One `jit` collapses each sweep
-    # to a single dispatch — measured 5x faster cold and 3.5x warm on a
-    # band lattice, and a whole lattice extraction of `scenes/motor_shield.py`
-    # from 151 s to 50 s, the same mesh either way.  The caller cannot do
+    # to a single dispatch (3-5x faster on a band lattice, the same mesh
+    # either way).  The caller cannot do
     # this for us: it does not know how many times its field is about to be
     # mapped, and jitting a field that is used once is a pessimisation.
     mapped = jax.jit(jax.vmap(sdf))
@@ -438,19 +437,19 @@ def edge_hermite_data(
         # boundaries): the secant is exact on piecewise-linear walls, and a
         # wall coplanar with a lattice plane puts every crossing on it, so
         # this is common, not exotic.  The autodiff gradient there is zero,
-        # float noise (measured 1e-8, which normalizes to a unit vector in an
+        # float noise (~1e-8, which normalizes to a unit vector in an
         # arbitrary direction), or a sliver of an epsilon-smoothed norm
-        # (measured 5e-4, pointing along the wall).  Such a crossing, and
+        # (~5e-4, pointing along the wall).  Such a crossing, and
         # every in-plane edge, takes a central difference across all three
         # lattice axes
         # instead: exact for a plane through the point at any tilt, the
         # symmetric bisector on a crease line, and a difference of values
         # rather than a branch on their sign.  Stepping along the edge alone
-        # (the earlier fallback) stays on the wall when the edge lies in it.
+        # would stay on the wall when the edge lies in it.
         probes = points[:, None, :] + probe_offsets[None, :, :]
         f_probe = field(probes.reshape((-1, 3))).reshape((edge_count, 2, 3))
         differenced = (f_probe[:, 0] - f_probe[:, 1]) / (2.0 * reach)
-        # Dead is: no length at all (the old test), or under a hundredth of
+        # Dead is: no length at all, or under a hundredth of
         # the unit length a distance field has off such points *and* pointing
         # away from the difference.  A short gradient that points the right
         # way (float64 polygon walls: |g| ~ 1e-3 on half the starter tet

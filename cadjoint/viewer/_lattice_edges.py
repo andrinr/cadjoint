@@ -25,11 +25,11 @@ from cadjoint.viewer._design_leaves import _design_leaves, _world_frame_leaves
 # between, then Newton-project each group onto the common zero set of those
 # operands' whole SDFs.  `_project_seam_groups` does that for every group in
 # one program and is what `_lattice_layers` calls.  `_project_to_seam` and
-# `_project_seam_groups_reference` are the one-program-per-group reading it
-# replaced; they stay because `tests/viewer/test_edge_artifacts.py` proves
-# the two extract the same edges, and the batched form is only trusted
-# because of that proof.  The private tier's B-rep edges do the same thing
-# one level down, on patch fields rather than leaf fields.
+# `_project_seam_groups_reference` are the one-program-per-group reference;
+# `tests/viewer/test_edge_artifacts.py` proves the two extract the same
+# edges, and the batched form is only trusted because of that proof.  The
+# private tier's B-rep edges do the same thing one level down, on patch
+# fields rather than leaf fields.
 
 
 def _project_to_seam(fields: list[Any], points: np.ndarray, max_step: float) -> np.ndarray:
@@ -96,10 +96,9 @@ def _project_seam_groups(
     :func:`_project_to_seam` is exact but pays a fixed cost per call —
     building the ``vmap(value_and_grad)`` evaluators and dispatching four
     Newton iterations — that is independent of how many points it
-    projects; measured, one point costs as much as three hundred.  A scene
-    with context geometry produces a seam group per operand *set*, so the
-    per-call cost was what the whole mesh overlay used to be made of
-    (measured on the starter: 15 groups, 108 points, 5.6 s).
+    projects; one point costs as much as three hundred.  A scene with
+    context geometry produces a seam group per operand *set*, so per-group
+    calls would make that fixed cost dominate the overlay.
 
     So every group goes through :func:`cadjoint.zeroset.project.project_groups`,
     the padded multi-group form of the one projection kernel: one program,
@@ -136,15 +135,13 @@ _ON_SURFACE = 1e-3
 def _nearest_leaves(magnitudes: np.ndarray, grid: Any) -> np.ndarray:
     """Which leaves own each dual vertex, with ties decided by geometry, not noise.
 
-    Ownership used to be one ``argmin``, and an argmin between equal values
-    is decided by float noise.  Geometry produces equal values all the
-    time: a crease vertex of ``min(a, b)`` lies on both operands at once,
-    a vertex in a gap below the grid's resolution sits midway between its
-    two walls, and coincident faces are equally far from both.  The seam
-    test compares owners across quad edges, so a flipped tie added or
-    removed a seam edge, changed which group its vertices were projected
-    in, and moved them by up to 0.028 between two evaluations of end_cap
-    whose Hermite data agree to 1e-7.
+    A plain ``argmin`` between equal values is decided by float noise, and
+    geometry produces equal values all the time: a crease vertex of
+    ``min(a, b)`` lies on both operands at once, a vertex in a gap below
+    the grid's resolution sits midway between its two walls, and
+    coincident faces are equally far from both.  The seam test compares
+    owners across quad edges, so a flipped tie would add or remove a seam
+    edge and change which group its vertices are projected in.
 
     Values within :data:`_OWNER_TIE` of a cell are therefore read as
     equal, and what a tie means depends on where it is.  A vertex *on* its
@@ -173,8 +170,7 @@ def _nearest_leaves(magnitudes: np.ndarray, grid: Any) -> np.ndarray:
 def _lattice_layers(scene: Any, grid: Any) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """The overlay's two layers read off the lattice — the public fallback.
 
-    What the overlay drew before the derived B-rep existed, and what it
-    draws again when the ``feature_edges`` kind is unfilled.  The wire layer
+    What the overlay draws when the ``feature_edges`` kind is unfilled.  The wire layer
     is the dual-contour mesh's native quad edges (triangulation diagonals
     carry no surface information).  The sharp layer is *not* mesh edges: a
     feature curve crosses grid cells diagonally, so its cells are usually

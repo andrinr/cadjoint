@@ -468,8 +468,7 @@ _REFINEMENT_FACTORS = (1.5, 2.25)
 #: :func:`cadjoint.meshing.diagnostics.self_intersections`): a hit proves
 #: the surface is folded, a miss proves nothing.
 #:
-#: It does not buy speed.  Measured on the end cap's housing (2026-09-02),
-#: it costs 0.12-0.16 s per rung at 145k-200k pairs -- about 1% of the
+#: It does not buy speed.  On the end cap's housing it costs 0.12-0.16 s per rung at 145k-200k pairs -- about 1% of the
 #: ~15 s the rung's extraction and projection cost, but *more* than the
 #: 0.06-0.16 s TetGen itself takes to reject a folded surface.  What it
 #: buys is the diagnosis: the rung is recorded as ``"self-intersecting"``

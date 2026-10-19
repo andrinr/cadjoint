@@ -116,13 +116,11 @@ def _shader_options() -> tuple[bool, bool, str]:
     edit, and so a scene can be put back on the traced path if the direct
     one ever draws something wrong.
 
-    * ``CADJOINT_SHADER_FORM=traced`` uses the JAX/StableHLO backend, which
-      was the default until the direct one was verified in a browser.  Same
+    * ``CADJOINT_SHADER_FORM=traced`` uses the JAX/StableHLO backend.  Same
       buffer contract, same three entry points, 3.5-6.7x slower to compile
       (``scenes/motor_shield.py``: 10.5 s against 1.6 s).
     * ``CADJOINT_SHADER_FORM=literal`` folds the parameters back into the
-      source, which is the form the frontend used before it learned to read
-      a buffer.
+      source instead of reading them from a buffer.
     * ``CADJOINT_SHADER_CULL=0`` emits the flat field that
       :mod:`cadjoint.backends.wgsl._culling` is tested against.
     * ``CADJOINT_SHADER_SCOPE=all`` puts every parameter in the buffer
@@ -320,8 +318,8 @@ def _compile_source(source: str) -> dict[str, Any]:
             "studies": studies_payload,
             "sim_meshes": sim_meshes_payload,
             "optimizations": optimizations_payload,
-            # The mesh-edge view is requested lazily via `mode: "mesh"` — computing
-            # it here used to dominate the compile round-trip.
+            # The mesh-edge view is requested lazily via `mode: "mesh"`; computing
+            # it here would dominate the compile round-trip.
             "mesh_edges": None,
             # Which private kinds this worker process can reach, so the
             # title block can say EDGES LATTICE / GEOMETRY FROZEN rather

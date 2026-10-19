@@ -28,12 +28,10 @@ from cadjoint.viewer.worker.scene import (
 # The server validates requested step counts, but the declaration itself may
 # ask for more than one HTTP-bounded run should pay for; the worker caps both.
 OPTIMIZE_STEP_LIMIT = 200
-# Study-backed runs solve a FEM problem (plus its adjoint) per step.  Measured
-# per-step wall clock at the declared scene resolutions: starter thermal
-# ~3.7 s steady (~17 s on JIT/topology-refreeze steps), bracket elastic
-# compliance ~5-7 s steady (~20 s on refreeze), plus ~8 s for the final
-# fresh-mesh evaluation — so 30 steps stays under the server's 300-second
-# /api/optimize budget with headroom even for the heavier elastic runs.
+# Study-backed runs solve a FEM problem (plus its adjoint) per step: ~4-7 s
+# steady at the scene resolutions, ~20 s on a JIT/topology-refreeze step,
+# plus ~8 s for the final fresh-mesh evaluation, so 30 steps keeps one run
+# to a few minutes.
 STUDY_OPTIMIZE_STEP_LIMIT = 30
 
 

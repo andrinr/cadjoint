@@ -93,7 +93,7 @@ class Option(StrEnum):
     reports the value (``'hex'``) rather than the member
     (``<MeshMethod.HEX: 'hex'>``).  Error messages all over cadjoint
     interpolate an offending or accepted value with ``{value!r}``, and a
-    member has to read there exactly as the string it replaced.
+    member has to read there exactly as its plain string would.
     """
 
     def __repr__(self) -> str:

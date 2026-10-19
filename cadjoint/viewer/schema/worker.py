@@ -8,8 +8,7 @@ boundary check the server runs on everything a worker sends before any of
 it reaches a route.
 
 Why check what the worker already built: the worker is a separate process
-running arbitrary user code, and until this module only ``compile`` and
-``export`` replies were checked at all.  A reply that does not match its
+running arbitrary user code.  A reply that does not match its
 model is a bug on one side of the contract, and it is reported as one — an
 ``error_kind: "contract"`` failure naming the field — instead of being
 forwarded to a browser that was promised something else.

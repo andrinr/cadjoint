@@ -19,8 +19,7 @@ lattice instead (:mod:`cadjoint.viewer._lattice_edges`): feature cells are
 classified from normal spreads and exact ``min``/``max`` CSG seams, the
 seam vertices are Newton-projected onto the common zero set of the
 operands meeting there, and the surviving cell links are the chords.  It
-is the same layer the overlay shipped before the graph existed, and it is
-honest about what it is: the staircase, the near-parallel rails and the
+is honest about what it is: the staircase, the near-parallel rails and the
 orphan ticks are fought with tangent, chain-degree and debris tests rather
 than solved.  A rim is a polygon of cell links, not a circle.
 :mod:`cadjoint.tier` is where the difference is reported.

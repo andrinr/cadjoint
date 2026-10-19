@@ -203,8 +203,8 @@ def _compiled_prefix(prefix: Any, *, enabled: bool) -> Any:
     A frozen topology holds the objective fixed for ``remesh_every`` steps and
     the parameter leaves keep their shapes and dtypes across a descent, so one
     traced program serves every step until the next refreeze; running it
-    op-by-op instead re-dispatches the whole chain per step (measured on the
-    starter: ~11 s per step eager against ~0.5 s jitted).
+    op-by-op instead re-dispatches the whole chain per step (~11 s per step
+    eager against ~0.5 s jitted on the starter).
 
     **Only the pure half is compiled, and that is the point.**  A frozen chain
     is a pure JAX prefix — the design field, dual contouring, the QEF vertex
@@ -215,21 +215,18 @@ def _compiled_prefix(prefix: Any, *, enabled: bool) -> Any:
     write that module to the persistent compilation cache at all
     (``jax/_src/compiler.py::_cache_write`` — "because it uses host
     callbacks").  One ``jax.jit`` spanning both halves is therefore
-    uncacheable *in its entirety*: on the starter that was 6.2 MB of HLO
-    retraced and recompiled in every process, warm cache or cold, about eight
-    seconds a run.  Compiling this half alone keeps it cacheable, and what is
-    left eager is a couple of plugin calls and a metric reduction.  Measured
-    in ``research/performance.md`` §15.
+    uncacheable *in its entirety* and retraced and recompiled in every
+    process.  Compiling this half alone keeps it cacheable, and what is left
+    eager is a couple of plugin calls and a metric reduction (see
+    ``research/performance.md`` §15).
 
-    Splitting also *removes* a hazard the whole-program form had to work
-    around.  ``tesseract_jax`` classifies an input as static exactly when it is
+    Splitting also avoids a static-input hazard.  ``tesseract_jax`` classifies an input as static exactly when it is
     not a tracer (``primitive.py``: ``is_static_mask``), and a frozen chain
     hands its plugins NumPy constants — the mesher's ``element`` code, the
     quality thresholds, the study's conductivity.  Under a ``jax.jit``
     enclosing the plugin call those arrive traced, and the VJP then invents a
     derivative slot for each: ``np.full(shape, np.nan, dtype)``, which for the
-    0-d ``int32`` ``element`` is a NaN cast to an integer.  The old form
-    defeated that with :func:`jax.ensure_compile_time_eval`; with every plugin
+    0-d ``int32`` ``element`` is a NaN cast to an integer.  With every plugin
     call outside every trace the constants are simply concrete, as they are on
     the eager path.
 
@@ -705,8 +702,7 @@ class Optimization:
         *before* the first evaluation and the optimizer state carries them
         between steps, so a narrower scope would leave float32 leaves in the
         parameter pytree for a float64 gradient to update.  ``"single"``
-        does not touch the flag at all, which is what leaves the default
-        path -- every scene that does not ask for this -- as it was.
+        does not touch the flag at all, so the default path is unaffected.
         """
         if self.precision != Precision.DOUBLE:
             yield
@@ -900,7 +896,7 @@ class Optimization:
         #   descending and sign-consistent with the direct path on the
         #   crease-heavy starter heat sink (research/tet-vs-hex.md), but it
         #   meshes the interpolant (can need a finer lattice) and drops
-        #   tangential vertex motion — kept opt-in until cleared as default.
+        #   tangential vertex motion, so it is opt-in.
         # - "tesseract-dc": the narrow cut — JAX dual contouring on the TRUE
         #   SDF (frozen edges, differentiable Newton + QEF) -> tetfill
         #   tesseract (TetGen only; exact pass-through VJP on the vertices

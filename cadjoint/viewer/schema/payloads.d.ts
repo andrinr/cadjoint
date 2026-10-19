@@ -389,8 +389,8 @@ export interface StudyPayload {
  * ``nodes`` is optional because not every condition is placed by selecting
  * nodes: a flow study's inlet, outlet and duct walls are planes of the
  * lattice, and carry an inlet velocity or a wall temperature instead.
- * ``serializable`` still says whether the condition round-trips, but it is
- * now the condition's own answer rather than its selection's.
+ * ``serializable`` says whether the condition round-trips; it is the
+ * condition's own answer, not its selection's.
  *
  * This is the shape a solved study echoes (``/api/simulate``'s ``study``);
  * the compile payload's :class:`StudyBc` adds where the condition is

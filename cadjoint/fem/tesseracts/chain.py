@@ -559,18 +559,16 @@ def _freeze_dc_surface(
 
     **Why the crossings are anchored rather than re-solved.**  The obvious
     map re-runs :func:`~cadjoint.meshing.edge_hermite_data` on the frozen
-    edge set every traced call.  That is wrong, and it is what used to break
-    the starter heat sink at step 5 of its own optimization: the root search
-    is bracketed by the *frozen sign pattern at the lattice vertices*, which
-    is discrete topology and expires.  Measured on ``scenes/starter.py``,
-    **168 of 858 brackets (20%) are already invalid one optimizer step
-    later** — the fin faces sit within 0.005 of a lattice plane, so a whole
-    plane of vertices changes sign at once.  On an expired edge bisection
-    collapses toward an endpoint, so the cell is fitted to a sample that is
-    not on the surface, ``qef_vertices``' cell clamp then pins neighbouring
-    cells' vertices onto their shared face, and the boundary tets built on
-    them go to zero volume (204 degenerate tets at step 2, ``min |vol|``
-    1.6e-21) until the FEM system is unsolvable.  Projecting the frozen
+    edge set every traced call.  That is wrong: the root search is bracketed
+    by the *frozen sign pattern at the lattice vertices*, which is discrete
+    topology and expires.  On ``scenes/starter.py`` a fifth of the brackets
+    are invalid one optimizer step later — the fin faces sit within 0.005 of
+    a lattice plane, so a whole plane of vertices changes sign at once.  On
+    an expired edge bisection collapses toward an endpoint, so the cell is
+    fitted to a sample that is not on the surface, ``qef_vertices``' cell
+    clamp then pins neighbouring cells' vertices onto their shared face, and
+    the boundary tets built on them go to zero volume until the FEM system
+    is unsolvable.  Projecting the frozen
     crossings instead needs no bracket at all, is defined for every design,
     and keeps every sample a genuine surface point with a genuine normal —
     so the QEF's plane fit still recovers **tangential** vertex motion, the

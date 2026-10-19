@@ -56,8 +56,7 @@ from cadjoint.viewer.schema.requests import (
 API_VERSION = 2
 """The version of this contract.
 
-1 was every server before the contract carried a number; a frontend that
-finds no ``api_version`` in ``/api/session`` is talking to one of those.
+A server whose ``/api/session`` carries no ``api_version`` is version 1.
 """
 
 API_VERSION_HEADER = "X-Cadjoint-Api"

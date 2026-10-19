@@ -27,7 +27,7 @@ def _pattern_axis(axis) -> tuple[Array, Array]:
     """The ``(origin, unit direction)`` of a polar pattern's axis of rotation.
 
     Args:
-        axis: ``'z'`` for the local z axis through the origin — the historical
+        axis: ``'z'`` for the local z axis through the origin — the
             default — or an :class:`~cadjoint.construction.faces.Axis`, such as
             the one a ``revolve`` declares.
 

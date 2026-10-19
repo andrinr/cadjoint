@@ -178,7 +178,7 @@ def _polygon_distance(p: Array, vertices: list[Array], axis: Array | None = None
             inside the solid of revolution — so it is left out of the
             distance and kept in the sign.  The distance to the remaining
             edges is then the 3D distance, provided the profile stays on
-            one side of the axis (issue #50).
+            one side of the axis.
 
     Returns:
         Signed distance, shape ``(...)``. Negative inside.

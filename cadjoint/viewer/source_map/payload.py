@@ -497,7 +497,7 @@ def _profile_entry(
         "spans": {},
         # Where the sketch is *declared*, so selecting it can reveal the
         # statement rather than nothing: a profile publishes no argument
-        # spans at all, which used to leave the editor with nowhere to go.
+        # spans at all.
         "statementSpan": statement_span(source, line),
         "constraints": _stamped_constraints(
             _profile_constraints(profile, source, line, traceable), token

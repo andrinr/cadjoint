@@ -88,11 +88,10 @@ class SDF(Fluent):
         :func:`cadjoint.construction.faces.attach_faces` binds ``faces``,
         ``face``, ``cap``, ``side`` and ``axis`` onto the SDF a generator
         returns, so ``extrude(profile, depth).cap("+")`` is a plain instance
-        attribute and never reaches this method. What *did* reach it before
-        was every downstream node: ``Difference(body, hole).cap("+")`` raised
-        ``AttributeError``, so the moment a body had a hole in it, it stopped
-        being something you could sketch on — which is most of feature-based
-        CAD.
+        attribute and never reaches this method. What reaches it is every
+        downstream node: ``Difference(body, hole).cap("+")`` must still
+        resolve, or a body with a hole in it stops being something you can
+        sketch on — which is most of feature-based CAD.
 
         Booleans and patterns do not move the base body's surface: cutting a
         hole in a plate leaves the plate's top face in the same plane, and

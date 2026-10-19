@@ -449,7 +449,7 @@ def _expanded_material(source: str, located: _Definition) -> str:
     whose result is a plain ``Material`` this process can build and read
     without executing any of the user's own code.  The literal is written one
     keyword per line — the shape the starter program uses — so the properties
-    it now states are editable rows rather than one very long line.
+    it states are editable rows rather than one very long line.
     """
     from cadjoint.materials import CATALOGUE
 

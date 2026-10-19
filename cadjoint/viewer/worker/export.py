@@ -157,7 +157,7 @@ def _object_grid(sdf: Any, resolution: int) -> Any:
     The bounds come from :func:`cadjoint.meshing.bounds.fit_bounds`, which
     scans growing cubes until one holds the part, so a 100 mm part
     modelled in millimetres is not clipped to the ±3 default volume and a
-    plate thinner than the scan spacing is still found (issue #49).
+    plate thinner than the scan spacing is still found.
     ``resolution`` counts cells along the longest axis and the other two
     axes take proportionally fewer, which keeps the spacing isotropic — a
     cube of cells over a flat plate would spend most of its budget on the

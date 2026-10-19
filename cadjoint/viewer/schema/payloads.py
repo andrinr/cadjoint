@@ -1,10 +1,10 @@
 """The compile payload, as models rather than as nested dicts.
 
 One model per shape the ``mode="compile"`` response carries, assembled into
-:class:`CompilePayload`. The worker builds the payload exactly as it always
-did and hands it here to be checked, so these models describe the wire
-rather than dictating it — but a field that changes shape without changing
-here now fails loudly at the boundary instead of quietly in the browser.
+:class:`CompilePayload`. The worker builds the payload as plain dicts and
+hands it here to be checked, so these models describe the wire rather than
+dictating it — but a field that changes shape without changing here fails
+loudly at the boundary instead of quietly in the browser.
 
 Two rules run through the file:
 
@@ -486,8 +486,8 @@ class StudyBcDescription(Open):
     ``nodes`` is optional because not every condition is placed by selecting
     nodes: a flow study's inlet, outlet and duct walls are planes of the
     lattice, and carry an inlet velocity or a wall temperature instead.
-    ``serializable`` still says whether the condition round-trips, but it is
-    now the condition's own answer rather than its selection's.
+    ``serializable`` says whether the condition round-trips; it is the
+    condition's own answer, not its selection's.
 
     This is the shape a solved study echoes (``/api/simulate``'s ``study``);
     the compile payload's :class:`StudyBc` adds where the condition is
@@ -808,10 +808,10 @@ class CompilePayload(Strict):
     construction: list[ConstructionNode]
     identities: list[IdentityEntry]
     # Every construction call with its written arguments, for the properties
-    # window; absent from an older worker, so it defaults to nothing.
+    # window; defaults to nothing when absent.
     elements: list[ConstructionElement] = Field(default_factory=list)
-    # What ``scene`` is built from, boolean by boolean; absent from an older
-    # worker, in which case the Objects panel falls back to a flat list.
+    # What ``scene`` is built from, boolean by boolean; when absent the
+    # Objects panel falls back to a flat list.
     scene_tree: SceneTree | None = None
     relations: list[ConstructionRelation]
     materials: list[MaterialDefinition]
@@ -820,8 +820,7 @@ class CompilePayload(Strict):
     optimizations: list[OptimizationPayload]
     mesh_edges: MeshEdgePayload | None
     # Per private plugin kind, whether it is filled in the worker's process
-    # (:func:`cadjoint.tier.status`).  Optional with a default, so a client
-    # built before the seam sees no change.
+    # (:func:`cadjoint.tier.status`).  Optional with a default.
     tier: dict[str, bool] | None = None
     solver_runs: list[ConstraintSolverRun]
     output: str

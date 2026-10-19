@@ -9,12 +9,11 @@ Newton run).  JAX keys its in-process executable cache on the function
 object, so every such call compiles from scratch — including the calls
 whose program is byte for byte one compiled a moment ago.
 
-Measured in the cold per-push suite (``CADJOINT_NO_COMPILATION_CACHE=1``,
-``-n 4``): ``project``'s jit compiled 435 programs, 212 of them identical
-to one the same worker had already compiled, and ``_newton_scan`` 393, of
-which 318.  The persistent compilation cache would serve those as disk
-reads, but a process without it — a library user, a test run with the cache
-off — pays XLA every time.
+In a cold test run about half of ``project``'s programs and four fifths of
+``_newton_scan``'s are identical to one the same process already compiled.
+The persistent compilation cache would serve those as disk reads, but a
+process without it — a library user, a test run with the cache off — pays
+XLA every time.
 
 :func:`call_jit` keeps the fresh-function contract and shares the
 *executable*: it lowers the call, and looks the result up by the module's

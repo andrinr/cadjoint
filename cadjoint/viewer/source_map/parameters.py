@@ -3,9 +3,8 @@
 The scene's two shaders read every *free* design parameter out of a uniform
 buffer (``compile_scene_with_uniforms``), so moving one is a ``writeBuffer``
 rather than a recompile.  The frontend can only take that path if it knows
-*which slot* a handle drives, and the compile payload used to say only where a
-value lives in the text — enough to rewrite the source, not enough to write a
-buffer.
+*which slot* a handle drives; where a value lives in the text is enough to
+rewrite the source, not enough to write a buffer.
 
 This module answers the missing half: given a captured construction object,
 which of its draggable values are backed by a free ``Parameter``, and by what
