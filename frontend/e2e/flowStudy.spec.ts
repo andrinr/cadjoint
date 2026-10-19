@@ -10,11 +10,10 @@
  */
 
 import { expect, test, type Page } from "@playwright/test";
+import { dismissBanner, waitForCompile } from "./helpers/app";
 
-async function waitForCompile(page: Page) {
-  await expect(page.getByTestId("status")).not.toHaveText(/^(|Starting…)$/, { timeout: 120_000 });
-  await expect(page.getByTestId("toolbar-busy")).toHaveCount(0, { timeout: 120_000 });
-}
+/** How long a compile of this spec's scenes may take. */
+const COMPILE_TIMEOUT = 120_000;
 
 async function openStudies(page: Page) {
   // The Window menu item toggles, and dock arrangements survive a reload, so
@@ -30,9 +29,8 @@ async function start(page: Page): Promise<string[]> {
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(String(error)));
   await page.goto("/");
-  await waitForCompile(page);
-  const dismiss = page.getByRole("button", { name: "Dismiss" });
-  if (await dismiss.isVisible().catch(() => false)) await dismiss.click();
+  await waitForCompile(page, COMPILE_TIMEOUT);
+  await dismissBanner(page);
   return errors;
 }
 

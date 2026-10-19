@@ -1,6 +1,7 @@
 import { mkdirSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { chromium, expect, test, type Browser, type Page } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
+import { flip, openViewer, recompile, SCENES } from "./helpers/app";
 
 /**
  * The B-rep inspector: the private tier's derived B-rep in place of the solid.
@@ -22,65 +23,11 @@ import { chromium, expect, test, type Browser, type Page } from "@playwright/tes
  * (picking runs on the CPU, but only against a view the renderer set up).
  */
 
-const PORT = process.env.CADJOINT_E2E_PORT ?? 8799;
-const SCENES = resolve(import.meta.dirname, "..", "..", "scenes");
+/** How long a compile of this spec's scenes may take. */
+const COMPILE_TIMEOUT = 120_000;
+
 const SHOTS = process.env.CADJOINT_BREP_SCREENS ?? "";
 const EXTRA = (process.env.CADJOINT_BREP_EXTRA ?? "").split(",").filter(Boolean);
-
-async function waitForCompile(page: Page) {
-  await expect(page.getByTestId("status")).not.toHaveText(/^(|Starting…)$/, { timeout: 120_000 });
-  await expect(page.getByTestId("toolbar-busy")).toHaveCount(0, { timeout: 120_000 });
-}
-
-async function recompile(page: Page, source: string) {
-  await page.evaluate((text) => {
-    type EditorLike = {
-      view?: { state: { doc: { length: number } }; dispatch: (spec: unknown) => void };
-    };
-    const content = document.querySelector("[data-testid=editor] .cm-content") as
-      | (HTMLElement & { cmView?: EditorLike; cmTile?: EditorLike })
-      | null;
-    const view = content?.cmView?.view ?? content?.cmTile?.view;
-    if (!view) throw new Error("no CodeMirror view");
-    view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: text } });
-  }, source);
-  await page.getByTestId("run").click();
-  await waitForCompile(page);
-}
-
-async function openViewer(width = 1400, height = 900): Promise<{ browser: Browser; page: Page } | null> {
-  const browser = await chromium.launch({
-    args: [
-      "--enable-unsafe-webgpu",
-      "--enable-features=Vulkan,WebGPU",
-      "--use-angle=metal",
-      "--use-gl=angle",
-      "--ignore-gpu-blocklist",
-      "--enable-gpu",
-    ],
-  });
-  const page = await browser.newPage({ viewport: { width, height } });
-  await page.goto(`http://127.0.0.1:${PORT}/`);
-  const adapter = await page.evaluate(async () =>
-    navigator.gpu && (await navigator.gpu.requestAdapter()) ? "available" : null,
-  );
-  if (!adapter) {
-    await browser.close();
-    return null;
-  }
-  await waitForCompile(page);
-  const dismiss = page.getByRole("button", { name: "Dismiss" });
-  if (await dismiss.isVisible().catch(() => false)) await dismiss.click();
-  return { browser, page };
-}
-
-/** Flip a render-popover switch and close the popover. */
-async function flip(page: Page, toggle: string) {
-  await page.getByTestId("display-options").click();
-  await page.getByTestId("render-customize").click();
-  await page.getByTestId(toggle).click();
-  await page.getByTestId("display-options").click();
-}
 
 /** Wait for the inspector's request to settle; returns the status word. */
 async function settled(page: Page): Promise<string> {
@@ -108,7 +55,7 @@ async function hoverFace(page: Page): Promise<string | null> {
 
 test("the inspector draws the derived B-rep and reads it out", async () => {
   test.setTimeout(400_000);
-  const opened = await openViewer();
+  const opened = await openViewer({ timeout: COMPILE_TIMEOUT, dismiss: true });
   test.skip(opened === null, "No WebGPU adapter in this browser build");
   if (!opened) return;
   const { browser, page } = opened;
@@ -189,7 +136,12 @@ test("the inspector on the shipped scenes, photographed", async () => {
   test.skip(!SHOTS, "set CADJOINT_BREP_SCREENS to the output directory");
   test.setTimeout(1_800_000);
   mkdirSync(SHOTS, { recursive: true });
-  const opened = await openViewer(1600, 1000);
+  const opened = await openViewer({
+    width: 1600,
+    height: 1000,
+    timeout: COMPILE_TIMEOUT,
+    dismiss: true,
+  });
   test.skip(opened === null, "No WebGPU adapter in this browser build");
   if (!opened) return;
   const { browser, page } = opened;
@@ -204,7 +156,7 @@ test("the inspector on the shipped scenes, photographed", async () => {
     for (const path of scenes) {
       const name = path.split("/").pop()!.replace(/\.py$/, "");
       await page.getByTestId("window-restore-editor").click().catch(() => {});
-      await recompile(page, readFileSync(path, "utf-8"));
+      await recompile(page, readFileSync(path, "utf-8"), COMPILE_TIMEOUT);
       await parkEditor(page);
       if (first) {
         // Once: the camera carries over from scene to scene.

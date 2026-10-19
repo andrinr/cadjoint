@@ -1,20 +1,28 @@
 import { expect, test, type Page } from "@playwright/test";
+import { dismissBanner, editorText, waitForCompile } from "./helpers/app";
+import {
+  FRONT_CAMERA,
+  canvasMetrics,
+  gizmoTip,
+  projectToCss,
+  type Vec3,
+} from "./helpers/projection";
 import { expectValue, pickOption } from "./helpers/select";
 
 /**
  * End-to-end coverage of viewer ↔ code parity.
  *
- * The projection below is an independent reimplementation of `src/viewer/math`
- * (same formulas as the preview shader). Duplicating it here is deliberate: if
- * the app's projection drifts, these tests click the wrong pixel and fail,
- * instead of both sides agreeing on something wrong.
+ * The projection (`helpers/projection.ts`) is an independent reimplementation
+ * of `src/viewer/math` (same formulas as the preview shader). Duplicating it
+ * is deliberate: if the app's projection drifts, these tests click the wrong
+ * pixel and fail, instead of both sides agreeing on something wrong.
  */
 
 /**
  * Run the real renderer, not the fallback.
  *
  * Everything about *picking* here is CPU-side — `viewer/hittest.ts` and the
- * projection reimplemented below — so these tests were written to pass on a
+ * reimplemented projection — so these tests were written to pass on a
  * browser with no WebGPU at all, and they still do. But a handful of the
  * things now under test are only true of a running renderer: the status line
  * names the quality tier the shader is budgeting against, and the floor grid
@@ -45,92 +53,6 @@ const hasWebGpu = (page: Page) =>
     }
   });
 
-const FOV_SCALE = 1.5;
-/**
- * Defaults from `Renderer`; the tests never move the camera.
- *
- * The +X−Y+Z corner at the true isometric elevation, atan(1/√2) — the same
- * pair of numbers as `VIEW_PRESETS.iso`, which is what the session opens on.
- */
-const CAMERA = {
-  yaw: Math.PI / 4,
-  pitch: Math.atan(1 / Math.SQRT2),
-  distance: 4.6,
-  target: [0, 0, 0] as const,
-};
-const FRONT_CAMERA = { ...CAMERA, yaw: 0, pitch: 0 };
-
-type Vec3 = [number, number, number];
-type CameraSpec = typeof CAMERA;
-
-const sub = (a: readonly number[], b: readonly number[]): Vec3 =>
-  [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
-const dot = (a: Vec3, b: Vec3) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
-const cross = (a: Vec3, b: Vec3): Vec3 => [
-  a[1] * b[2] - a[2] * b[1],
-  a[2] * b[0] - a[0] * b[2],
-  a[0] * b[1] - a[1] * b[0],
-];
-const norm = (a: Vec3): Vec3 => {
-  const n = Math.hypot(...a) || 1;
-  return [a[0] / n, a[1] / n, a[2] / n];
-};
-
-/** Z-up, matching `cameraPosition` in `src/viewer/math`: azimuth about +Z
- *  measured from −Y, so yaw 0 / pitch 0 is the Front view. */
-function cameraPosition(camera: CameraSpec = CAMERA): Vec3 {
-  const cp = Math.cos(camera.pitch);
-  return [
-    camera.target[0] + camera.distance * cp * Math.sin(camera.yaw),
-    camera.target[1] - camera.distance * cp * Math.cos(camera.yaw),
-    camera.target[2] + camera.distance * Math.sin(camera.pitch),
-  ];
-}
-
-/** Project a world point to CSS pixels inside the canvas element. */
-function projectToCss(
-  world: Vec3,
-  canvas: { width: number; height: number; clientWidth: number; clientHeight: number },
-  camera: CameraSpec = CAMERA,
-  projection: "perspective" | "orthographic" = "orthographic",
-) {
-  const position = cameraPosition(camera);
-  const forward = norm(sub(camera.target, position));
-  // World up is +Z, with the +Y fallback the app uses at the poles.
-  const reference: Vec3 = Math.abs(forward[2]) > 0.999 ? [0, 1, 0] : [0, 0, 1];
-  const right = norm(cross(forward, reference));
-  const up = cross(right, forward);
-  const delta = sub(world, position);
-  const viewDepth = dot(delta, forward);
-  const aspect = canvas.width / canvas.height;
-  const divisor =
-    FOV_SCALE * (projection === "orthographic" ? camera.distance : viewDepth);
-  const u = dot(delta, right) / divisor;
-  const v = dot(delta, up) / divisor;
-  const px = (u / aspect + 0.5) * canvas.width;
-  const py = (0.5 - v) * canvas.height;
-  // Framebuffer pixels back to CSS pixels for Playwright's mouse.
-  return {
-    x: (px * canvas.clientWidth) / canvas.width,
-    y: (py * canvas.clientHeight) / canvas.height,
-  };
-}
-
-async function canvasMetrics(page: Page) {
-  return page.evaluate(() => {
-    const canvas = document.querySelector<HTMLCanvasElement>("[data-testid=viewer-canvas]")!;
-    const rect = canvas.getBoundingClientRect();
-    return {
-      width: canvas.width,
-      height: canvas.height,
-      clientWidth: canvas.clientWidth,
-      clientHeight: canvas.clientHeight,
-      left: rect.left,
-      top: rect.top,
-    };
-  });
-}
-
 /**
  * The heat-sink starter sketches on the XZ plane (normal +Y): profile
  * u = −world-X, v = +world-Z, so a vertex [u, v] sits at world [−u, 0, v].
@@ -142,46 +64,11 @@ const FIN_TIP: Vec3 = [0.15, 0, 0.85];
 /** Midpoint of the fin comb's base edge, for outline picks. */
 const BASE_EDGE: Vec3 = [0.5, 0, 0];
 
-/**
- * The full editor document. CodeMirror renders only the visible lines, so
- * `.cm-content` innerText truncates tall programs (the starter is ~160
- * lines); read the document from the editor state instead.
- */
-async function editorText(page: Page): Promise<string> {
-  return page.evaluate(() => {
-    type DocView = { view?: { state: { doc: { toString(): string } } } };
-    const content = document.querySelector("[data-testid=editor] .cm-content") as
-      | (HTMLElement & { cmView?: DocView; cmTile?: DocView })
-      | null;
-    // CodeMirror hangs its doc view off the content element (`cmView` in
-    // older builds, `cmTile` in current ones); either path reaches the full
-    // document. innerText is the last resort and truncates tall programs.
-    const view = content?.cmView?.view ?? content?.cmTile?.view;
-    if (view) return view.state.doc.toString();
-    return content?.innerText ?? "";
-  });
-}
-
-async function waitForCompile(page: Page) {
-  // The settle signal is the toolbar's busy seam. It is present for exactly
-  // as long as the app is behind its own source — from the edit, through the
-  // debounce window and the request, until the shaders are installed — which
-  // the status line no longer is: while work is in flight the status says
-  // nothing at all, so that the one indicator for running work is the
-  // toolbar's chip. A settled status is therefore a second, independent
-  // signal, and "Starting…" is the placeholder to wait past on a cold load.
-  await expect(page.getByTestId("status")).not.toHaveText(/^(|Starting…)$/, {
-    timeout: 60_000,
-  });
-  await expect(page.getByTestId("toolbar-busy")).toHaveCount(0, { timeout: 60_000 });
-}
-
 test.beforeEach(async ({ page }) => {
   await page.goto("/");
   await waitForCompile(page);
   // A machine without WebGPU shows a dismissable banner over the canvas.
-  const dismiss = page.getByRole("button", { name: "Dismiss" });
-  if (await dismiss.isVisible().catch(() => false)) await dismiss.click();
+  await dismissBanner(page);
 });
 
 /**
@@ -899,8 +786,7 @@ test("render presets activate, edit, and persist without bloating the closed UI"
 
   await page.reload();
   await waitForCompile(page);
-  const dismiss = page.getByRole("button", { name: "Dismiss" });
-  if (await dismiss.isVisible().catch(() => false)) await dismiss.click();
+  await dismissBanner(page);
   // The popover is transient, but the preset state persists: reopen it.
   await expect(page.getByTestId("render-popover")).toHaveCount(0);
   await page.getByTestId("display-options").click();
@@ -971,26 +857,6 @@ test("editing the code updates the sketch the viewer reports", async ({ page }) 
   await expect(page.getByTestId("selection-chip")).toHaveText("vertex 0");
   await expect(page.locator(".cm-vertex-highlight")).toHaveText("[-2.2, -0.9]");
 });
-
-/** Where the gizmo's X arrow tip lands for a primitive at `origin`. */
-function gizmoTip(
-  origin: Vec3,
-  axis: 0 | 1 | 2,
-  canvas: Parameters<typeof projectToCss>[1],
-  camera: CameraSpec = CAMERA,
-  projection: "perspective" | "orthographic" = "orthographic",
-) {
-  const position = cameraPosition(camera);
-  const size = Math.max(0.15, 0.18 * Math.hypot(...sub(origin, position)));
-  const unit: Vec3 = [0, 0, 0];
-  unit[axis] = size * 0.6;
-  return projectToCss(
-    [origin[0] + unit[0], origin[1] + unit[1], origin[2] + unit[2]],
-    canvas,
-    camera,
-    projection,
-  );
-}
 
 const sphereCount = async (page: Page) =>
   ((await editorText(page)).match(/Solid\.sphere/g) ?? []).length;

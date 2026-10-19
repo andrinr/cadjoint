@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { recompile, waitForCompile } from "./helpers/app";
 
 /**
  * Two pieces of "the app should just do the obvious thing".
@@ -19,19 +20,8 @@ import { expect, test, type Page } from "@playwright/test";
  * Both are CPU-side — selection, payload spans, DOM — so neither needs a GPU.
  */
 
-async function waitForCompile(page: Page) {
-  // The settle signal is the toolbar's busy seam. It is present for exactly
-  // as long as the app is behind its own source — from the edit, through the
-  // debounce window and the request, until the shaders are installed — which
-  // the status line no longer is: while work is in flight the status says
-  // nothing at all, so that the one indicator for running work is the
-  // toolbar's chip. A settled status is therefore a second, independent
-  // signal, and "Starting…" is the placeholder to wait past on a cold load.
-  await expect(page.getByTestId("status")).not.toHaveText(/^(|Starting…)$/, {
-    timeout: 90_000,
-  });
-  await expect(page.getByTestId("toolbar-busy")).toHaveCount(0, { timeout: 90_000 });
-}
+/** How long a compile of this spec's scenes may take. */
+const COMPILE_TIMEOUT = 90_000;
 
 /** The text CodeMirror is currently highlighting, or "". */
 async function highlighted(page: Page): Promise<string> {
@@ -45,7 +35,7 @@ async function highlighted(page: Page): Promise<string> {
 
 test("selecting an object reveals the statement that declares it", async ({ page }) => {
   await page.goto("/");
-  await waitForCompile(page);
+  await waitForCompile(page, COMPILE_TIMEOUT);
 
   // ── a sketch: the case that used to reveal nothing at all ────────────
   await page.getByTestId("tree-row-profile_0").click();
@@ -87,28 +77,11 @@ test("selecting an object reveals the statement that declares it", async ({ page
   await expect.poll(() => highlighted(page), { timeout: 10_000 }).toMatch(/^\w+ = \w/);
 });
 
-/** Replace the whole document and run it. */
-async function recompile(page: Page, source: string) {
-  await page.evaluate((text) => {
-    type EditorLike = {
-      view?: { state: { doc: { length: number } }; dispatch: (spec: unknown) => void };
-    };
-    const content = document.querySelector("[data-testid=editor] .cm-content") as
-      | (HTMLElement & { cmView?: EditorLike; cmTile?: EditorLike })
-      | null;
-    const view = content?.cmView?.view ?? content?.cmTile?.view;
-    if (!view) throw new Error("no CodeMirror view");
-    view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: text } });
-  }, source);
-  await page.getByTestId("run").click();
-  await waitForCompile(page);
-}
-
 test("Escape cancels one thing per press, starting with the pending command", async ({
   page,
 }) => {
   await page.goto("/");
-  await waitForCompile(page);
+  await waitForCompile(page, COMPILE_TIMEOUT);
 
   // The starter's sketches are both already consumed by an operator, and the
   // rail disables Loft for those — so this needs two un-operated profiles.
@@ -126,6 +99,7 @@ test("Escape cancels one thing per press, starting with the pending command", as
       "scene = Solid.box(size=[0.4, 0.4, 0.4], position=[0.0, 0.0, 0.0], name='blk')",
       "",
     ].join("\n"),
+    COMPILE_TIMEOUT,
   );
 
   const patches: string[] = [];
@@ -191,7 +165,7 @@ test("clicking a sketch handle does not leave the point following the mouse", as
   page,
 }) => {
   await page.goto("/");
-  await waitForCompile(page);
+  await waitForCompile(page, COMPILE_TIMEOUT);
 
   await page.getByTestId("mode-vertex").click();
   const handle = await page.evaluate(() => {

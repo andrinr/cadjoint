@@ -1,4 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
+import { dismissBanner, editorText, recompile, waitForCompile } from "./helpers/app";
+import { canvasMetrics, gizmoTip, projectToCss } from "./helpers/projection";
 import { expectValue, pickOption } from "./helpers/select";
 
 /**
@@ -11,133 +13,10 @@ import { expectValue, pickOption } from "./helpers/select";
  * literal and nothing else; and the properties window shows the selection's
  * written arguments and writes an edit back through `/api/patch`.
  *
- * The projection below is the same independent reimplementation of
- * `src/viewer/math` that `playground.spec.ts` carries, for the same reason:
+ * The projection comes from `helpers/projection.ts`, the independent
+ * reimplementation of `src/viewer/math` that `playground.spec.ts` uses too:
  * a drift in the app's projection must fail the test, not be shared by it.
  */
-
-const FOV_SCALE = 1.5;
-const CAMERA = {
-  yaw: Math.PI / 4,
-  pitch: Math.atan(1 / Math.SQRT2),
-  distance: 4.6,
-  target: [0, 0, 0] as const,
-};
-
-type Vec3 = [number, number, number];
-
-const sub = (a: readonly number[], b: readonly number[]): Vec3 => [
-  a[0] - b[0],
-  a[1] - b[1],
-  a[2] - b[2],
-];
-const dot = (a: Vec3, b: Vec3) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
-const cross = (a: Vec3, b: Vec3): Vec3 => [
-  a[1] * b[2] - a[2] * b[1],
-  a[2] * b[0] - a[0] * b[2],
-  a[0] * b[1] - a[1] * b[0],
-];
-const norm = (a: Vec3): Vec3 => {
-  const n = Math.hypot(...a) || 1;
-  return [a[0] / n, a[1] / n, a[2] / n];
-};
-
-function cameraPosition(): Vec3 {
-  const cp = Math.cos(CAMERA.pitch);
-  return [
-    CAMERA.target[0] + CAMERA.distance * cp * Math.sin(CAMERA.yaw),
-    CAMERA.target[1] - CAMERA.distance * cp * Math.cos(CAMERA.yaw),
-    CAMERA.target[2] + CAMERA.distance * Math.sin(CAMERA.pitch),
-  ];
-}
-
-interface CanvasMetrics {
-  width: number;
-  height: number;
-  clientWidth: number;
-  clientHeight: number;
-  left: number;
-  top: number;
-}
-
-/** Orthographic projection of a world point to CSS pixels inside the canvas. */
-function projectToCss(world: Vec3, canvas: CanvasMetrics) {
-  const position = cameraPosition();
-  const forward = norm(sub(CAMERA.target, position));
-  const reference: Vec3 = Math.abs(forward[2]) > 0.999 ? [0, 1, 0] : [0, 0, 1];
-  const right = norm(cross(forward, reference));
-  const up = cross(right, forward);
-  const delta = sub(world, position);
-  const aspect = canvas.width / canvas.height;
-  const divisor = FOV_SCALE * CAMERA.distance;
-  const u = dot(delta, right) / divisor;
-  const v = dot(delta, up) / divisor;
-  const px = (u / aspect + 0.5) * canvas.width;
-  const py = (0.5 - v) * canvas.height;
-  return {
-    x: (px * canvas.clientWidth) / canvas.width,
-    y: (py * canvas.clientHeight) / canvas.height,
-  };
-}
-
-/** Where the gizmo's arrow tip for an axis sits, the way `gizmoScale` sizes it. */
-function gizmoTip(origin: Vec3, axis: 0 | 1 | 2, canvas: CanvasMetrics) {
-  const position = cameraPosition();
-  const size = Math.max(0.15, 0.18 * Math.hypot(...sub(origin, position)));
-  const unit: Vec3 = [0, 0, 0];
-  unit[axis] = size * 0.6;
-  return projectToCss([origin[0] + unit[0], origin[1] + unit[1], origin[2] + unit[2]], canvas);
-}
-
-async function canvasMetrics(page: Page): Promise<CanvasMetrics> {
-  return page.evaluate(() => {
-    const canvas = document.querySelector<HTMLCanvasElement>("[data-testid=viewer-canvas]")!;
-    const rect = canvas.getBoundingClientRect();
-    return {
-      width: canvas.width,
-      height: canvas.height,
-      clientWidth: canvas.clientWidth,
-      clientHeight: canvas.clientHeight,
-      left: rect.left,
-      top: rect.top,
-    };
-  });
-}
-
-async function editorText(page: Page): Promise<string> {
-  return page.evaluate(() => {
-    type DocView = { view?: { state: { doc: { toString(): string } } } };
-    const content = document.querySelector("[data-testid=editor] .cm-content") as
-      | (HTMLElement & { cmView?: DocView; cmTile?: DocView })
-      | null;
-    const view = content?.cmView?.view ?? content?.cmTile?.view;
-    return view ? view.state.doc.toString() : (content?.innerText ?? "");
-  });
-}
-
-async function waitForCompile(page: Page) {
-  await expect(page.getByTestId("status")).not.toHaveText(/^(|Starting…)$/, {
-    timeout: 60_000,
-  });
-  await expect(page.getByTestId("toolbar-busy")).toHaveCount(0, { timeout: 60_000 });
-}
-
-/** Replace the whole document, run it, and wait for the compile to land. */
-async function recompile(page: Page, source: string) {
-  await page.evaluate((text) => {
-    type EditorLike = {
-      view?: { state: { doc: { length: number } }; dispatch: (spec: unknown) => void };
-    };
-    const content = document.querySelector("[data-testid=editor] .cm-content") as
-      | (HTMLElement & { cmView?: EditorLike; cmTile?: EditorLike })
-      | null;
-    const view = content?.cmView?.view ?? content?.cmTile?.view;
-    if (!view) throw new Error("no CodeMirror view");
-    view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: text } });
-  }, source);
-  await page.getByTestId("run").click();
-  await waitForCompile(page);
-}
 
 /**
  * Turn on the "all sketch planes" switch in the render popover.
@@ -156,8 +35,7 @@ async function showAllPlanes(page: Page) {
 test.beforeEach(async ({ page }) => {
   await page.goto("/");
   await waitForCompile(page);
-  const dismiss = page.getByRole("button", { name: "Dismiss" });
-  if (await dismiss.isVisible().catch(() => false)) await dismiss.click();
+  await dismissBanner(page);
 });
 
 test("every sketch in the scene draws its plane, named", async ({ page }) => {

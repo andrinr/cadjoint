@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { dismissBanner } from "./helpers/app";
 
 /**
  * F7: a removal is not confirmed, and the undo for it is in the top bar
@@ -9,8 +10,7 @@ import { expect, test } from "@playwright/test";
 test("removing a boundary condition offers its undo, which restores it", async ({ page }) => {
   await page.goto("/");
   await expect(page.getByTestId("run")).toBeEnabled({ timeout: 60_000 });
-  const dismiss = page.getByRole("button", { name: "Dismiss" });
-  if (await dismiss.isVisible().catch(() => false)) await dismiss.click();
+  await dismissBanner(page);
 
   await page.getByTestId("editmode-simulate").click();
   const removeButtons = page.locator('button[title="Remove this boundary condition"]');

@@ -1,4 +1,5 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
+import { dismissBanner, editorText } from "./helpers/app";
 import { pickOption } from "./helpers/select";
 
 /**
@@ -20,8 +21,7 @@ async function waitForDock(page: Page) {
 test.beforeEach(async ({ page }) => {
   await page.goto("/");
   await waitForDock(page);
-  const dismiss = page.getByRole("button", { name: "Dismiss" });
-  if (await dismiss.isVisible().catch(() => false)) await dismiss.click();
+  await dismissBanner(page);
 });
 
 /** Drag a tab onto a point, the way dockview's pointer strategy expects. */
@@ -44,19 +44,6 @@ async function dragTabTo(page: Page, tab: Locator, to: { x: number; y: number })
 }
 
 const groupCount = (page: Page) => page.locator(".dv-groupview").count();
-
-/** The editor's whole document, read from CodeMirror rather than the DOM. */
-async function editorText(page: Page): Promise<string> {
-  return page.evaluate(() => {
-    type DocView = { view?: { state: { doc: { toString(): string } } } };
-    const content = document.querySelector("[data-testid=editor] .cm-content") as
-      | (HTMLElement & { cmView?: DocView; cmTile?: DocView })
-      | null;
-    const view = content?.cmView?.view ?? content?.cmTile?.view;
-    if (view) return view.state.doc.toString();
-    return content?.innerText ?? "";
-  });
-}
 
 test("the model desk opens docked, tabbed, and with a viewport that cannot be closed", async ({
   page,
