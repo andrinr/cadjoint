@@ -15,7 +15,7 @@ import {
   type RenderPreset,
   type RenderPresetId,
 } from "../renderPresets";
-import type { DisplaySettings, SdfView, ShadowMode } from "../viewer/renderer";
+import type { DisplaySettings, SdfView, ShadowMode } from "../viewer/display";
 import {
   MARCH_STEPS_MAX,
   MARCH_STEPS_MIN,
@@ -24,7 +24,7 @@ import {
   effectiveMarchSteps,
   isSliceView,
   slicePosition,
-} from "../viewer/renderer";
+} from "../viewer/display";
 import { sdfRampCss } from "../viewer/sdfRamp";
 import { brepMessage, brepStatus } from "../state";
 import { MM_PER_UNIT, formatDistance } from "../viewer/graticule";

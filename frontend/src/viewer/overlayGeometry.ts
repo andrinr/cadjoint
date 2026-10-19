@@ -93,7 +93,7 @@ export const HANDLE_SHAPE = { free: 0, held: 1, selected: 2 } as const;
 export function vertexHeld(node: Pick<ConstructionNode, "vertices" | "constraints">, index: number): boolean {
   const vertex = node.vertices[index];
   if (vertex && !vertex.free) return true;
-  return (node.constraints ?? []).some(
+  return node.constraints.some(
     (constraint) => constraint.kind === "fixed" && constraint.vertices.includes(index),
   );
 }

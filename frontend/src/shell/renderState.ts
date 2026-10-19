@@ -22,11 +22,8 @@ import {
   type RenderPresetId,
 } from "../renderPresets";
 import { setCameraAngles } from "../state";
-import {
-  QUALITY_PRESETS,
-  type DisplaySettings,
-  type Renderer,
-} from "../viewer/renderer";
+import { QUALITY_PRESETS, type DisplaySettings } from "../viewer/display";
+import type { Renderer } from "../viewer/renderer";
 
 export interface RenderState {
   display: Accessor<DisplaySettings>;

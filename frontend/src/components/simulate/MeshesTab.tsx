@@ -3,7 +3,7 @@
  *
  * Each card is one `SimMesh(...)` in the program: its resolution, bounds,
  * padding and element family are edited straight into the source through
- * /patch, and "Generate mesh" builds it server-side and shows it with a
+ * /api/patch, and "Generate mesh" builds it server-side and shows it with a
  * quality heatmap. The empty state matters as much as the list: a scene with
  * no declared mesh still solves on each study's implicit mesh, so the
  * fallback offers to generate and inspect that one.

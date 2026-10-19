@@ -61,8 +61,8 @@ export function focusSpan(
   }
   const statement = node.statementSpan;
   if (statement) return { from: statement[0], to: statement[1], precise: false };
-  // Older payloads, and anything the statement locator could not place: the
-  // position literal is still better than nothing for a primitive.
-  const position = node.spans?.position;
+  // A statement the locator could not place: the position literal is still
+  // better than nothing for a primitive.
+  const position = node.spans.position;
   return position ? { from: position[0], to: position[1], precise: true } : null;
 }

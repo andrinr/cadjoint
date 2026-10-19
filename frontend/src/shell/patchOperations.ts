@@ -1,7 +1,7 @@
 /**
  * The named edits the panes can make to the program.
  *
- * Every viewer and panel action is one `/patch` operation, and the op names
+ * Every viewer and panel action is one `/api/patch` operation, and the op names
  * and their payload keys are the app's half of that contract. Collecting the
  * wrappers here keeps the shell's JSX free of request literals and gives the
  * contract one place to read: if the server renames an argument, it changes

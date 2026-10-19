@@ -347,8 +347,9 @@ function buildFromSceneTree(
  *
  * With the evaluated scene tree, rows follow the composition: booleans nest
  * their operands in argument order, each solid appears where it is used, and
- * a sketch's operators nest beneath it. Without one (an older worker), nodes
- * appear as the compiler reported them and the booleans follow, flat.
+ * a sketch's operators nest beneath it. Without one, or with one that has no
+ * roots (before the first compile, or a `scene` that evaluates to nothing),
+ * nodes appear as the compiler reported them and the booleans follow, flat.
  */
 export function buildSceneTree(
   nodes: ConstructionNode[],

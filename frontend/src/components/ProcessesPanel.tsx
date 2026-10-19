@@ -142,7 +142,7 @@ export function ProcessesPanel() {
       job_id: job.job_id,
       source_hash: job.source_hash,
       kind: job.kind,
-      fields: job.fields ?? {},
+      fields: job.fields,
     });
     // Deterministic rather than clever: each kind of result has exactly one
     // window that knows how to draw it — a solved field in Results, a

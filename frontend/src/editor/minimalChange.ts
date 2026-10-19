@@ -1,7 +1,7 @@
 /**
  * The smallest single replacement that turns one text into another.
  *
- * Source arrives from outside the editor — a `/patch` response, a session
+ * Source arrives from outside the editor — a `/api/patch` response, a session
  * start, the optimizer adopting its result — and used to be adopted by
  * replacing the whole document. CodeMirror treats that as "everything
  * changed": the selection collapses to the start and the view scrolls to

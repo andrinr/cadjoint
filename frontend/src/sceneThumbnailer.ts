@@ -6,7 +6,7 @@
  * to see the part is to *draw* it, with the same raymarcher the viewport
  * uses, rather than to ship a screenshot somebody remembered to update.
  *
- * So this compiles the scene through the ordinary `/compile` endpoint and
+ * So this compiles the scene through the ordinary `/api/compile` endpoint and
  * hands the resulting shaders to a second {@link Renderer} bound to a
  * 320x200 canvas parked off-screen. That renderer is deliberately its own
  * instance: sharing the viewport's would mean swapping the shaders of the
@@ -25,7 +25,8 @@
 
 import * as api from "./api";
 import { readThumbnail, writeThumbnail, THUMBNAIL_HEIGHT, THUMBNAIL_WIDTH } from "./thumbnails";
-import { DEFAULT_DISPLAY, QUALITY_PRESETS, Renderer } from "./viewer/renderer";
+import { DEFAULT_DISPLAY, QUALITY_PRESETS } from "./viewer/display";
+import { Renderer } from "./viewer/renderer";
 
 /** What one thumbnail request produced. */
 export type ThumbnailOutcome =

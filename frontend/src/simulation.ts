@@ -5,16 +5,13 @@
  * the viridis ramp (kept in sync with the constants baked into
  * simulation.wgsl) and the clip-plane math behind the ParaView-style slicing
  * slider. Boundary-condition state lives in the scene program itself — the
- * panel edits it through /patch, so there is no client-side BC model here.
+ * panel edits it through /api/patch, so there is no client-side BC model here.
  * No DOM, no signals — unit-testable as-is.
  */
 
 // Every color role (field ramp, quality ramp, overlays, edges) lives in
-// simColors.ts; these re-exports keep the ramp's historical home working.
-import { fieldRamp, fieldRampCss } from "./simColors";
-
-/** Map a normalized scalar through the FIELD (viridis) ramp. */
-export const viridis = fieldRamp;
+// simColors.ts.
+import { fieldRampCss } from "./simColors";
 
 /** CSS linear-gradient for the field legend, sampled from the same ramp. */
 export const rampCss = fieldRampCss;

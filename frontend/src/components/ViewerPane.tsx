@@ -4,7 +4,7 @@
  * Pointer priority: a press that lands on a sketch handle starts an edit (drag
  * or select); anything else orbits the camera. In "add vertex" mode a click is
  * intersected with the sketch plane instead. Edits are applied to the Python
- * source through `/patch`, never to a private scene graph.
+ * source through `/api/patch`, never to a private scene graph.
  *
  * What stays here is the dispatch: which gesture a press begins, how a move
  * advances it, and what a release commits. Everything a gesture then *does*

@@ -452,10 +452,10 @@ test("a solved field survives a mode switch and is fetched back by job id", asyn
 
   // Now change the program. The result still describes the old text, so it
   // stays on screen and says so — throwing it away would be worse.
-  await page.getByTestId("sim-tab-meshes").click();
+  await page.getByTestId("window-tab-meshes").click();
   await page.getByTestId("mesh-arg-sink-mesh-padding").fill("0.03");
   await page.getByTestId("mesh-arg-sink-mesh-padding").blur();
-  await page.getByTestId("sim-tab-results").click();
+  await page.getByTestId("window-tab-results").click();
   await expect(page.getByTestId("simulate-stale")).toBeVisible({ timeout: 60_000 });
   await expect(page.getByTestId("simulate-legend")).toContainText("temperature");
   expect(solves()).toBe(1);
@@ -555,16 +555,14 @@ test("the Simulate desk arranges four windows that move like any other", async (
   await expect(page.getByTestId("simulate-panel")).toBeVisible();
   await expect(page.getByTestId("results-panel")).toBeVisible();
 
-  // The old tab strip's ids live on the dock's tabs, so the control that
-  // used to switch a tab is the control that raises the window.
-  await page.getByTestId("sim-tab-meshes").click();
+  // Clicking a window's tab raises that window in its group.
+  await page.getByTestId("window-tab-meshes").click();
   await expect(page.getByTestId("meshes-panel")).toBeVisible();
   await expect(page.getByTestId("simulate-panel")).toHaveCount(0);
-  await page.getByTestId("sim-tab-studies").click();
+  await page.getByTestId("window-tab-studies").click();
   await expect(page.getByTestId("simulate-panel")).toBeVisible();
 
-  // And they are windows in every sense: close one and the Window menu has
-  // it back, which a tab inside a panel never offered.
+  // Close one and the Window menu brings it back.
   await page.getByTestId("window-close-results").click();
   await expect(page.getByTestId("results-panel")).toHaveCount(0);
   await page.getByTestId("menu-window").click();
@@ -574,7 +572,7 @@ test("the Simulate desk arranges four windows that move like any other", async (
 
   // Optimize is one window with two homes rather than two copies of a card
   // list: the Model desk tabs it behind Materials, this desk behind Results.
-  await page.getByTestId("sim-tab-optimize").click();
+  await page.getByTestId("window-tab-optimize").click();
   await expect(page.getByTestId("optimize-panel")).toBeVisible();
   await page.getByTestId("editmode-model").click();
   await page.getByTestId("window-tab-optimize").click();

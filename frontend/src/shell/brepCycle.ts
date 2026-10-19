@@ -23,7 +23,7 @@ import {
   setBrepPayload,
   setBrepStatus,
 } from "../state";
-import type { DisplaySettings } from "../viewer/renderer";
+import type { DisplaySettings } from "../viewer/display";
 
 export interface BrepCycleOptions {
   display: Accessor<DisplaySettings>;

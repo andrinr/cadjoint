@@ -3,7 +3,7 @@
  * request bodies for the study patch operations.
  *
  * Studies are declared in the scene program; the panel only ever edits them
- * through /patch source edits, so everything here is a straight mapping from
+ * through /api/patch source edits, so everything here is a straight mapping from
  * payload shapes to patch-request shapes with no state of its own.
  */
 
@@ -186,7 +186,7 @@ export function draftSelection(draft: BcDraft): StudySelection {
   }
 }
 
-/** Body for POST /patch adding the drafted BC (App prepends `source`). */
+/** Body for POST /api/patch adding the drafted BC (App prepends `source`). */
 export function addBcRequest(study: StudyPayload, draft: BcDraft): Record<string, unknown> {
   const body: Record<string, unknown> = {
     op: "add_study_bc",

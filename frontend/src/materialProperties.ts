@@ -94,16 +94,9 @@ export function formatPhysical(value: number): string {
  * All seven, because an unstated property is a row the inspector has an offer
  * for — "state it" — and a row that is not drawn is an offer nobody can take.
  * What varies is the row's `state`, and the panel draws each one differently.
- * An older server sends no `physical` block at all, and that is a different
- * answer: it cannot tell us anything about any of them, so there is nothing
- * to draw and `hasPhysicalBlock` says so.
  */
 export function physicalRows(material: MaterialDefinition): PhysicalRow[] {
-  const physical = material.physical;
-  if (!physical) return [];
-  const units = material.units ?? {};
-  const free = material.free ?? {};
-  const spans = material.spans ?? {};
+  const { physical, units, free, spans } = material;
   return PHYSICAL_PROPERTIES.map(({ key, label }) => {
     const value = physical[key];
     const numeric = typeof value === "number" && Number.isFinite(value) ? value : null;
@@ -127,7 +120,3 @@ export function physicalRows(material: MaterialDefinition): PhysicalRow[] {
 /** The rows this material actually states — what a reader sees as content. */
 export const statedRows = (material: MaterialDefinition): PhysicalRow[] =>
   physicalRows(material).filter((row) => row.state === "stated");
-
-/** Whether the inspector should draw a physical section at all. */
-export const hasPhysicalBlock = (material: MaterialDefinition): boolean =>
-  material.physical !== undefined;

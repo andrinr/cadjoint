@@ -316,7 +316,7 @@ test("the revolved starter object exposes its profile and operator", async ({ pa
 test("sketch constraints are drawn over the viewport", async ({ page }) => {
   // The starter's constraint catalog is still growing, so never hardcode
   // counts or dimension values here: derive the expected overlay population
-  // from a fresh /compile of the session program — the same ground truth the
+  // from a fresh /api/compile of the session program — the same ground truth the
   // viewer renders from. Overlay rules mirrored from ViewerPane: every fixed
   // sketch constraint or object relation draws a marker; every *numeric*
   // distance draws a dimension with label Number(value.toPrecision(4));
@@ -324,7 +324,7 @@ test("sketch constraints are drawn over the viewport", async ({ page }) => {
   const truth = await page.evaluate(async () => {
     const session = await (await fetch("/api/session")).json();
     const compiled = await (
-      await fetch("/compile", {
+      await fetch("/api/compile", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -1423,7 +1423,7 @@ test("relational constraint chips render for API-added kinds", async ({ page }) 
     "scene = extrude(profile, depth=0.4)",
     "",
   ].join("\n");
-  // Drive /patch directly — the same API the app uses — to cover the kinds the
+  // Drive /api/patch directly — the same API the app uses — to cover the kinds the
   // starter program never adds, then load the accumulated source into the app.
   const patched = await page.evaluate(async (source) => {
     const session = (await (await fetch("/api/session")).json()) as { token: string };
@@ -1436,7 +1436,7 @@ test("relational constraint chips render for API-added kinds", async ({ page }) 
       { op: "add_constraint", line: 2, kind: "perpendicular", indices: [0, 1, 1, 2] },
     ];
     for (const operation of operations) {
-      const response = await fetch("/patch", {
+      const response = await fetch("/api/patch", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -1595,10 +1595,10 @@ test("studies are declared, edited, and deleted through source patches", async (
 
   // cool-sink optimizes this study, so retire the optimization first —
   // deleting the study out from under it would leave a broken program.
-  await page.getByTestId("sim-tab-optimize").click();
+  await page.getByTestId("window-tab-optimize").click();
   await page.getByTestId("optimize-delete-cool-sink").click();
   await editorHas("Optimization(", true);
-  await page.getByTestId("sim-tab-studies").click();
+  await page.getByTestId("window-tab-studies").click();
 
   // Deleting it reaches the empty state, which offers to add one again.
   await page.getByTestId("simulate-delete-sink-conduction").click();
@@ -1649,7 +1649,7 @@ test("meshes are declared, inspected, and deleted through source patches", async
   // The starter declares its mesh (sink-mesh) up front: the tab lists the
   // card rather than the empty state, and the study references it.
   await page.getByTestId("editmode-simulate").click();
-  await page.getByTestId("sim-tab-meshes").click();
+  await page.getByTestId("window-tab-meshes").click();
   await expect(page.getByTestId("mesh-empty")).toHaveCount(0);
   await expect(page.getByTestId("mesh-sink-mesh")).toBeVisible();
 
@@ -1725,14 +1725,14 @@ test("clicking the inspected mesh proposes a sphere BC selection", async ({ page
       .toBe(!negate);
 
   await page.getByTestId("editmode-simulate").click();
-  await page.getByTestId("sim-tab-meshes").click();
+  await page.getByTestId("window-tab-meshes").click();
   await page.getByTestId("mesh-add").click();
   await editorHas("SimMesh(");
   await page.getByTestId("mesh-inspect-mesh1").click();
   await expect(page.getByTestId("mesh-stats")).toBeVisible({ timeout: 90_000 });
 
   // Arm viewport picking from the study's add-BC builder (Studies tab).
-  await page.getByTestId("sim-tab-studies").click();
+  await page.getByTestId("window-tab-studies").click();
   await page.getByTestId("simulate-add-bc-sink-conduction").click();
   await expect(page.getByTestId("simulate-builder")).toBeVisible();
   await page.getByTestId("simulate-builder-pick").click();

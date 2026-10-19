@@ -9,7 +9,7 @@ import { expectValue, pickOption } from "./helpers/select";
  * tag is what these tests read, so they hold on a browser with no WebGPU);
  * taking hold of a plane and dragging the gizmo rewrites the plane's origin
  * literal and nothing else; and the properties window shows the selection's
- * written arguments and writes an edit back through `/patch`.
+ * written arguments and writes an edit back through `/api/patch`.
  *
  * The projection below is the same independent reimplementation of
  * `src/viewer/math` that `playground.spec.ts` carries, for the same reason:

@@ -22,7 +22,7 @@
 import { createEffect, createSignal, For, on, onCleanup, onMount, Show } from "solid-js";
 import type { JSX } from "solid-js";
 import type { EditingMode } from "../editingMode";
-import { editingMode, setPanels, setPanelVisibilityHandler, type PanelVisibility } from "../state";
+import { editingMode } from "../state";
 import { ProcessesPanel } from "../components/ProcessesPanel";
 import { createDock, type Dock } from "./dock";
 import { publishWindowManager, type WindowManager } from "./manager";
@@ -54,14 +54,6 @@ export interface WindowLayoutProps {
   /** The Solid tree for one window, rendered into the dock's container. */
   renderWindow: (id: WindowId) => JSX.Element;
 }
-
-/** The Window menu's older, coarser vocabulary, kept working. */
-const PANEL_KEY_TO_WINDOW: Record<keyof PanelVisibility, WindowId> = {
-  editor: "editor",
-  objectTree: "objects",
-  materials: "materials",
-  sketch: "sketch",
-};
 
 export function WindowLayout(props: WindowLayoutProps) {
   let host!: HTMLDivElement;
@@ -288,30 +280,13 @@ export function WindowLayout(props: WindowLayoutProps) {
     dock.layout();
     applyMode(activeMode);
     publishWindowManager(manager);
-    setPanelVisibilityHandler((key: keyof PanelVisibility, visible: boolean) => {
-      const id = PANEL_KEY_TO_WINDOW[key];
-      if (visible) openWindow(id);
-      else closeWindow(id);
-    });
 
     onCleanup(() => {
       if (persistHandle !== undefined) clearTimeout(persistHandle);
       persistNow();
-      setPanelVisibilityHandler(null);
       publishWindowManager(null);
       dock?.dispose();
       dock = undefined;
-    });
-  });
-
-  // Mirror the dock into the coarse `panels()` record the menu bar reads.
-  createEffect(() => {
-    const current = states()[activeMode];
-    setPanels({
-      editor: current.editor === "open",
-      objectTree: current.objects === "open",
-      materials: current.materials === "open",
-      sketch: current.sketch === "open",
     });
   });
 

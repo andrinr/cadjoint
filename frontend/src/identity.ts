@@ -1,7 +1,7 @@
 /**
  * How a request names the declaration it edits.
  *
- * Every addressable `/patch` operation accepts either `id` — the stable id
+ * Every addressable `/api/patch` operation accepts either `id` — the stable id
  * the compile payload publishes for that entry — or the older positional
  * handle: a line for a construction node, an index for a study, mesh or
  * optimization. The server resolves whichever it is given.

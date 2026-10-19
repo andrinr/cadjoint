@@ -19,9 +19,6 @@
 
 import type {
   ConstructionNode,
-  LintDiagnostic,
-  LintFix,
-  SimMeshPayload,
   StudyPayload,
 } from "../../cadjoint/viewer/schema/payloads";
 
@@ -39,14 +36,6 @@ export type ConstructionKind = ConstructionNode["kind"];
  * here once the patch layer can write it.
  */
 export type StudyPayloadKind = StudyPayload["kind"];
-
-/** Element type a SimMesh extracts. */
-export type MeshMethod = NonNullable<SimMeshPayload["method"]>;
-
-export type LintSeverity = LintDiagnostic["severity"];
-
-/** Where a ruff autofix came from, i.e. how far it may be trusted. */
-export type FixApplicability = LintFix["applicability"];
 
 /** A viewport-picked BC region, pre-filling the add-BC builder. */
 export type BcProposal =

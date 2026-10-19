@@ -2,7 +2,7 @@
  * Wires the panes together: the shell and nothing else.
  *
  * The loop that gives the viewer and the code parity —
- *   viewer edit → POST /patch → new source into the editor → POST /compile →
+ *   viewer edit → POST /api/patch → new source into the editor → POST /api/compile →
  *   new shaders + construction tree → viewer redraws
  * — lives in `shell/compileCycle.ts`. What is left here is the arrangement:
  * which Solid tree each window holds, which callbacks each one gets, and the
@@ -43,6 +43,7 @@ import { createAppCommands } from "./shell/appCommands";
 import { createShellShortcuts } from "./shell/shellShortcuts";
 import { fixSelectedPoint } from "./shell/toolActions";
 import { createSourceActions, createSourceHistory } from "./shell/sourceHistory";
+import { windowManager } from "./windows/manager";
 import { WindowLayout } from "./windows/WindowLayout";
 import type { WindowId } from "./windows/panels";
 import { focusSpan } from "./editorFocus";
@@ -61,7 +62,6 @@ import {
   profiles,
   selection,
   setConsoleText,
-  setPanelVisible,
   setSelection,
   setSource,
   reportViewerError,
@@ -402,7 +402,7 @@ export function App() {
           <EditorPane
             highlight={highlight()}
             onRun={() => void compile.run()}
-            onCollapse={() => setPanelVisible("editor", false)}
+            onCollapse={() => windowManager()?.close("editor")}
           />
         );
 

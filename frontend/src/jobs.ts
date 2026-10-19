@@ -41,8 +41,6 @@ export type {
 /** The kinds of work the server registers. */
 export type JobKind = JobSummary["kind"];
 
-export type JobStatus = JobSummary["status"];
-
 /**
  * What a panel stores instead of a result.
  *
@@ -392,18 +390,6 @@ function now(): number {
 }
 
 /**
- * Nudge the poller: refresh now, and keep polling while work is running.
- *
- * For a caller that has just started something the registry will know about
- * but does not itself want to watch — a compile, say. Cheap by design: a
- * poll already running is not doubled, and one that finds nothing pending
- * stops after a single request.
- */
-export function pokeJobs(): void {
-  void refreshJobs();
-}
-
-/**
  * Start polling, and stop when the returned function is called.
  *
  * Reference-counted: the Processes window subscribes while it is open, and a
@@ -426,11 +412,6 @@ export function watchJobs(): () => void {
       timer = undefined;
     }
   };
-}
-
-/** Whether anything is polling right now (for tests and diagnostics). */
-export function jobsWatchers(): number {
-  return watchers;
 }
 
 /** One line of "something is running", for a chip that is not a window. */

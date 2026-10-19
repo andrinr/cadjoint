@@ -2,7 +2,7 @@
  * Application state.
  *
  * The Python source is the single source of truth: viewer edits go through
- * `/patch`, the patched text replaces the editor contents, and a recompile
+ * `/api/patch`, the patched text replaces the editor contents, and a recompile
  * regenerates the construction tree. Nothing about a sketch is stored outside
  * the program text except the transient drag override below.
  */
@@ -69,7 +69,7 @@ export const [elements, setElements] = createSignal<ConstructionElement[]>([]);
  */
 export const [inspected, setInspectedSignal] = createSignal<string | null>(null);
 
-/** What `scene` evaluates to, boolean by boolean; null from an older worker. */
+/** What `scene` evaluates to, boolean by boolean; null before the first compile. */
 export const [sceneTree, setSceneTree] = createSignal<SceneTree | null>(null);
 
 /**
@@ -241,49 +241,6 @@ export const [busy, setBusy] = createSignal(false);
 export const [dirty, setDirty] = createSignal(false);
 /** Saved scene file name, or null for an unsaved buffer. */
 export const [sceneName, setSceneName] = createSignal<string | null>(null);
-
-/** Which shell panels are shown, toggled from the Window menu. */
-export interface PanelVisibility {
-  editor: boolean;
-  objectTree: boolean;
-  materials: boolean;
-  sketch: boolean;
-}
-
-export const DEFAULT_PANELS: PanelVisibility = {
-  editor: true,
-  objectTree: true,
-  materials: true,
-  sketch: true,
-};
-
-export const [panels, setPanels] = createSignal<PanelVisibility>({ ...DEFAULT_PANELS });
-
-/**
- * Who actually opens and closes windows.
- *
- * The dock (`windows/WindowLayout`) is the source of truth: it owns the
- * arrangement, the per-mode layouts, and the browser-local record. It
- * registers here on mount so the menu bar's coarse Window items keep working
- * unchanged, and mirrors the result back into `panels()` for their check
- * marks. Before it mounts — and in unit tests, which never build a dock —
- * this falls back to the plain signal.
- */
-type PanelVisibilityHandler = (key: keyof PanelVisibility, visible: boolean) => void;
-
-let panelVisibilityHandler: PanelVisibilityHandler | null = null;
-
-export function setPanelVisibilityHandler(handler: PanelVisibilityHandler | null): void {
-  panelVisibilityHandler = handler;
-}
-
-export function setPanelVisible(key: keyof PanelVisibility, visible: boolean): void {
-  if (panelVisibilityHandler) {
-    panelVisibilityHandler(key, visible);
-    return;
-  }
-  setPanels({ ...panels(), [key]: visible });
-}
 
 /** Vertex being dragged, with its live sketch-plane position. */
 export interface DragState {

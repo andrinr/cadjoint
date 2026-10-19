@@ -78,6 +78,3 @@ function rampGradient(ramp: (t: number) => [number, number, number], stops = 12)
 export const fieldRampCss = (stops = 12): string => rampGradient(fieldRamp, stops);
 export const qualityRampCss = (stops = 12): string => rampGradient(qualityRamp, stops);
 
-/** Quality accent for panel chrome tied to the quality ramp (histogram). */
-export const QUALITY_ACCENT: Rgb = qualityRamp(0.75);
-

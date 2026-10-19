@@ -93,7 +93,7 @@ import type { Renderer } from "../../viewer/renderer";
 /** What the app shell hands the controller when it creates it. */
 export interface SimulateControllerProps {
   renderer: Renderer;
-  /** Serialized /patch queue owned by the app shell. */
+  /** Serialized /api/patch queue owned by the app shell. */
   onPatch: (body: Record<string, unknown>) => Promise<void>;
   /** Adopt server-produced source like a patch response (optimize runs). */
   onAdoptSource: (source: string) => Promise<void>;

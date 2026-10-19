@@ -248,16 +248,6 @@ export function CodeIcon(props: IconProps) {
   );
 }
 
-export function TraceIcon(props: IconProps) {
-  return (
-    <svg {...base(props.size ?? BOX)}>
-      <circle cx="8.5" cy="8.5" r="2.5" />
-      <path d="M8.5 1.5V3M8.5 14V15.5M1.5 8.5H3M14 8.5H15.5" />
-      <path d="M4 4L4.6 4.6M12.4 12.4L13 13M13 4L12.4 4.6M4.6 12.4L4 13" />
-    </svg>
-  );
-}
-
 export function ObjectSelectIcon(props: IconProps) {
   return (
     <svg {...base(props.size ?? BOX)}>
@@ -325,15 +315,6 @@ export function OrthographicIcon(props: IconProps) {
     <svg {...base(props.size ?? BOX)}>
       <path d="M2.5 3.5H13.5V13.5H2.5Z" />
       <path d="M2.5 8.5H13.5" />
-    </svg>
-  );
-}
-
-/** A corner-on cube: the isometric home view. */
-export function IsoIcon(props: IconProps) {
-  return (
-    <svg {...base(props.size ?? BOX)}>
-      <path d={CUBE} />
     </svg>
   );
 }

@@ -3,7 +3,7 @@
  *
  * Each card is one `ThermalStudy(...)` or `ElasticStudy(...)` in the program.
  * Its numeric arguments, the mesh it discretizes and the object it is
- * restricted to are all plain source rewrites through /patch, so the card and
+ * restricted to are all plain source rewrites through /api/patch, so the card and
  * the code never disagree. Solving posts only the study's name: the server
  * re-derives the mesh and the BCs from the declaration.
  *

@@ -63,23 +63,6 @@ export function sharedLayout(
   };
 }
 
-/** Compile a WGSL module and surface its compilation errors as an exception. */
-export async function compileModule(
-  device: GPUDevice,
-  code: string,
-  label: string,
-): Promise<GPUShaderModule> {
-  const module = device.createShaderModule({ code, label });
-  const info = await module.getCompilationInfo();
-  const errors = info.messages.filter((message) => message.type === "error");
-  if (errors.length) {
-    throw new Error(
-      errors.map((m) => `${label} ${m.lineNum}:${m.linePos} ${m.message}`).join("\n"),
-    );
-  }
-  return module;
-}
-
 /**
  * One construction overlay, in its two depth behaviours.
  *

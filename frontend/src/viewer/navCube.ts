@@ -331,8 +331,6 @@ export const TRIAD: { axis: Vec3; label: string; token: string }[] = [
 ];
 
 /** Every facet's preset must exist; asserted once, at module load. */
-export const FACET_KEYS = FACETS.map((facet) => facet.key);
-
 if (
   FACETS.some(
     (facet) =>

@@ -5,7 +5,7 @@ import {
   DEFAULT_QUALITY,
   QUALITY_PRESETS,
   type DisplaySettings,
-} from "./viewer/renderer";
+} from "./viewer/display";
 
 export type RenderPresetId = "xray" | "studio" | "wire";
 

@@ -7,15 +7,10 @@
  * are depth-tested against the solid. Transform controls use a separate
  * always-visible pass so the selected object cannot hide its own gizmo.
  *
- * Ported from the previous inline playground script, with the depth attachment,
- * the overlay pipelines, and pan support added.
- *
- * What is left here is the device and the frame: adapter setup, the GPU
- * buffers and textures, and the passes that draw them. The declarative parts
- * moved out — the settings the panels write live in `display.ts`, the vertex
- * packing in `overlayGeometry.ts`, and the pipeline descriptors in
- * `pipelines.ts` — and are re-exported below so `viewer/renderer` stays the
- * one import path callers know.
+ * This module holds the device and the frame: adapter setup, the GPU buffers
+ * and textures, and the passes that draw them. The settings the panels write
+ * live in `display.ts`, the vertex packing in `overlayGeometry.ts`, and the
+ * pipeline descriptors in `pipelines.ts`.
  */
 
 import {
@@ -104,29 +99,8 @@ export interface ShaderStats {
 }
 import { CHROME, VIEWPORT_BACKGROUND, hexToRgb } from "../tokens";
 
-export {
-  DEFAULT_DISPLAY,
-  DEFAULT_QUALITY,
-  DISPLAY,
-  QUALITY_PRESETS,
-  SDF_SLICE_RANGE,
-  MARCH_STEPS_MAX,
-  MARCH_STEPS_MIN,
-  SDF_VIEW_CODE,
-  VIEW_PRESETS,
-  displayFlags,
-  effectiveMarchSteps,
-  isSliceView,
-  matchViewPreset,
-  sameView,
-  slicePosition,
-  type DisplaySettings,
-  type QualityPreset,
-  type SdfView,
-  type ShadowMode,
-  type Shaders,
-  type ViewPreset,
-} from "./display";
+/** For `shell/compileCycle.ts`, which imports the settings type from here. */
+export type { DisplaySettings } from "./display";
 
 /**
  * The viewport's paper ground, `#e6e6e9`, as the swapchain sees it.
@@ -510,16 +484,8 @@ export class Renderer {
     return { width, height };
   }
 
-  get rendererLabel(): string {
-    return this.adapterLabel;
-  }
-
   get unavailableReason(): string {
     return this.initError;
-  }
-
-  get currentSampleCount(): number {
-    return this.sampleCount;
   }
 
   get gizmoMode(): GizmoMode {
@@ -554,10 +520,6 @@ export class Renderer {
   /** Framebuffer size, used by hit testing to match projected pixels. */
   get viewport(): { width: number; height: number } {
     return { width: this.canvas?.width ?? 1, height: this.canvas?.height ?? 1 };
-  }
-
-  get cameraPosition(): Vec3 {
-    return cameraPosition(this.camera);
   }
 
   /** The view descriptor picking and overlay projection must agree on. */
@@ -1308,15 +1270,6 @@ export class Renderer {
   /** Whether the installed scene reads its parameters from a buffer. */
   get hasParameterBuffer(): boolean {
     return this.program !== null && this.parameterBuffer !== null;
-  }
-
-  /** Shader module cache counters, for tests and the performance study. */
-  get shaderCacheStats(): { hits: number; misses: number; size: number } {
-    return {
-      hits: this.shaderModules.hits,
-      misses: this.shaderModules.misses,
-      size: this.shaderModules.size,
-    };
   }
 
   /**

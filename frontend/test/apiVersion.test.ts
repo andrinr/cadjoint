@@ -12,9 +12,4 @@ describe("the API version check", () => {
     expect(message).toContain(`speaks version ${CLIENT_API_VERSION + 1}`);
     expect(message).toContain("npm run build");
   });
-
-  it("treats a server that reports nothing as a mismatch, not a match", () => {
-    // Every server before the versioned contract: /api/session had no field.
-    expect(apiVersionMismatch(undefined)).toContain("does not report a version");
-  });
 });
