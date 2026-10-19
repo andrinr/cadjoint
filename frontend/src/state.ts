@@ -8,7 +8,9 @@
  */
 
 import { createSignal } from "solid-js";
+import type { BrepHover } from "./brep";
 import type {
+  BRepInspectionPayload,
   BcProposal,
   ConstructionNode,
   ConstructionRelation,
@@ -181,6 +183,20 @@ export interface SimProbe {
 
 export const [simProbe, setSimProbe] = createSignal<SimProbe | null>(null);
 export const [meshEdges, setMeshEdges] = createSignal<MeshEdgePayload | null>(null);
+
+/**
+ * The B-rep inspector (`src/brep.ts`): the last derived B-rep and where its
+ * request stands. `unavailable` is sticky for the session — the private tier
+ * does not appear mid-run — and is what greys the display switch out.
+ */
+export type BrepStatus = "idle" | "loading" | "ready" | "error" | "unavailable";
+export const [brepPayload, setBrepPayload] = createSignal<BRepInspectionPayload | null>(null);
+export const [brepStatus, setBrepStatus] = createSignal<BrepStatus>("idle");
+/** The failure or the missing-tier sentence, for the panel. */
+export const [brepMessage, setBrepMessage] = createSignal<string | null>(null);
+export const [brepHover, setBrepHover] = createSignal<BrepHover>(null);
+export const [brepHiddenKinds, setBrepHiddenKinds] = createSignal<ReadonlySet<string>>(new Set());
+export const [brepOffSurfaceOnly, setBrepOffSurfaceOnly] = createSignal(false);
 
 /**
  * The analytic face under the pointer while the face tool is armed.

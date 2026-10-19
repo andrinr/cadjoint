@@ -440,6 +440,77 @@ export interface MeshEdgePayload {
   edges?: "graph" | "lattice";
 }
 
+/** The derived B-rep, or why there is none (``available`` false). */
+export interface BRepInspectionPayload {
+  available: boolean;
+  reason?: string | null;
+  error?: string | null;
+  positions?: number[] | null;
+  triangles?: number[] | null;
+  triangle_face?: number[] | null;
+  faces?: BRepFacePayload[] | null;
+  edges?: BRepEdgePayload[] | null;
+  vertices?: BRepVertexPayload[] | null;
+  diagnostics?: BRepDiagnostics | null;
+}
+
+/** One face of the derived B-rep, for the inspector's readout. */
+export interface BRepFacePayload {
+  id: number;
+  kind: string;
+  surface: string;
+  analytic: boolean;
+  patch: number;
+  leaf: number;
+  leaf_type?: string | null;
+  area?: number | null;
+}
+
+/** One face-pair boundary chain, kinded by how it reached the screen. */
+export interface BRepEdgePayload {
+  id: number;
+  kind: string;
+  state: string;
+  faces: number[];
+  patches: number[];
+  vertices: number[];
+  closed: boolean;
+  analytic: boolean;
+  residual?: number | null;
+  crossing?: number | null;
+  points: number[];
+  off_surface: number;
+}
+
+/** One solved corner of the derived B-rep. */
+export interface BRepVertexPayload {
+  id: number;
+  kind: string;
+  point: [number, number, number];
+  faces: number[];
+  residual?: number | null;
+}
+
+/** Counts, the path that produced the B-rep, and why the exact one refused. */
+export interface BRepDiagnostics {
+  faces: number;
+  edges: number;
+  vertices: number;
+  source: string;
+  exact: boolean;
+  fallback_reason?: string | null;
+  surfaces: Record<string, number>;
+  edge_kinds: Record<string, number>;
+  vertex_kinds: Record<string, number>;
+  off_surface_tolerance: number;
+  off_surface_edges: number;
+  feature_curves?: string | null;
+  cell: number;
+  resolution: number;
+  stats: Record<string, number | string | boolean>;
+  timings: Record<string, number>;
+}
+
 /** What ``/patch`` answers with: the patched program, or why not. */
 export interface PatchResponse {
   ok: boolean;
