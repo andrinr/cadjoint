@@ -10,7 +10,7 @@ FEM simulation composed into one function JAX can differentiate end to end.
 > [!WARNING]
 > The API is not stable. Expect breaking changes.
 
-[![The bracket in the playground's Sketch mode. The camera turns around the part, then the free handle at the tip of the gusset rib is dragged up the vertical web; the rib and its smooth-union blend follow at frame rate, and the rib_tip literal in the editor is rewritten on release.](https://raw.githubusercontent.com/andrinr/cadjoint/main/docs/assets/motion/bracket-orbit-drag.webp)](https://andrinr.github.io/cadjoint/docs/viewer.html)
+[![The bracket in the playground's vertex mode, with the rib's distance constraint removed. The camera turns half way around the part; the pointer drags the free handle at the tip of the gusset rib up and out, the rib and its smooth-union blend follow the drag, and on release the rib_tip Vector2 literal in the editor is rewritten. The handle is dragged back, and the camera finishes the turn.](https://raw.githubusercontent.com/andrinr/cadjoint/main/docs/assets/motion/bracket-orbit-drag.webp)](https://andrinr.github.io/cadjoint/docs/viewer.html)
 
 *Dragging the `rib_tip` handle updates the shader's parameter buffer each frame and rewrites the `Vector2` literal in `scene.py` on release.*
 
@@ -36,15 +36,15 @@ One Python program declares every stage, and JAX differentiates through each:
 - No boundary representation is stored; every surface is extracted from the
   SDF at a chosen resolution.
 
-[![The end cap's cap-conduction thermal study solved from the Simulate desk: the job chip counts the seconds while the cut-cell mesh is assembled and solved, then the temperature field appears on the part with its legend and the camera turns around it.](https://raw.githubusercontent.com/andrinr/cadjoint/main/docs/assets/motion/end-cap-solve.webp)](https://github.com/andrinr/cadjoint/blob/main/scenes/end_cap.py)
+[![The end cap's cap-conduction thermal study in the Simulate desk. Clicking Solve meshes and solves the study, shown time-lapsed; the temperature field then appears on the part, and the Results panel shows its legend and the minimum, mean and maximum temperature.](https://raw.githubusercontent.com/andrinr/cadjoint/main/docs/assets/motion/end-cap-solve.webp)](https://github.com/andrinr/cadjoint/blob/main/scenes/end_cap.py)
 
 *The end cap's `ThermalStudy` is meshed and solved with one click.*
 
-[![The heat sink's cool-sink optimization run from the Optimize panel: eight Adam steps stream in with the objective trace, then the scrubber replays the path while the fin comb changes proportions.](https://raw.githubusercontent.com/andrinr/cadjoint/main/docs/assets/motion/heat-sink-optimize.webp)](https://github.com/andrinr/cadjoint/blob/main/scenes/starter.py)
+[![The heat sink's cool-sink optimization in the Optimize panel, time-lapsed. Clicking Run takes eight Adam steps while the objective trace is drawn; the viewport then replays the trajectory, and the fins slim and taper as the peak temperature objective falls from 1.612 to 1.465.](https://raw.githubusercontent.com/andrinr/cadjoint/main/docs/assets/motion/heat-sink-optimize.webp)](https://github.com/andrinr/cadjoint/blob/main/scenes/starter.py)
 
 *The heat sink starts overbuilt; its declared `Optimization` slims it by descending on the gradient of peak temperature with respect to the sketch.*
 
-[![The heat sink in Sketch mode: the armed sketch tool shows a ghost plane labelled new sketch on the floor; hovering the fin comb shows its plane, frame and normal, and dragging the gizmo's Z arrow lifts the comb while the editor's SketchPlane origin is rewritten.](https://raw.githubusercontent.com/andrinr/cadjoint/main/docs/assets/motion/sketch-planes.webp)](https://github.com/andrinr/cadjoint/blob/main/scenes/starter.py)
+[![The heat sink in Sketch mode. Selecting the fin comb in the Objects tree shows its sketch plane with the move gizmo; dragging the gizmo's Z arrow lifts the plane and the comb with it, and the ORIGIN field in the Properties window updates to the rewritten SketchPlane origin. The plane is then dragged back down.](https://raw.githubusercontent.com/andrinr/cadjoint/main/docs/assets/motion/sketch-planes.webp)](https://github.com/andrinr/cadjoint/blob/main/scenes/starter.py)
 
 *In Sketch mode, dragging a literal work plane by its gizmo rewrites its `SketchPlane(origin=...)`; a plane taken from a face (`SketchPlane.on(body.cap("+"))`) is instead an expression over the parent feature's parameters, so it is differentiable.*
 
@@ -109,9 +109,9 @@ The editor holds `scene.py` and the viewport shows the compiled field. Vertex
 handles, gizmos, material swatches, face picks, constraint chips, solver runs
 and the properties window all write back into the source.
 
-[![The properties window: clicking the fin comb's extrude row in the object tree shows its profile, its depth (the named parameter fin_depth) and its material. Typing a new depth deepens the comb, and choosing copper from the material dropdown recolours it.](https://raw.githubusercontent.com/andrinr/cadjoint/main/docs/assets/motion/properties-window.webp)](https://github.com/andrinr/cadjoint/blob/main/scenes/starter.py)
+[![The properties window: clicking the fin comb's extrude row in the Objects tree shows its profile, its depth (the named parameter fin_depth) and its material. Typing 1.8 into the depth field deepens the comb, typing 1.2 restores it, and follow selection clears the window.](https://raw.githubusercontent.com/andrinr/cadjoint/main/docs/assets/motion/properties-window.webp)](https://github.com/andrinr/cadjoint/blob/main/scenes/starter.py)
 
-*The properties window edits the arguments of the selected call: here the comb's depth and material.*
+*The properties window edits the arguments of the selected call: here the comb's extrusion depth.*
 
 The server listens only on localhost but executes the scene's Python on your
 machine; only run code you trust. The
