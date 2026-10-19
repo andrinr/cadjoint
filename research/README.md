@@ -18,6 +18,16 @@ their full text is in git history (PR #19).
   rationale, and a known CalculiX deck fragility.
 - [WebGPU SDF path tracing](./path-tracing.md) — design and deliberate
   boundaries of the browser path-tracing mode.
+- [Design language](./design-language.md) — the settled visual and
+  interaction specification of the playground.
+- [Editing operations](./editing-operations.md) — the spec of record for the
+  28 source-rewriting patch operations.
+- [Performance](./performance.md) — where the playground's seconds go, and
+  the measured record of every speed-up taken or declined.
+- [Flow solver](./flow-solver.md) — the differentiable flow solver and its
+  conjugate heat-transfer coupling.
+- [Complex scene](./complex-scene.md) and [complex scene 2](./complex-scene-2.md)
+  — what modelling two real parts broke, and what was fixed.
 
 ## Living roadmap material
 
@@ -27,7 +37,18 @@ their full text is in git history (PR #19).
 - [Constraint system](./constraints.md) — final state and the remaining
   constraint vocabulary (tangent, midpoint, concentric, …).
 
+## Experiments
+
+- [`cutfem/`](./cutfem/README.md) — a cut-cell finite-element solve on an
+  implicit model, differentiated in θ.
+- [`reverse/`](./reverse/README.md) — reverse-engineering a scene from a STEP
+  file and measuring how close it is.
+- [`zeroset_test/`](./zeroset_test/README.md) — end-to-end harness for
+  `zero-set.proto`.
+
 ## Screenshots
 
 `app/` and `edge-view/` hold the viewer screenshots embedded in PR #19
-(feature-edge QA, simulate-panel parity, the editing modes).
+(feature-edge QA, simulate-panel parity, the editing modes); `refactor/` the
+before/after panels of the panel refactor, `complex-scene/` the end-cap
+part, and `design/` the design-language captures.

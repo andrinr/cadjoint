@@ -3,8 +3,7 @@
  *
  * `supersede.test.ts` states the rule in the abstract; this states it in the
  * app's own terms, over the real `createCompileCycle` with only the network
- * and the renderer replaced. The claims are the ones the user's report turns
- * into: two edits in quick succession show the **second** one's geometry, the
+ * and the renderer replaced. The claims: two edits in quick succession show the **second** one's geometry, the
  * first one's worker is killed rather than merely ignored, a burst of patches
  * is one compile of the final program, and the app never ends a burst busy or
  * showing a program that is not the one in the editor.
@@ -12,6 +11,7 @@
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createRoot, createSignal } from "solid-js";
+import { deferred, settle } from "./helpers";
 
 const compile = vi.fn();
 const mesh = vi.fn();
@@ -87,16 +87,6 @@ function answer(name: string) {
   };
 }
 
-/** A promise the test resolves when it wants the "worker" to answer. */
-function deferred<T>() {
-  let resolve!: (value: T) => void;
-  const promise = new Promise<T>((settle) => {
-    resolve = settle;
-  });
-  return { promise, resolve };
-}
-
-const settle = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const DEBOUNCE = 20;
 

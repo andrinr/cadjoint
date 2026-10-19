@@ -8,41 +8,47 @@ construction order.  Nothing here knows what a study is beyond a name and a
 :class:`cadjoint.flow.FlowStudy` fills a lattice, and both land in the same
 list.
 
-Mirrors ``capture_constraint_solves`` in :mod:`cadjoint.constraints.solve`
-and ``capture_sim_meshes`` in :mod:`cadjoint.fem.simmesh`.
+One :class:`cadjoint.capture.Capture`, like the mesh, optimization and
+constraint-solve registries.
 """
 
 from __future__ import annotations
 
-from collections.abc import Iterator
-from contextlib import contextmanager
-from contextvars import ContextVar
-from typing import Any
+from collections.abc import Sequence
+from contextlib import AbstractContextManager
+from typing import Any, Protocol
 
-__all__ = ["capture_studies", "declared_studies", "register_study"]
+from cadjoint.capture import Capture
+from cadjoint.descriptions import StudyDescription
 
-_CAPTURED_STUDIES: ContextVar[list[Any] | None] = ContextVar(
-    "cadjoint_captured_studies",
-    default=None,
-)
+__all__ = ["Study", "capture_studies", "declared_studies", "register_study"]
 
 
-@contextmanager
-def capture_studies() -> Iterator[list[Any]]:
+class Study(Protocol):
+    """What every study is, whatever it solves."""
+
+    name: str
+    bcs: Sequence[Any]
+    last_result: Any
+
+    def describe(self) -> StudyDescription: ...
+
+    def solve(self, sdf: Any = None) -> Any: ...
+
+
+_STUDIES: Capture[Study] = Capture("cadjoint_captured_studies")
+
+
+def capture_studies() -> AbstractContextManager[list[Study]]:
     """Collect every study constructed inside this context.
 
     Yields:
         The list the studies land in, in construction order.
     """
-    studies: list[Any] = []
-    token = _CAPTURED_STUDIES.set(studies)
-    try:
-        yield studies
-    finally:
-        _CAPTURED_STUDIES.reset(token)
+    return _STUDIES.collect()
 
 
-def declared_studies() -> list[Any]:
+def declared_studies() -> list[Study]:
     """The studies declared so far in the active capture context.
 
     How a declaration resolves a *name* to the study it refers to — an
@@ -53,10 +59,10 @@ def declared_studies() -> list[Any]:
         The captured studies in construction order.  A copy: appending to
         it does not register anything.
     """
-    return list(_CAPTURED_STUDIES.get() or ())
+    return _STUDIES.declared()
 
 
-def register_study(study: Any) -> None:
+def register_study(study: Study) -> None:
     """Add a study to the active :func:`capture_studies` context, if any.
 
     The registration hook the study classes call from ``__post_init__``.
@@ -66,6 +72,4 @@ def register_study(study: Any) -> None:
     Args:
         study: Any object with a ``name`` and a ``describe()``.
     """
-    captured = _CAPTURED_STUDIES.get()
-    if captured is not None:
-        captured.append(study)
+    _STUDIES.record(study)

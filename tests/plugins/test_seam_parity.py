@@ -7,11 +7,9 @@ move.  So the tests here run the real seam — ``Optimization.run`` on the
 starter heat sink, the scene's own resolution — and compare objectives with
 ``==``, not ``approx``.
 
-Measured on 2026-09-02 (macOS/arm64, starter hex chain, one step):
-``gradient_path="tesseract"`` and its ``"plugins"`` alias both report
-J = 0.9886978328015229, and so does a run whose ``thermal_solver`` kind is
-filled by a differently-named plugin pointing at the same package — 16
-digits, exactly equal, all three.
+A run whose ``thermal_solver`` kind is filled by a differently-named
+plugin pointing at the same package reports the same objective as
+``gradient_path="tesseract"``, to the last bit.
 """
 # Imports follow pytest.importorskip by design.
 # ruff: noqa: E402
@@ -94,14 +92,6 @@ def _one_step(starter, gradient_path: str) -> float:
 
 
 class TestSeamParity:
-    def test_the_plugins_alias_is_the_tesseract_path(self, starter):
-        """Same objective to the last bit — the alias renames nothing else."""
-        canonical = _one_step(starter, "tesseract")
-        alias = _one_step(starter, "plugins")
-        print(f"\nstarter hex seam: tesseract J={canonical!r} plugins J={alias!r}")
-        assert np.isfinite(canonical)
-        assert alias == canonical
-
     def test_a_renamed_solver_plugin_gives_the_identical_objective(self, starter):
         """The chain really resolves by kind, and resolution costs nothing.
 
@@ -112,6 +102,7 @@ class TestSeamParity:
         does — and the objective is bit-for-bit what it was.
         """
         baseline = _one_step(starter, "tesseract")
+        assert np.isfinite(baseline)
 
         renamed = build_registry(use_entry_points=False)
         renamed.register(
@@ -127,7 +118,7 @@ class TestSeamParity:
         previous = set_registry(renamed)
         try:
             assert renamed.default_for("thermal_solver") == "thermal_elsewhere"
-            through_registry = _one_step(starter, "plugins")
+            through_registry = _one_step(starter, "tesseract")
         finally:
             set_registry(previous)
             renamed.close()
@@ -186,17 +177,6 @@ class TestBackendsResolveThroughTheRegistry:
 
         backend = TesseractBackend(elastic="elastic_calculix")
         assert backend._plugin_for("elastic").name == "elastic_calculix"
-
-    def test_a_legacy_api_path_still_works(self):
-        """The pre-plugin escape hatch keeps working, as a local spec."""
-        from cadjoint.fem.backends import TesseractBackend
-
-        backend = TesseractBackend(
-            api_path=_TESSERACTS / "thermal_jaxfem" / "tesseract_api.py",
-        )
-        plugin = backend._plugin_for("thermal")
-        assert plugin.spec.transport == "local"
-        assert plugin.schema_hash() == get_plugin("thermal_jaxfem").schema_hash()
 
     def test_the_calculix_backend_names_a_plugin_not_a_path(self):
         from cadjoint.fem.calculix import CalculixBackend, find_ccx

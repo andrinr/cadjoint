@@ -46,8 +46,8 @@ describe("selectionEvaluable", () => {
 });
 
 describe("primitive selections", () => {
-  // The server describes `Nodes.cylinder` too (cadjoint/studies/selection.py);
-  // it used to fall through every case here and evaluate to undefined.
+  // The server describes `Nodes.cylinder` too (cadjoint/studies/selection.py),
+  // so it must not fall through every case here to undefined.
   it("cylinder selects by distance from its axis, which need not be unit length", () => {
     const mask = evaluate({
       kind: "cylinder",

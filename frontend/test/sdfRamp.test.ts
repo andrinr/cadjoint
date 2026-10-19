@@ -27,9 +27,8 @@ import {
   qualityRamp,
   type Rgb,
 } from "../src/simColors";
+import { distance } from "./helpers";
 
-const distance = (a: Rgb, b: Rgb): number =>
-  Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
 
 /** Closest approach to a ramp, over 201 samples of it. */
 const nearest = (color: Rgb, ramp: (t: number) => [number, number, number]): number => {

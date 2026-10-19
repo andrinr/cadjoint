@@ -12,9 +12,9 @@
  * stated in SI with the unit printed beside the number.
  *
  * ── Why the physical rows are boxes and not sliders ──────────────────────
- * These were read-only, on the argument that a study's result depends on them
- * and they should be shown as declared rather than nudged. Half of that is
- * right and the conclusion was wrong: a number a solve depends on is exactly
+ * A study's result depends on these, which is a reason to show them as
+ * declared rather than nudge them — not a reason to make them read-only: a
+ * number a solve depends on is exactly
  * the number you want to be able to *type*, to a stated significant figure,
  * rather than approach with a slider — 7e10 and 6.9e10 are different materials
  * and no slider distinguishes them. So each stated row is a number box that
@@ -34,9 +34,10 @@ import { For, Show, createEffect, createMemo, createSignal } from "solid-js";
 import * as api from "../api";
 import { busy, materials, nodes, source } from "../state";
 import { NumberInput } from "./ui";
-import { hasPhysicalBlock, physicalRows, type PhysicalRow } from "../materialProperties";
+import { physicalRows, type PhysicalRow } from "../materialProperties";
 import type { MaterialDefinition, SetMaterialPropertyRequest } from "../types";
 import { materialPreviewUrl } from "./materialPreview";
+import { hexToRgb, rgbToHex } from "../tokens";
 
 export const MATERIAL_DRAG_TYPE = "application/x-cadjoint-material";
 
@@ -50,7 +51,7 @@ export interface MaterialPanelProps {
   /**
    * Adopt server-produced source, exactly as a patch response is adopted.
    *
-   * The physical rows do their own `/patch` round trip rather than going
+   * The physical rows do their own `/api/patch` round trip rather than going
    * through the shell's `applyPatch`, for one reason: `applyPatch` turns a
    * refusal into a status-line message and returns nothing, and this panel
    * needs the refusal itself to put beside the row that caused it. What it
@@ -86,28 +87,6 @@ const SEED_VALUE: Record<string, number> = {
   thermal_expansion: 1e-5,
   yield_strength: 1e8,
 };
-
-function colorHex(color: readonly number[]): string {
-  return (
-    "#" +
-    color
-      .map((value) =>
-        Math.round(Math.max(0, Math.min(1, value)) * 255)
-          .toString(16)
-          .padStart(2, "0"),
-      )
-      .join("")
-  );
-}
-
-function colorRgb(hex: string): [number, number, number] {
-  const value = hex.replace("#", "");
-  return [0, 2, 4].map((offset) => Number.parseInt(value.slice(offset, offset + 2), 16) / 255) as [
-    number,
-    number,
-    number,
-  ];
-}
 
 export function MaterialPanel(props: MaterialPanelProps) {
   const [activeId, setActiveId] = createSignal<string | null>(null);
@@ -265,13 +244,13 @@ export function MaterialPanel(props: MaterialPanelProps) {
                   <span>Color</span>
                   <input
                     type="color"
-                    value={colorHex(material().color)}
+                    value={rgbToHex(material().color)}
                     disabled={busy() || !material().editable}
                     onChange={(event) =>
                       void props.onSetValue(
                         material().line,
                         "color",
-                        colorRgb(event.currentTarget.value),
+                        [...hexToRgb(event.currentTarget.value)],
                       )
                     }
                     data-testid="material-color"
@@ -333,114 +312,112 @@ export function MaterialPanel(props: MaterialPanelProps) {
                 />
               </label>
 
-              <Show when={hasPhysicalBlock(material())}>
-                <div class="material-section-head">
-                  <span>Physical</span>
-                </div>
-                <dl class="material-physical" data-testid="material-physical">
-                  <For each={physicalRows(material())}>
-                    {(row) => (
-                      <div
-                        class="material-physical-row"
-                        classList={{
-                          unstated: row.state === "unstated",
-                          opaque: row.state === "opaque",
-                          free: row.free,
-                        }}
-                        data-state={row.state}
-                        data-testid={`material-physical-${row.key}`}
-                      >
-                        <dt title={row.free ? "An optimization may move this" : undefined}>
-                          {row.label}
-                        </dt>
-                        <dd>
-                          <Show
-                            when={row.state === "stated"}
-                            fallback={
-                              <Show
-                                when={row.state === "unstated"}
-                                fallback={
-                                  // A keyword whose value is an expression: the
-                                  // number is not ours to overwrite, and saying
-                                  // so is more use than an inert box.
-                                  <em title="Stated as an expression — edit it in the code">
-                                    in code
-                                  </em>
-                                }
-                              >
-                                <button
-                                  type="button"
-                                  class="material-physical-state"
-                                  disabled={
-                                    busy() || !material().editable || pending() !== null
-                                  }
-                                  title={`State a ${row.label.toLowerCase()} for ${material().name}`}
-                                  onClick={() =>
-                                    void writeProperty(
-                                      material(),
-                                      row.key,
-                                      SEED_VALUE[row.key] ?? 1,
-                                    )
-                                  }
-                                  data-testid={`material-state-${row.key}`}
-                                >
-                                  state
-                                </button>
-                              </Show>
-                            }
-                          >
-                            <NumberInput
-                              value={row.value ?? 0}
-                              step={stepFor(row)}
-                              disabled={busy() || !material().editable || pending() !== null}
-                              title={`${row.label} in ${row.unit || "a dimensionless ratio"}`}
-                              testId={`material-value-${row.key}`}
-                              onCommit={(value) =>
-                                void writeProperty(material(), row.key, value)
+              <div class="material-section-head">
+                <span>Physical</span>
+              </div>
+              <dl class="material-physical" data-testid="material-physical">
+                <For each={physicalRows(material())}>
+                  {(row) => (
+                    <div
+                      class="material-physical-row"
+                      classList={{
+                        unstated: row.state === "unstated",
+                        opaque: row.state === "opaque",
+                        free: row.free,
+                      }}
+                      data-state={row.state}
+                      data-testid={`material-physical-${row.key}`}
+                    >
+                      <dt title={row.free ? "An optimization may move this" : undefined}>
+                        {row.label}
+                      </dt>
+                      <dd>
+                        <Show
+                          when={row.state === "stated"}
+                          fallback={
+                            <Show
+                              when={row.state === "unstated"}
+                              fallback={
+                                // A keyword whose value is an expression: the
+                                // number is not ours to overwrite, and saying
+                                // so is more use than an inert box.
+                                <em title="Stated as an expression — edit it in the code">
+                                  in code
+                                </em>
                               }
-                            />
-                            <button
-                              type="button"
-                              class="material-physical-clear"
-                              disabled={busy() || !material().editable || pending() !== null}
-                              title={`Remove ${row.label.toLowerCase()} from the declaration`}
-                              aria-label={`Remove ${row.label}`}
-                              onClick={() => void writeProperty(material(), row.key, null)}
-                              data-testid={`material-clear-${row.key}`}
                             >
-                              ×
-                            </button>
-                          </Show>
-                          <Show when={row.unit}>
-                            <small>{row.unit}</small>
-                          </Show>
-                        </dd>
-                        <Show when={refusal()?.key === row.key}>
-                          <p class="material-physical-error" data-testid={`material-error-${row.key}`}>
-                            {refusal()!.message}
-                            <Show when={canExpand()}>
                               <button
                                 type="button"
+                                class="material-physical-state"
+                                disabled={
+                                  busy() || !material().editable || pending() !== null
+                                }
+                                title={`State a ${row.label.toLowerCase()} for ${material().name}`}
                                 onClick={() =>
                                   void writeProperty(
                                     material(),
                                     row.key,
-                                    row.value ?? SEED_VALUE[row.key] ?? 1,
-                                    true,
+                                    SEED_VALUE[row.key] ?? 1,
                                   )
                                 }
-                                data-testid={`material-expand-${row.key}`}
+                                data-testid={`material-state-${row.key}`}
                               >
-                                Write it out as a Material(…)
+                                state
                               </button>
                             </Show>
-                          </p>
+                          }
+                        >
+                          <NumberInput
+                            value={row.value ?? 0}
+                            step={stepFor(row)}
+                            disabled={busy() || !material().editable || pending() !== null}
+                            title={`${row.label} in ${row.unit || "a dimensionless ratio"}`}
+                            testId={`material-value-${row.key}`}
+                            onCommit={(value) =>
+                              void writeProperty(material(), row.key, value)
+                            }
+                          />
+                          <button
+                            type="button"
+                            class="material-physical-clear"
+                            disabled={busy() || !material().editable || pending() !== null}
+                            title={`Remove ${row.label.toLowerCase()} from the declaration`}
+                            aria-label={`Remove ${row.label}`}
+                            onClick={() => void writeProperty(material(), row.key, null)}
+                            data-testid={`material-clear-${row.key}`}
+                          >
+                            ×
+                          </button>
                         </Show>
-                      </div>
-                    )}
-                  </For>
-                </dl>
-              </Show>
+                        <Show when={row.unit}>
+                          <small>{row.unit}</small>
+                        </Show>
+                      </dd>
+                      <Show when={refusal()?.key === row.key}>
+                        <p class="material-physical-error" data-testid={`material-error-${row.key}`}>
+                          {refusal()!.message}
+                          <Show when={canExpand()}>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                void writeProperty(
+                                  material(),
+                                  row.key,
+                                  row.value ?? SEED_VALUE[row.key] ?? 1,
+                                  true,
+                                )
+                              }
+                              data-testid={`material-expand-${row.key}`}
+                            >
+                              Write it out as a Material(…)
+                            </button>
+                          </Show>
+                        </p>
+                      </Show>
+                    </div>
+                  )}
+                </For>
+              </dl>
             </section>
           )}
         </Show>

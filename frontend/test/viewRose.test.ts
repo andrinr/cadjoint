@@ -7,10 +7,9 @@
  * direction is called in any octant. And the *cube* has to agree with it: the
  * facet turned toward you must be the facet the camera is standing on, for
  * every direction and not merely for the one that was looked at while
- * building it. That second claim is the one the widget shipped wrong — its
- * CSS pitch rotation doubled and mirrored the elevation, so a camera above the
- * floor was shown the BOTTOM face — and it is invisible at pitch 0, which is
- * how it survived.
+ * building it. A CSS pitch rotation that doubles and mirrors the elevation
+ * shows a camera above the floor the BOTTOM face, and is invisible at pitch
+ * 0, so the second claim is checked off the horizon.
  */
 
 import { describe, expect, it } from "vitest";
@@ -25,13 +24,11 @@ import {
   CHAMFER,
   FACETS,
   cameraBasisFor,
-  cross,
-  dot,
   facetVisible,
   frontFacet,
   project,
-  type Vec3,
 } from "../src/viewer/navCube";
+import { cross, dot, type Vec3 } from "../src/viewer/math";
 import { octant } from "../src/viewer/graticule";
 
 /** The camera offset the app builds from a yaw/pitch, in a Z-up world. */
@@ -314,8 +311,7 @@ describe("the cube agrees with the camera", () => {
     };
     expect(facing("top")).toBe("TOP");
     expect(facing("bottom")).toBe("BOTTOM");
-    // The standpoint from the screenshot that exposed the bug: above the
-    // floor, so never BOTTOM whatever the azimuth.
+    // A corner above the floor: never BOTTOM, whatever the azimuth.
     const corner = VIEW_PRESETS["front-left-top"];
     const basis = cameraBasisFor(corner.yaw, corner.pitch);
     const shown = FACETS.filter(

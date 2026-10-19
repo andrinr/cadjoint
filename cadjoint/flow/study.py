@@ -85,6 +85,15 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 
+from cadjoint.descriptions import (
+    FlowStudyDescription,
+    HeatSourceDescription,
+    HeldTemperatureDescription,
+    InletDescription,
+    OutletDescription,
+    WallsDescription,
+)
+from cadjoint.enums import BoundaryConditionType, StudyKind
 from cadjoint.flow.domain import PROFILES, FlowGrid, sample_solid_fraction
 from cadjoint.flow.energy import (
     AIR_PRANDTL,
@@ -104,7 +113,6 @@ from cadjoint.flow.steady import SteadyOptions
 from cadjoint.studies import NodeSelection, register_study, require_triplet
 
 __all__ = [
-    "FLOW_STUDY_KIND",
     "FlowStudy",
     "FlowStudyResult",
     "HeatSource",
@@ -113,24 +121,6 @@ __all__ = [
     "Outlet",
     "Walls",
 ]
-
-#: The ``kind`` a :meth:`FlowStudy.describe` payload carries.
-#:
-#: A module constant rather than a :class:`~cadjoint.enums.StudyKind`
-#: member, and the distinction is the point.  ``StudyKind`` is the
-#: vocabulary of studies the viewer can *create and edit* through its patch
-#: endpoints -- its members drive four tables in
-#: ``cadjoint/viewer/patch/studies.py`` that say how to write a study's
-#: constructor and which boundary conditions it takes -- and none of that
-#: exists for a flow study.  Adding a member would make ``add_study``
-#: advertise ``flow`` as a kind it can write and then refuse to write it.
-#:
-#: What a scene *declares* is a wider vocabulary than what the viewer can
-#: author, so ``StudyPayload.kind`` carries this string and the enum does
-#: not.  That is what lets a scene declaring a flow study compile, render
-#: and serialize its study today, while the Studies window's own editing
-#: affordances stay honest about covering two kinds.
-FLOW_STUDY_KIND = "flow"
 
 #: Boundary conditions a flow study accepts.
 BC_KINDS = ("inlet", "outlet", "walls", "heat_source", "held_temperature")
@@ -217,10 +207,10 @@ class Inlet:
         """Always: an inlet is a plane and three numbers, not a selection."""
         return True
 
-    def describe(self) -> dict[str, Any]:
+    def describe(self) -> InletDescription:
         """JSON-ready description."""
         return {
-            "type": "inlet",
+            "type": BoundaryConditionType.INLET.value,
             "velocity": list(self.velocity),
             "temperature": self.temperature,
         }
@@ -245,9 +235,9 @@ class Outlet:
         """Always: the outlet carries no arguments to fail to serialize."""
         return True
 
-    def describe(self) -> dict[str, Any]:
+    def describe(self) -> OutletDescription:
         """JSON-ready description."""
-        return {"type": "outlet"}
+        return {"type": BoundaryConditionType.OUTLET.value}
 
 
 @dataclass(frozen=True)
@@ -284,9 +274,9 @@ class Walls:
         """Always: a wall condition is one optional number."""
         return True
 
-    def describe(self) -> dict[str, Any]:
+    def describe(self) -> WallsDescription:
         """JSON-ready description."""
-        return {"type": "walls", "temperature": self.temperature}
+        return {"type": BoundaryConditionType.WALLS.value, "temperature": self.temperature}
 
 
 @dataclass(frozen=True)
@@ -321,9 +311,13 @@ class HeatSource:
         """Whether :meth:`describe` round-trips (false for predicates)."""
         return self.nodes.serializable
 
-    def describe(self) -> dict[str, Any]:
+    def describe(self) -> HeatSourceDescription:
         """JSON-ready description."""
-        return {"type": "heat_source", "nodes": self.nodes.describe(), "power": self.power}
+        return {
+            "type": BoundaryConditionType.HEAT_SOURCE.value,
+            "nodes": self.nodes.describe(),
+            "power": self.power,
+        }
 
 
 @dataclass(frozen=True)
@@ -358,10 +352,10 @@ class HeldTemperature:
         """Whether :meth:`describe` round-trips (false for predicates)."""
         return self.nodes.serializable
 
-    def describe(self) -> dict[str, Any]:
+    def describe(self) -> HeldTemperatureDescription:
         """JSON-ready description."""
         return {
-            "type": "held_temperature",
+            "type": BoundaryConditionType.HELD_TEMPERATURE.value,
             "nodes": self.nodes.describe(),
             "value": self.value,
         }
@@ -380,7 +374,7 @@ class FlowStudyResult:
 
     Attributes:
         name: The study's name.
-        kind: :data:`FLOW_STUDY_KIND`.
+        kind: ``StudyKind.FLOW``.
         grid: The lattice the solve ran on.
         chi: Solid fraction, ``(NX, NY, NZ)``.
         velocity: Converged velocity in lattice units, ``(3, NX, NY, NZ)``;
@@ -497,7 +491,7 @@ class FlowStudy:
     """Declarative conjugate heat transfer in forced convection.
 
     Declared in a scene exactly like :class:`~cadjoint.fem.study.ThermalStudy`
-    -- constructing one inside :func:`~cadjoint.fem.study.capture_studies`
+    -- constructing one inside :func:`~cadjoint.studies.capture_studies`
     registers it -- but it meshes nothing.  The lattice is fixed and the
     design enters as a field on it, which is why the whole solve stays one
     differentiable JAX expression.
@@ -853,15 +847,15 @@ class FlowStudy:
 
     # ── serialization ───────────────────────────────────────────────────
 
-    def describe(self) -> dict[str, Any]:
+    def describe(self) -> FlowStudyDescription:
         """JSON-ready payload: everything a viewer would need to display it.
 
         Returns:
-            A dictionary whose ``kind`` is :data:`FLOW_STUDY_KIND`.
+            A dictionary whose ``kind`` is ``"flow"``.
         """
         return {
             "name": self.name,
-            "kind": FLOW_STUDY_KIND,
+            "kind": StudyKind.FLOW.value,
             "resolution": list(self.resolution),
             "bounds": list(self.bounds),
             "size": list(self.size),
@@ -997,7 +991,7 @@ class FlowStudy:
         )
         result = FlowStudyResult(
             name=self.name,
-            kind=FLOW_STUDY_KIND,
+            kind=StudyKind.FLOW.value,
             grid=grid,
             chi=chi,
             velocity=velocity,

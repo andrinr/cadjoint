@@ -1,22 +1,29 @@
 import { expect, test, type Page } from "@playwright/test";
+import { dismissBanner, editorText, waitForCompile } from "./helpers/app";
+import {
+  FRONT_CAMERA,
+  canvasMetrics,
+  gizmoTip,
+  projectToCss,
+  type Vec3,
+} from "./helpers/projection";
 import { expectValue, pickOption } from "./helpers/select";
 
 /**
  * End-to-end coverage of viewer ↔ code parity.
  *
- * The projection below is an independent reimplementation of `src/viewer/math`
- * (same formulas as the preview shader). Duplicating it here is deliberate: if
- * the app's projection drifts, these tests click the wrong pixel and fail,
- * instead of both sides agreeing on something wrong.
+ * The projection (`helpers/projection.ts`) is an independent reimplementation
+ * of `src/viewer/math` (same formulas as the preview shader). Duplicating it
+ * is deliberate: if the app's projection drifts, these tests click the wrong
+ * pixel and fail, instead of both sides agreeing on something wrong.
  */
 
 /**
  * Run the real renderer, not the fallback.
  *
  * Everything about *picking* here is CPU-side — `viewer/hittest.ts` and the
- * projection reimplemented below — so these tests were written to pass on a
- * browser with no WebGPU at all, and they still do. But a handful of the
- * things now under test are only true of a running renderer: the status line
+ * reimplemented projection — so these tests pass on a browser with no WebGPU
+ * at all. But a handful of the things under test are only true of a running renderer: the status line
  * names the quality tier the shader is budgeting against, and the floor grid
  * is occluded by the part in the depth buffer. Headless Chromium will give us
  * a Metal adapter if asked, so ask; `hasWebGpu` skips the two assertions that
@@ -45,92 +52,6 @@ const hasWebGpu = (page: Page) =>
     }
   });
 
-const FOV_SCALE = 1.5;
-/**
- * Defaults from `Renderer`; the tests never move the camera.
- *
- * The +X−Y+Z corner at the true isometric elevation, atan(1/√2) — the same
- * pair of numbers as `VIEW_PRESETS.iso`, which is what the session opens on.
- */
-const CAMERA = {
-  yaw: Math.PI / 4,
-  pitch: Math.atan(1 / Math.SQRT2),
-  distance: 4.6,
-  target: [0, 0, 0] as const,
-};
-const FRONT_CAMERA = { ...CAMERA, yaw: 0, pitch: 0 };
-
-type Vec3 = [number, number, number];
-type CameraSpec = typeof CAMERA;
-
-const sub = (a: readonly number[], b: readonly number[]): Vec3 =>
-  [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
-const dot = (a: Vec3, b: Vec3) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
-const cross = (a: Vec3, b: Vec3): Vec3 => [
-  a[1] * b[2] - a[2] * b[1],
-  a[2] * b[0] - a[0] * b[2],
-  a[0] * b[1] - a[1] * b[0],
-];
-const norm = (a: Vec3): Vec3 => {
-  const n = Math.hypot(...a) || 1;
-  return [a[0] / n, a[1] / n, a[2] / n];
-};
-
-/** Z-up, matching `cameraPosition` in `src/viewer/math`: azimuth about +Z
- *  measured from −Y, so yaw 0 / pitch 0 is the Front view. */
-function cameraPosition(camera: CameraSpec = CAMERA): Vec3 {
-  const cp = Math.cos(camera.pitch);
-  return [
-    camera.target[0] + camera.distance * cp * Math.sin(camera.yaw),
-    camera.target[1] - camera.distance * cp * Math.cos(camera.yaw),
-    camera.target[2] + camera.distance * Math.sin(camera.pitch),
-  ];
-}
-
-/** Project a world point to CSS pixels inside the canvas element. */
-function projectToCss(
-  world: Vec3,
-  canvas: { width: number; height: number; clientWidth: number; clientHeight: number },
-  camera: CameraSpec = CAMERA,
-  projection: "perspective" | "orthographic" = "orthographic",
-) {
-  const position = cameraPosition(camera);
-  const forward = norm(sub(camera.target, position));
-  // World up is +Z, with the +Y fallback the app uses at the poles.
-  const reference: Vec3 = Math.abs(forward[2]) > 0.999 ? [0, 1, 0] : [0, 0, 1];
-  const right = norm(cross(forward, reference));
-  const up = cross(right, forward);
-  const delta = sub(world, position);
-  const viewDepth = dot(delta, forward);
-  const aspect = canvas.width / canvas.height;
-  const divisor =
-    FOV_SCALE * (projection === "orthographic" ? camera.distance : viewDepth);
-  const u = dot(delta, right) / divisor;
-  const v = dot(delta, up) / divisor;
-  const px = (u / aspect + 0.5) * canvas.width;
-  const py = (0.5 - v) * canvas.height;
-  // Framebuffer pixels back to CSS pixels for Playwright's mouse.
-  return {
-    x: (px * canvas.clientWidth) / canvas.width,
-    y: (py * canvas.clientHeight) / canvas.height,
-  };
-}
-
-async function canvasMetrics(page: Page) {
-  return page.evaluate(() => {
-    const canvas = document.querySelector<HTMLCanvasElement>("[data-testid=viewer-canvas]")!;
-    const rect = canvas.getBoundingClientRect();
-    return {
-      width: canvas.width,
-      height: canvas.height,
-      clientWidth: canvas.clientWidth,
-      clientHeight: canvas.clientHeight,
-      left: rect.left,
-      top: rect.top,
-    };
-  });
-}
-
 /**
  * The heat-sink starter sketches on the XZ plane (normal +Y): profile
  * u = −world-X, v = +world-Z, so a vertex [u, v] sits at world [−u, 0, v].
@@ -142,46 +63,11 @@ const FIN_TIP: Vec3 = [0.15, 0, 0.85];
 /** Midpoint of the fin comb's base edge, for outline picks. */
 const BASE_EDGE: Vec3 = [0.5, 0, 0];
 
-/**
- * The full editor document. CodeMirror renders only the visible lines, so
- * `.cm-content` innerText truncates tall programs (the starter is ~160
- * lines); read the document from the editor state instead.
- */
-async function editorText(page: Page): Promise<string> {
-  return page.evaluate(() => {
-    type DocView = { view?: { state: { doc: { toString(): string } } } };
-    const content = document.querySelector("[data-testid=editor] .cm-content") as
-      | (HTMLElement & { cmView?: DocView; cmTile?: DocView })
-      | null;
-    // CodeMirror hangs its doc view off the content element (`cmView` in
-    // older builds, `cmTile` in current ones); either path reaches the full
-    // document. innerText is the last resort and truncates tall programs.
-    const view = content?.cmView?.view ?? content?.cmTile?.view;
-    if (view) return view.state.doc.toString();
-    return content?.innerText ?? "";
-  });
-}
-
-async function waitForCompile(page: Page) {
-  // The settle signal is the toolbar's busy seam. It is present for exactly
-  // as long as the app is behind its own source — from the edit, through the
-  // debounce window and the request, until the shaders are installed — which
-  // the status line no longer is: while work is in flight the status says
-  // nothing at all, so that the one indicator for running work is the
-  // toolbar's chip. A settled status is therefore a second, independent
-  // signal, and "Starting…" is the placeholder to wait past on a cold load.
-  await expect(page.getByTestId("status")).not.toHaveText(/^(|Starting…)$/, {
-    timeout: 60_000,
-  });
-  await expect(page.getByTestId("toolbar-busy")).toHaveCount(0, { timeout: 60_000 });
-}
-
 test.beforeEach(async ({ page }) => {
   await page.goto("/");
   await waitForCompile(page);
   // A machine without WebGPU shows a dismissable banner over the canvas.
-  const dismiss = page.getByRole("button", { name: "Dismiss" });
-  if (await dismiss.isVisible().catch(() => false)) await dismiss.click();
+  await dismissBanner(page);
 });
 
 /**
@@ -316,7 +202,7 @@ test("the revolved starter object exposes its profile and operator", async ({ pa
 test("sketch constraints are drawn over the viewport", async ({ page }) => {
   // The starter's constraint catalog is still growing, so never hardcode
   // counts or dimension values here: derive the expected overlay population
-  // from a fresh /compile of the session program — the same ground truth the
+  // from a fresh /api/compile of the session program — the same ground truth the
   // viewer renders from. Overlay rules mirrored from ViewerPane: every fixed
   // sketch constraint or object relation draws a marker; every *numeric*
   // distance draws a dimension with label Number(value.toPrecision(4));
@@ -324,7 +210,7 @@ test("sketch constraints are drawn over the viewport", async ({ page }) => {
   const truth = await page.evaluate(async () => {
     const session = await (await fetch("/api/session")).json();
     const compiled = await (
-      await fetch("/compile", {
+      await fetch("/api/compile", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -479,7 +365,7 @@ test("dragging a handle rewrites the vertex literal", async ({ page }) => {
  * `add_primitive` names what it places `box1`, `box2`, … and the starter scene
  * has boxes of its own — a board and a die under the heat sink — declared
  * above it. A bare `/Solid\.box\(/` therefore matches the *board*, and a test
- * that placed a box then read "its" position was reading the board's, aiming
+ * that places a box then reads "its" position would read the board's, aiming
  * the gizmo drag at empty space several units away. Ask for the variable.
  */
 const boxCall = (source: string, variable: string): string | null =>
@@ -507,7 +393,7 @@ test("the polygon tool inserts a vertex and stays active", async ({ page }) => {
 
   // The patch and its recompile are async; poll rather than racing them.
   await expect.poll(() => vertexLiteralCount(page), { timeout: 45_000 }).toBe(before + 1);
-  // Unlike the old one-shot button, the tool keeps going for the next click.
+  // The tool stays armed for the next click.
   await expect(page.getByTestId("tool-polygon")).toHaveClass(/active/);
   await waitForCompile(page);
 
@@ -550,8 +436,7 @@ const visibleFaceLabels = (page: Page) =>
 
 test("the cube sets a direction and never the projection", async ({ page }) => {
   // Isometric is a direction; orthographic is a projection. Choosing a
-  // standpoint must not quietly change how the scene is projected — which is
-  // what the retired ISO preset button used to do.
+  // standpoint must not quietly change how the scene is projected.
   expect(await projectionMode(page)).toContain("Orthographic");
   expect(await viewReadout(page)).toContain("ISO");
 
@@ -580,8 +465,8 @@ test("the cube sets a direction and never the projection", async ({ page }) => {
 });
 
 test("the cube shows the face the camera is standing on", async ({ page }) => {
-  // The defect this replaces: the container's pitch rotation had the wrong
-  // sign, so a camera above the floor was shown BOTTOM. The cube states which
+  // A pitch rotation of the wrong sign shows a camera above the floor
+  // BOTTOM. The cube states which
   // facet it has turned to the front, so ask it, and check the answer against
   // which face names are legible at all — a face nobody can read is a face the
   // camera is not standing on.
@@ -687,9 +572,9 @@ test("the projection toggle works on its own", async ({ page }) => {
 
 test("the projection toggle sits in the viewport bar beside render settings", async ({ page }) => {
   // Projection is not a direction, and the cube is the direction control, so
-  // the toggle left the cube's square for the bar of controls for how the
-  // picture is drawn: it shares a row with the render-settings button, right
-  // beside it, and no longer overlaps the cube's stage.
+  // the toggle sits in the bar of controls for how the picture is drawn: it
+  // shares a row with the render-settings button, right beside it, and stays
+  // clear of the cube's stage.
   const bar = page.getByTestId("view-controls");
   await expect(bar.getByTestId("projection-toggle")).toBeVisible();
   await expect(bar.getByTestId("display-options")).toBeVisible();
@@ -738,11 +623,10 @@ const inkBox = (page: Page, selector: string) =>
   });
 
 test("the axis triad clears the cube, whichever way the camera turns", async ({ page }) => {
-  // The defect this pins: the triad was drawn inside the cube's own square,
-  // and because it turns with the camera its arms swept a disc across the
-  // silhouette, the face labels and the projection toggle — the X label ran
-  // off the left edge of the stage and the Z arm crossed the top facet. It
-  // has a square of its own under the cube now, so the two never meet: the
+  // The triad turns with the camera, so its arms sweep a disc; inside the
+  // cube's own square that disc would cross the silhouette, the face labels
+  // and the projection toggle. It has a square of its own under the cube, so
+  // the two never meet: the
   // topmost triad ink stays below the lowest cube ink at every standpoint.
   const canvas = page.getByTestId("viewer-canvas");
   const frame = (await canvas.boundingBox())!;
@@ -829,9 +713,7 @@ test("selection mode decides what a click picks", async ({ page }) => {
 
   // Object mode is the default, so a sketch vertex is not picked as a vertex:
   // the click selects the sketch, and what the editor reveals is that sketch's
-  // declaration rather than a single point's literal. (It used to assert no
-  // highlight at all, which stopped being true when selecting an object began
-  // revealing the statement that declares it.)
+  // declaration rather than a single point's literal.
   await expect(page.getByTestId("mode-object")).toHaveClass(/active/);
   await page.mouse.click(metrics.left + point.x, metrics.top + point.y);
   await expect(page.getByTestId("selection-chip")).not.toHaveText("vertex 0");
@@ -867,11 +749,10 @@ test("render presets activate, edit, and persist without bloating the closed UI"
   // Closed, the panel holds the three preset cards and the distance-field
   // switch — a *view* selector, sibling to the presets rather than a detail of
   // one — and nothing else. The budget covers those two blocks; the preset
-  // editor, which is the bulky part, is still absent above. The design
-  // language gave each preset card an icon tile and the panel a titled
-  // header, which together cost ~40px over the old 380 budget (measured 422
-  // at 288px wide); 440 keeps that and still fails if the editor or any
-  // other block leaks into the closed state.
+  // editor, which is the bulky part, is still absent above. Each preset
+  // card's icon tile and the panel's titled header bring it to about 422px at
+  // 288px wide; 440 allows that and still fails if the editor or any other
+  // block leaks into the closed state.
   const compactPanel = await page.getByTestId("render-panel").boundingBox();
   expect(compactPanel!.width).toBeLessThanOrEqual(310);
   expect(compactPanel!.height).toBeLessThan(440);
@@ -899,8 +780,7 @@ test("render presets activate, edit, and persist without bloating the closed UI"
 
   await page.reload();
   await waitForCompile(page);
-  const dismiss = page.getByRole("button", { name: "Dismiss" });
-  if (await dismiss.isVisible().catch(() => false)) await dismiss.click();
+  await dismissBanner(page);
   // The popover is transient, but the preset state persists: reopen it.
   await expect(page.getByTestId("render-popover")).toHaveCount(0);
   await page.getByTestId("display-options").click();
@@ -926,9 +806,8 @@ test("render presets activate, edit, and persist without bloating the closed UI"
 });
 
 test("a floated window covers the pane it is dropped over", async ({ page }) => {
-  // The panels used to float over the viewport and had to be ordered against
-  // the code pane by hand. They are real windows now, so the only overlap
-  // left is a deliberate one: a group lifted out of the grid.
+  // Panels are real windows, so the only overlap is a deliberate one: a
+  // group lifted out of the grid.
   await page.evaluate(() => window.__cadjointWindows!.float("objects"));
   const floating = page.locator(".dv-groupview-floating");
   await expect(floating).toHaveCount(1);
@@ -971,26 +850,6 @@ test("editing the code updates the sketch the viewer reports", async ({ page }) 
   await expect(page.getByTestId("selection-chip")).toHaveText("vertex 0");
   await expect(page.locator(".cm-vertex-highlight")).toHaveText("[-2.2, -0.9]");
 });
-
-/** Where the gizmo's X arrow tip lands for a primitive at `origin`. */
-function gizmoTip(
-  origin: Vec3,
-  axis: 0 | 1 | 2,
-  canvas: Parameters<typeof projectToCss>[1],
-  camera: CameraSpec = CAMERA,
-  projection: "perspective" | "orthographic" = "orthographic",
-) {
-  const position = cameraPosition(camera);
-  const size = Math.max(0.15, 0.18 * Math.hypot(...sub(origin, position)));
-  const unit: Vec3 = [0, 0, 0];
-  unit[axis] = size * 0.6;
-  return projectToCss(
-    [origin[0] + unit[0], origin[1] + unit[1], origin[2] + unit[2]],
-    canvas,
-    camera,
-    projection,
-  );
-}
 
 const sphereCount = async (page: Page) =>
   ((await editorText(page)).match(/Solid\.sphere/g) ?? []).length;
@@ -1064,9 +923,8 @@ test("the material browser creates, edits, and drag-assigns materials", async ({
     .toMatch(/bush_b = Solid\.cylinder\([\s\S]*?material=copper/);
   await waitForCompile(page);
 
-  // Parking is the window frame's job, and only the frame's: the panel used to
-  // carry an em-dash of its own beside the frame's minimise, so every panel
-  // showed two identical controls doing one thing. The frame's control parks
+  // Parking is the window frame's job, and only the frame's: a panel carries
+  // no minimise of its own beside the frame's. The frame's control parks
   // it — it leaves the dock and turns into a tray entry, and clicking that
   // brings it back where it was.
   await expect(page.getByTestId("material-close")).toHaveCount(0);
@@ -1085,10 +943,8 @@ const materialCall = (source: string, variable: string): string =>
   source.match(new RegExp(String.raw`^${variable} = Material\([\s\S]*?^\)`, "m"))?.[0] ?? "";
 
 test("the inspector states, edits and removes a physical property", async ({ page }) => {
-  // The physical rows were a printed list: what a study's result depends on,
-  // shown but not touchable. Every one of them is optional on a `Material`, so
-  // "not touchable" meant the one thing the inspector could not do was declare
-  // a property — you left the panel and typed the keyword yourself.
+  // Every physical property is optional on a `Material`, so the inspector
+  // has to declare one as well as show and edit what is stated.
   await page.getByTestId("material-copper").click();
   const rows = page.getByTestId("material-physical");
   await expect(rows).toBeVisible();
@@ -1423,7 +1279,7 @@ test("relational constraint chips render for API-added kinds", async ({ page }) 
     "scene = extrude(profile, depth=0.4)",
     "",
   ].join("\n");
-  // Drive /patch directly — the same API the app uses — to cover the kinds the
+  // Drive /api/patch directly — the same API the app uses — to cover the kinds the
   // starter program never adds, then load the accumulated source into the app.
   const patched = await page.evaluate(async (source) => {
     const session = (await (await fetch("/api/session")).json()) as { token: string };
@@ -1436,7 +1292,7 @@ test("relational constraint chips render for API-added kinds", async ({ page }) 
       { op: "add_constraint", line: 2, kind: "perpendicular", indices: [0, 1, 1, 2] },
     ];
     for (const operation of operations) {
-      const response = await fetch("/patch", {
+      const response = await fetch("/api/patch", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -1595,10 +1451,10 @@ test("studies are declared, edited, and deleted through source patches", async (
 
   // cool-sink optimizes this study, so retire the optimization first —
   // deleting the study out from under it would leave a broken program.
-  await page.getByTestId("sim-tab-optimize").click();
+  await page.getByTestId("window-tab-optimize").click();
   await page.getByTestId("optimize-delete-cool-sink").click();
   await editorHas("Optimization(", true);
-  await page.getByTestId("sim-tab-studies").click();
+  await page.getByTestId("window-tab-studies").click();
 
   // Deleting it reaches the empty state, which offers to add one again.
   await page.getByTestId("simulate-delete-sink-conduction").click();
@@ -1649,7 +1505,7 @@ test("meshes are declared, inspected, and deleted through source patches", async
   // The starter declares its mesh (sink-mesh) up front: the tab lists the
   // card rather than the empty state, and the study references it.
   await page.getByTestId("editmode-simulate").click();
-  await page.getByTestId("sim-tab-meshes").click();
+  await page.getByTestId("window-tab-meshes").click();
   await expect(page.getByTestId("mesh-empty")).toHaveCount(0);
   await expect(page.getByTestId("mesh-sink-mesh")).toBeVisible();
 
@@ -1725,14 +1581,14 @@ test("clicking the inspected mesh proposes a sphere BC selection", async ({ page
       .toBe(!negate);
 
   await page.getByTestId("editmode-simulate").click();
-  await page.getByTestId("sim-tab-meshes").click();
+  await page.getByTestId("window-tab-meshes").click();
   await page.getByTestId("mesh-add").click();
   await editorHas("SimMesh(");
   await page.getByTestId("mesh-inspect-mesh1").click();
   await expect(page.getByTestId("mesh-stats")).toBeVisible({ timeout: 90_000 });
 
   // Arm viewport picking from the study's add-BC builder (Studies tab).
-  await page.getByTestId("sim-tab-studies").click();
+  await page.getByTestId("window-tab-studies").click();
   await page.getByTestId("simulate-add-bc-sink-conduction").click();
   await expect(page.getByTestId("simulate-builder")).toBeVisible();
   await page.getByTestId("simulate-builder-pick").click();
@@ -1821,10 +1677,9 @@ test("a face pick plants a sketch on the comb's cap", async ({ page }) => {
 });
 
 test("the code panels leave with the pointer and with the focus", async ({ page }) => {
-  // The complaint: "those coding infos panels are great but stick around even
-  // when I move out of the code window." The signature tooltip is a StateField
-  // — shown because of where the caret is, not where the pointer is — so
-  // nothing about leaving the editor was ever going to close it.
+  // The signature tooltip is a StateField — shown because of where the caret
+  // is, not where the pointer is — so nothing about leaving the editor closes
+  // it on its own.
   const editor = page.getByTestId("editor");
   const tooltip = page.locator(".cm-signature-tooltip");
 
@@ -1967,12 +1822,11 @@ async function framePixels(
 }
 
 test("the floor grid is behind the part, X-Ray included", async ({ page }) => {
-  // "also lets put that floor grid behind all objects". It was not: the
-  // default preset is X-Ray, an x-rayed solid used to withhold its depth so
-  // that construction geometry could read through it, and the ground grid —
-  // which draws behind whatever depth the scene wrote — came through the heat
-  // sink with it. The part read as something laid over a grid rather than
-  // something standing on the ground.
+  // The default preset is X-Ray, and an x-rayed solid writes its depth like
+  // an opaque one, so the ground grid — which draws behind whatever depth the
+  // scene wrote — cannot come through the heat sink. A grid showing through
+  // makes the part read as laid over a grid rather than standing on the
+  // ground.
   //
   // This is a question about pixels, so it is asked in pixels: the same patch
   // of frame with the grid on and with it off. Off the part the two differ,

@@ -2,24 +2,21 @@
  * The viewport's ground grid: how far apart its lines are, and where the
  * detents on that spacing lie.
  *
- * This used to be a *faceplate* — a fixed screen-space rule, eight divisions
- * down the viewport, with the geometry moving behind it the way a trace moves
- * behind a CRT's etched graticule. It was honest but it was inert: pinned to
- * the frame, it never moved with the scene, so it said nothing about where
- * anything was in space. What replaced it is the CAD convention instead: a
- * square grid ruled on a world coordinate plane — the ground, z = 0, wherever
- * the ground is worth ruling, since the world is Z-up — drawn in projection so
- * it recedes, which is what actually tells you where the floor is and which way
- * you are looking. In the shallow views, where the floor is edge-on and rules
+ * It follows the CAD convention: a square grid ruled on a world coordinate
+ * plane — the ground, z = 0, wherever the ground is worth ruling, since the
+ * world is Z-up — drawn in projection so it recedes, which is what tells you
+ * where the floor is and which way you are looking. A fixed screen-space rule
+ * would stay pinned to the frame and say nothing about where anything is in
+ * space. In the shallow views, where the floor is edge-on and rules
  * as a single line, the grid moves to the wall the camera faces instead; see
  * `GRID_FLOOR_PREFERENCE`.
  *
- * The number the readout states is now simply the grid's spacing, on the same
+ * The number the readout states is the grid's spacing, on the same
  * 1-2-5 ladder an instrument's scale switch has, chosen so a cell is about one
  * eighth of the frame height. It is a world distance, so it is exactly true
- * whatever the camera does — the thing it can no longer promise is that you can
+ * whatever the camera does — what it cannot promise is that you can
  * *measure* with it on screen, because under perspective a cell shrinks with
- * depth. That is what `calibrated` means now, and it is the same condition the
+ * depth. That is what `calibrated` means, and it is the same condition the
  * Tektronix 2465 marks with a `>` prefix on an uncalibrated scale factor.
  *
  * Everything here is pure arithmetic over a camera — no DOM, no GPU — so the
@@ -32,10 +29,10 @@ import { sameView, VIEW_PRESETS } from "./display";
 /**
  * Cells down the viewport height, at the framing the spacing is chosen for.
  *
- * Tektronix's vertical count (475A: "8 × 10 cm display"), kept because it is
- * still the right density: eight cells is enough to judge a distance against
- * and few enough that the far half of the plane has not turned to noise. It no
- * longer fixes anything on screen — the grid is in the world now — it only
+ * Tektronix's vertical count (475A: "8 × 10 cm display"), because it is the
+ * right density: eight cells is enough to judge a distance against and few
+ * enough that the far half of the plane has not turned to noise. It fixes
+ * nothing on screen — the grid is in the world — it only
  * decides which rung of the ladder the spacing lands on as you zoom.
  */
 export const DIVISIONS = 8;

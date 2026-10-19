@@ -40,13 +40,18 @@ from typing import Any
 
 from cadjoint.viewer._jobs import REGISTRY, attach_process, current_job
 from cadjoint.viewer._limits import OVERSIZED_SOURCE_ERROR, exceeds_source_limit
-from cadjoint.viewer.schema.worker import checked_progress, checked_reply, checked_request
+from cadjoint.viewer.schema.worker import (
+    WorkerMode,
+    checked_progress,
+    checked_reply,
+    checked_request,
+)
 from cadjoint.viewer.worker.protocol import MODULE, RETIRE_FLAG
 
-# The edit round-trip budget. It used to be 20 s, which the gearbox end-cap's
-# first compile exceeds against a cold compilation cache; a compile that is
-# genuinely long is now visible and cancellable through the job registry, so
-# the budget errs on the side of finishing rather than killing real work.
+# The edit round-trip budget. A large scene's first compile against a cold
+# compilation cache takes well over 20 s; a long compile is visible and
+# cancellable through the job registry, so the budget errs on the side of
+# finishing rather than killing real work.
 COMPILE_TIMEOUT_SECONDS = 90
 
 # Mesh extraction is a lazy background overlay, not the edit round-trip: dual
@@ -63,20 +68,20 @@ BREP_TIMEOUT_SECONDS = 180
 
 
 #: How each worker mode names itself in a timeout message.
-_MODE_NOUNS = {
+_MODE_NOUNS: dict[WorkerMode, str] = {
     "compile": "Compilation",
     "mesh": "Meshing",
     "mesh_inspect": "Mesh inspection",
     "brep": "B-rep inspection",
     "simulate": "Simulation",
+    "optimize": "Optimization",
     "export": "Export",
-    "lint": "Linting",
 }
 
 
 def _run_worker(
     source: str,
-    mode: str,
+    mode: WorkerMode,
     timeout: float,
     extra: dict[str, Any] | None = None,
     *,
@@ -124,7 +129,7 @@ def _run_worker(
         process.communicate()
         return {
             "ok": False,
-            "error": f"{_MODE_NOUNS.get(mode, 'Compilation')} exceeded the {timeout:g}-second timeout.",
+            "error": f"{_MODE_NOUNS[mode]} exceeded the {timeout:g}-second timeout.",
         }
 
     if process.returncode != 0:
@@ -319,14 +324,10 @@ def warm_start(source: str | None = None) -> bool:
     by the user's first edit, while the browser is still fetching the
     frontend.
 
-    Only ``compile`` is primed.  The mesh used to be primed too, and on every
-    scene open, on the theory that the feature-edge overlay should be warm
-    by the time it is asked for.  It never was asked for on most opens (the
-    overlay is off by default), it grew to several cores and gigabytes on
-    the larger scenes, nothing cancelled it on a scene switch or joined it
-    when the real request arrived, and it outlived the server.  Measured
-    beside a running one, compiles the user was waiting on hit their
-    timeout.  The overlay now pays its own cold cache once, on demand.
+    Only ``compile`` is primed.  The feature-edge overlay is off by default
+    and its extraction takes several cores and gigabytes on larger scenes,
+    so priming it would compete with the compiles the user is waiting on;
+    the overlay pays its own cold cache once, on demand.
 
     Runs at most once per process and never blocks the caller: it returns as
     soon as the thread is started, and returns ``False`` when the warm-up is
@@ -400,11 +401,9 @@ def brep_source(source: str, timeout: float = BREP_TIMEOUT_SECONDS) -> dict[str,
 # is visible and cancellable, so the budget errs on the side of finishing.
 SIMULATE_TIMEOUT_SECONDS = 600
 SIMULATE_KINDS = ("study",)
-# Mesh inspection only builds the hex mesh (no solve), but big grids still
-# outgrow the compile budget.
-# Mesh inspection meshes and then measures quality; a tet10 mesh of a large
-# part on a cold cache and a busy machine outgrew 60 s. Cancellable, so
-# generous.
+# Mesh inspection meshes and then measures quality (no solve); a tet10 mesh
+# of a large part on a cold cache and a busy machine exceeds 60 s.
+# Cancellable, so generous.
 MESH_INSPECT_TIMEOUT_SECONDS = 300
 
 

@@ -1,10 +1,10 @@
 """The compile payload, as models rather than as nested dicts.
 
 One model per shape the ``mode="compile"`` response carries, assembled into
-:class:`CompilePayload`. The worker builds the payload exactly as it always
-did and hands it here to be checked, so these models describe the wire
-rather than dictating it — but a field that changes shape without changing
-here now fails loudly at the boundary instead of quietly in the browser.
+:class:`CompilePayload`. The worker builds the payload as plain dicts and
+hands it here to be checked, so these models describe the wire rather than
+dictating it — but a field that changes shape without changing here fails
+loudly at the boundary instead of quietly in the browser.
 
 Two rules run through the file:
 
@@ -368,9 +368,9 @@ class MaterialDefinition(Open):
     opacity: float
     ior: float
     reflectivity: float
-    physical: dict[str, float | None] | None = None
-    units: dict[str, str] | None = None
-    free: dict[str, bool] | None = None
+    physical: dict[str, float | None]
+    units: dict[str, str]
+    free: dict[str, bool]
     spans: dict[str, Span]
 
 
@@ -486,8 +486,8 @@ class StudyBcDescription(Open):
     ``nodes`` is optional because not every condition is placed by selecting
     nodes: a flow study's inlet, outlet and duct walls are planes of the
     lattice, and carry an inlet velocity or a wall temperature instead.
-    ``serializable`` still says whether the condition round-trips, but it is
-    now the condition's own answer rather than its selection's.
+    ``serializable`` says whether the condition round-trips; it is the
+    condition's own answer, not its selection's.
 
     This is the shape a solved study echoes (``/api/simulate``'s ``study``);
     the compile payload's :class:`StudyBc` adds where the condition is
@@ -519,25 +519,36 @@ class DomainEntry(Open):
     type: str
 
 
-class StudyPayload(Open):
-    """One study declared in the scene program.
-
-    ``kind`` names what a program may *contain*;
-    :class:`~cadjoint.enums.StudyKind` names what the viewer can *create and
-    edit* through the patch endpoints.  The two are equal today — a
-    :class:`cadjoint.flow.FlowStudy` is displayed and written like the other
-    two, though it discretises a fixed lattice rather than a mesh, so it
-    carries a ``resolution`` and no ``mesh``.
-
-    They are kept as separate vocabularies because they have differed and
-    may again: ``flow`` was in this one and not the enum for as long as the
-    patch layer could not write a ``FlowStudy``, and widening the enum ahead
-    of that would have made ``add_study`` advertise a kind it could not
-    produce.  A kind here and not in the enum reports ``editable: false``.
-    """
+class Located(BaseModel):
+    """Where a declaration is written: the fields the worker adds to its ``describe()``."""
 
     index: int
     stableId: str | None
+    line: int | None
+    span: Span | None
+    editable: bool
+
+
+class FluidDescription(Strict):
+    """A flow study's fluid and scheme, as :meth:`cadjoint.flow.FlowStudy.describe` reports it."""
+
+    reynolds: float | None
+    viscosity: float
+    inlet_speed: float
+    alpha_max: float
+    scheme: str
+    peclet_cell: float
+    richardson: float
+
+
+class StudyDescription(Open):
+    """A study's own ``describe()`` (:data:`cadjoint.descriptions.StudyDescription`).
+
+    ``source`` is a thermal study's, ``gravity`` an elastic study's and
+    ``fluid`` a flow study's.  A flow study discretises a fixed lattice, so
+    it carries a ``resolution`` and no ``mesh``.
+    """
+
     name: str
     kind: Literal["thermal", "elastic", "flow"]
     resolution: int | list[int] | None = None
@@ -546,20 +557,29 @@ class StudyPayload(Open):
     mesh: str | None = None
     domain: DomainEntry | None = None
     material: dict[str, float | str] = Field(default_factory=dict)
-    line: int | None
-    span: Span | None
-    editable: bool
+    source: float | None = None
+    gravity: Vector3 | None = None
+    fluid: FluidDescription | None = None
+    bcs: list[StudyBcDescription]
+
+
+class StudyPayload(StudyDescription, Located):
+    """One study declared in the scene program.
+
+    ``kind`` names what a program may contain;
+    :class:`~cadjoint.enums.StudyKind` names what the patch endpoints can
+    write.  A kind here and not in the enum reports ``editable: false``.
+    """
+
     mesh_span: Span | None = None
     domain_span: Span | None = None
     bcs: list[StudyBc]
 
 
-class SimMeshPayload(Open):
+class SimMeshPayload(Located, Open):
     """One ``SimMesh`` declared in the scene program."""
 
     kind: Literal["mesh"]
-    index: int
-    stableId: str | None
     name: str
     resolution: int | list[int]
     bounds: list[float] | None = None
@@ -572,17 +592,12 @@ class SimMeshPayload(Open):
     mesher: Literal["tetgen", "gmsh"] | None = None
     frozen_geometry: bool = False
     domain: DomainEntry | None = None
-    line: int | None
-    span: Span | None
-    editable: bool
 
 
-class OptimizationPayload(Open):
+class OptimizationPayload(Located, Open):
     """One ``Optimization(...)`` declared in the scene program."""
 
     kind: Literal["optimization"]
-    index: int
-    stableId: str | None
     name: str
     steps: int
     learning_rate: float
@@ -592,9 +607,8 @@ class OptimizationPayload(Open):
     study: str | None = None
     metric: str | None = None
     remesh_every: int | None = None
-    line: int | None
-    span: Span | None
-    editable: bool
+    regularizer: str | None = None
+    regularizer_weight: float | None = None
     steps_span: Span | None = None
     learning_rate_span: Span | None = None
 
@@ -794,10 +808,10 @@ class CompilePayload(Strict):
     construction: list[ConstructionNode]
     identities: list[IdentityEntry]
     # Every construction call with its written arguments, for the properties
-    # window; absent from an older worker, so it defaults to nothing.
+    # window; defaults to nothing when absent.
     elements: list[ConstructionElement] = Field(default_factory=list)
-    # What ``scene`` is built from, boolean by boolean; absent from an older
-    # worker, in which case the Objects panel falls back to a flat list.
+    # What ``scene`` is built from, boolean by boolean; when absent the
+    # Objects panel falls back to a flat list.
     scene_tree: SceneTree | None = None
     relations: list[ConstructionRelation]
     materials: list[MaterialDefinition]
@@ -806,8 +820,7 @@ class CompilePayload(Strict):
     optimizations: list[OptimizationPayload]
     mesh_edges: MeshEdgePayload | None
     # Per private plugin kind, whether it is filled in the worker's process
-    # (:func:`cadjoint.tier.status`).  Optional with a default, so a client
-    # built before the seam sees no change.
+    # (:func:`cadjoint.tier.status`).  Optional with a default.
     tier: dict[str, bool] | None = None
     solver_runs: list[ConstraintSolverRun]
     output: str

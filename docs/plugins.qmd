@@ -410,8 +410,8 @@ chain runs:
 | `gradient_path` | Plugin kinds it resolves |
 |---|---|
 | `"direct"` (default) | none: in-process JAX and jax-fem |
-| `"tesseract"` (alias `"plugins"`) | `mesher` → `thermal_solver`/`elastic_solver` |
-| `"tesseract-dc"` (alias `"plugins-dc"`) | `tetfill` → `thermal_solver`/`elastic_solver` |
+| `"tesseract"` | `mesher` → `thermal_solver`/`elastic_solver` |
+| `"tesseract-dc"` | `tetfill` → `thermal_solver`/`elastic_solver` |
 
 `SolverBackend` (`backend="jaxfem" | "tesseract" | "calculix"`) resolves the
 same way: `"tesseract"` takes the `thermal_solver` / `elastic_solver` kinds,

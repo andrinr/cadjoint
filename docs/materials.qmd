@@ -94,7 +94,7 @@ scene. The [example](#example) builds a scene from two of them.
 Every factory's docstring cites its sources — MatWeb and ASM datasheets for the
 metals, the CRC Handbook for the elements, NEMA/IPC and laminate datasheets for
 FR-4, Hopcroft *et al.* (JMEMS 2010) for silicon's modulus, NatureWorks and
-Farah *et al.* for PLA. `aluminum_6061` is a US-spelling alias.
+Farah *et al.* for PLA.
 
 Three entries have caveats, also stated in their docstrings:
 

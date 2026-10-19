@@ -16,7 +16,7 @@ already feeds *any* operator (one sketch, one solid), pick a free
 valid), then insert the statement and its import above the scene assignment.
 
 Structural vertex edits keep the sketch's constraints honest
-(:func:`_renumbered_constraints`): a deleted vertex takes the constraints
+(:func:`_constraint_edits`): a deleted vertex takes the constraints
 that referenced it with it, and every ``profile.vertices[i]`` written after
 the edited position is renumbered so it still names the point it was written
 for.

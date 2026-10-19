@@ -35,11 +35,9 @@ STUDY_CALL_KINDS = {
 }
 """Study constructor names mapped to their viewer payload ``kind``.
 
-``FlowStudy`` belongs here even though it meshes nothing, and leaving it
-out was not merely a missing feature: :func:`_study_entries` aligns
-statements to captured studies by position and count, so a scene declaring
-a flow study alongside a mesh study found *neither* aligned and marked the
-mesh study non-editable too."""
+``FlowStudy`` belongs here even though it meshes nothing:
+:func:`_study_entries` aligns statements to captured studies by position and
+count, so every study constructor must be listed for any of them to align."""
 
 
 @dataclass(frozen=True)

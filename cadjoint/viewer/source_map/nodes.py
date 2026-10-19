@@ -229,8 +229,8 @@ def statement_span(source: str, line: int | None) -> Span | None:
 
     The viewer addresses an object by the line its constructor call starts on,
     which is enough to patch it but not enough to *show* it: pointing an editor
-    at ``Solid.box(`` reveals a call, and pointing it at the position literal —
-    which is what the payload used to offer — reveals three numbers. What a
+    at ``Solid.box(`` reveals a call, and pointing it at the position literal
+    reveals three numbers. What a
     reader wants when they select an object is the statement that declares it,
     ``board = Solid.box(...)``, however many lines it runs to.
 

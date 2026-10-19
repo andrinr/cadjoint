@@ -277,8 +277,3 @@ class TestCylinder:
         rebuilt = selection_from_description(payload)
         assert selection.serializable
         assert np.array_equal(rebuilt.resolve(bar_mesh), selection.resolve(bar_mesh))
-        # The optional fields default when absent, as an older payload would omit them.
-        plain = selection_from_description(
-            {"kind": "cylinder", "center": [0, 0, 0], "axis": [1, 0, 0], "radius": 0.3}
-        )
-        assert plain.describe()["inner"] == 0.0 and plain.describe()["half_length"] is None

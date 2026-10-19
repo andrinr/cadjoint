@@ -73,11 +73,11 @@ class TestTheDeclaration:
     """What the scene says it is, before anything is solved."""
 
     def test_it_declares_one_flow_study_and_one_optimization(self, scene):
-        from cadjoint.flow import FLOW_STUDY_KIND, FlowStudy
+        from cadjoint.flow import FlowStudy
         from cadjoint.optimize import Optimization
 
         assert isinstance(scene.drag, FlowStudy)
-        assert scene.drag.describe()["kind"] == FLOW_STUDY_KIND
+        assert scene.drag.describe()["kind"] == "flow"
         assert isinstance(scene.streamline, Optimization)
         assert scene.streamline.study is None, "this is the objective form"
 

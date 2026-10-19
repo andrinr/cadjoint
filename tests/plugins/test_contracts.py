@@ -73,11 +73,11 @@ class TestEveryKindIsUnderContract:
     def test_the_tier_kinds_are_the_contracted_kinds(self):
         assert set(tier.KINDS) == set(contracts.KIND_CONTRACTS)
         assert set(tier.KINDS) == {
-            PluginKind.NODE_MAP.value,
-            PluginKind.FEATURE_EDGES.value,
-            PluginKind.BREP.value,
-            PluginKind.STEP_EXPORT.value,
-            PluginKind.DRAG.value,
+            PluginKind.NODE_MAP,
+            PluginKind.FEATURE_EDGES,
+            PluginKind.BREP,
+            PluginKind.STEP_EXPORT,
+            PluginKind.DRAG,
         }
 
     def test_every_kind_names_a_protocol_and_a_method(self):
@@ -89,22 +89,22 @@ class TestEveryKindIsUnderContract:
 
     def test_only_the_node_map_carries_a_derivative(self):
         """Edges, a B-rep, a STEP file and a drag result are not differentiated."""
-        _inputs, output = contracts.payload_types(PluginKind.NODE_MAP.value)
+        _inputs, output = contracts.payload_types(PluginKind.NODE_MAP)
         assert output["differentiable"]
         for kind in tier.KINDS:
-            if kind == PluginKind.NODE_MAP.value:
+            if kind == PluginKind.NODE_MAP:
                 continue
             assert not contracts.payload_types(kind)[1]["differentiable"], kind
 
     def test_the_signature_hash_moves_with_the_contract_version(self, monkeypatch):
         """A stale private build is caught by the hash, not inside a trace."""
-        before = contracts.contract_signature(PluginKind.NODE_MAP.value)
+        before = contracts.contract_signature(PluginKind.NODE_MAP)
         monkeypatch.setattr(contracts, "CONTRACT_VERSION", CONTRACT_VERSION + 1)
-        assert contracts.contract_signature(PluginKind.NODE_MAP.value) != before
+        assert contracts.contract_signature(PluginKind.NODE_MAP) != before
 
     def test_a_kind_without_a_contract_is_not_one_of_ours(self):
-        assert contracts.contract_for(PluginKind.TET_MESHER.value) is None
-        assert contracts.payload_types(PluginKind.TET_MESHER.value) == ({}, {})
+        assert contracts.contract_for(PluginKind.TET_MESHER) is None
+        assert contracts.payload_types(PluginKind.TET_MESHER) == ({}, {})
 
 
 @pytest.mark.usefixtures("stub_tier")
@@ -142,11 +142,11 @@ class TestAProviderSatisfiesEveryContract:
         assert plugin.probe().schema_hash == contracts.contract_signature(kind)
 
     def test_the_node_map_is_the_only_one_that_advertises_a_vjp(self):
-        node_map = plugin_for_kind(PluginKind.NODE_MAP.value)
+        node_map = plugin_for_kind(PluginKind.NODE_MAP)
         assert node_map.capabilities.supports("differentiable")
         assert node_map.capabilities.supports("in_process")
         assert "vector_jacobian_product" in node_map.capabilities.endpoints
-        edges = plugin_for_kind(PluginKind.FEATURE_EDGES.value)
+        edges = plugin_for_kind(PluginKind.FEATURE_EDGES)
         assert not edges.capabilities.supports("differentiable")
         with pytest.raises(ValueError, match="carries no derivative"):
             edges.vjp({}, ["scene"], ["result"], {"result": None})
@@ -177,36 +177,36 @@ class TestTheImportIsChecked:
         register_plugin(
             PluginSpec(
                 name="not_a_node_map",
-                kind=PluginKind.NODE_MAP.value,
+                kind=PluginKind.NODE_MAP,
                 transport=PluginTransport.PYTHON,
                 object="numpy:ndarray",
             ),
             default=True,
         )
         with pytest.raises(PluginMismatch, match="NodeMap contract"):
-            assert plugin_for_kind(PluginKind.NODE_MAP.value).component
+            assert plugin_for_kind(PluginKind.NODE_MAP).component
 
     def test_a_missing_module_is_a_reason_not_a_traceback(self):
         register_plugin(
             PluginSpec(
                 name="absent_edges",
-                kind=PluginKind.FEATURE_EDGES.value,
+                kind=PluginKind.FEATURE_EDGES,
                 transport=PluginTransport.PYTHON,
                 object="cadjoint_no_such_module:EDGES",
             ),
             default=True,
         )
-        entry = tier.status()[PluginKind.FEATURE_EDGES.value]
+        entry = tier.status()[PluginKind.FEATURE_EDGES]
         assert not entry.available
         assert "cadjoint_no_such_module" in entry.reason
-        assert tier.component(PluginKind.FEATURE_EDGES.value) is None
+        assert tier.component(PluginKind.FEATURE_EDGES) is None
 
     def test_a_malformed_object_string_is_a_config_error(self):
         from cadjoint.plugins import PluginConfigError
 
         spec = PluginSpec(
             name="bad",
-            kind=PluginKind.BREP.value,
+            kind=PluginKind.BREP,
             transport=PluginTransport.PYTHON,
             object="tests.plugins.stubs",
         )
@@ -230,17 +230,17 @@ class TestTheImportIsChecked:
             register_plugin(
                 PluginSpec(
                     name="stale_brep",
-                    kind=PluginKind.BREP.value,
+                    kind=PluginKind.BREP,
                     transport=PluginTransport.PYTHON,
                     object="cadjoint.plugins.contracts:_STALE_FOR_TEST",
                 ),
                 default=True,
             )
-            entry = tier.status()[PluginKind.BREP.value]
+            entry = tier.status()[PluginKind.BREP]
             assert not entry.compatible and not entry.available
             assert f"version {CONTRACT_VERSION + 1}" in entry.reason
             with pytest.raises(tier.TierUnavailable) as caught:
-                tier.require(PluginKind.BREP.value)
+                tier.require(PluginKind.BREP)
             assert "built for plugin contract version" in str(caught.value)
         finally:
             del module._STALE_FOR_TEST  # type: ignore[attr-defined]

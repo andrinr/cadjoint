@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { dismissBanner, editorText, waitForCompile } from "./helpers/app";
 
 /**
  * The editor's three analysis features, end to end against the real ruff and
@@ -10,32 +11,6 @@ import { expect, test, type Page } from "@playwright/test";
  * arithmetic under them is asserted in `test/editorIntelligence.test.ts`;
  * what is checked here is that the wiring exists.
  */
-
-async function waitForCompile(page: Page) {
-  // The settle signal is the toolbar's busy seam. It is present for exactly
-  // as long as the app is behind its own source — from the edit, through the
-  // debounce window and the request, until the shaders are installed — which
-  // the status line no longer is: while work is in flight the status says
-  // nothing at all, so that the one indicator for running work is the
-  // toolbar's chip. A settled status is therefore a second, independent
-  // signal, and "Starting…" is the placeholder to wait past on a cold load.
-  await expect(page.getByTestId("status")).not.toHaveText(/^(|Starting…)$/, {
-    timeout: 60_000,
-  });
-  await expect(page.getByTestId("toolbar-busy")).toHaveCount(0, { timeout: 60_000 });
-}
-
-/** The full document, read off the CodeMirror view rather than the DOM. */
-async function editorText(page: Page): Promise<string> {
-  return page.evaluate(() => {
-    type DocView = { view?: { state: { doc: { toString(): string } } } };
-    const content = document.querySelector("[data-testid=editor] .cm-content") as
-      | (HTMLElement & { cmView?: DocView; cmTile?: DocView })
-      | null;
-    const view = content?.cmView?.view ?? content?.cmTile?.view;
-    return view ? view.state.doc.toString() : (content?.innerText ?? "");
-  });
-}
 
 /** Put the caret at the end of the document, so typing appends. */
 async function caretToEnd(page: Page) {
@@ -62,8 +37,7 @@ async function caretToEnd(page: Page) {
 test.beforeEach(async ({ page }) => {
   await page.goto("/");
   await waitForCompile(page);
-  const dismiss = page.getByRole("button", { name: "Dismiss" });
-  if (await dismiss.isVisible().catch(() => false)) await dismiss.click();
+  await dismissBanner(page);
 });
 
 test("lint marks an undefined name and applies a ruff fix", async ({ page }) => {

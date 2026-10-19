@@ -19,9 +19,8 @@ def _mix(first: Any, second: Any, weight: Array) -> Array:
     the result of an expression that saw a ``nan`` is not enough: the VJP of
     ``jnp.where`` multiplies the unselected branch's cotangent by zero, and
     ``0.0 * nan`` is ``nan``. So a single-``where`` version returns the right
-    value and a ``nan`` *gradient*, which is worse than the bug it fixes —
-    the value is checkable and the gradient reaches an optimiser as
-    ``grad_norm=nan`` twenty minutes later. Both operands are made finite
+    value and a ``nan`` *gradient*, which reaches an optimiser as
+    ``grad_norm=nan`` far from its cause. Both operands are made finite
     *before* the lerp; the second ``where`` puts the ``nan`` back where it
     belongs, over an expression that never carried one.
     """
@@ -45,14 +44,11 @@ def blend_materials(first: dict, second: dict, weight: Array) -> dict:
     child that leaves a property unspecified erases the other child's value
     even where its weight is *exactly zero*. Every cut tool in a real part is
     such a child: a ``Face.hole`` is geometry, not a substance, and it says
-    nothing about conductivity. The consequence was that any solid with a
-    single hole in it reported ``conductivity = nan`` at every interior point,
-    and every ``FROM_MATERIAL`` study over it failed with "the scene's
-    material field does not specify 'conductivity' for 3748 of 3748
-    elements".
+    nothing about conductivity; with a plain lerp any solid with a hole in it
+    would report ``conductivity = nan`` at every interior point.
 
     Here a property is unspecified only when *neither* side specifies it. Two
-    specified values still blend exactly as before, which is what makes a
+    specified values blend as a plain lerp, which is what makes a
     smooth CSG interface a smooth (and differentiable) property interface.
 
     Args:
@@ -144,7 +140,6 @@ class BooleanOp(SDF):
     Subclasses must implement:
     - @staticmethod def sdf(child_sdfs: tuple, p: Array, **params) -> Array
     - __call__(self, p: Array) -> Array
-    - to_functional(self) -> Callable
 
     Subclasses should store:
     - self.sdfs: Tuple of child SDFs

@@ -14,7 +14,6 @@ class Transform(SDF):
     Subclasses must implement:
     - @staticmethod def sdf(child_sdf, p: Array, **params) -> Array
     - __call__(self, p: Array) -> Array
-    - to_functional(self) -> Callable
 
     Subclasses should store:
     - self.sdf: The child SDF being transformed

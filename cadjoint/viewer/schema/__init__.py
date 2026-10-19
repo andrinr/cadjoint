@@ -1,12 +1,6 @@
 """The typed contract between the compile worker and the viewer.
 
-For most of the playground's life the payload had no schema: the worker
-built nested dicts, the frontend declared what it hoped to find in
-``frontend/src/types.ts``, and the only thing keeping the two honest was
-that both were edited in the same commit. A field renamed on one side
-became ``undefined`` on the other, silently.
-
-This package is the single definition instead:
+This package is the single definition of the payloads both sides exchange:
 
 - :mod:`.payloads` models the compile response and everything inside it;
 - :mod:`.requests` models every ``/api/patch`` request the server accepts,
@@ -21,7 +15,7 @@ regenerated and diffed by a test — is what the frontend imports, so the two
 sides cannot drift without something going red.
 
 The models are *descriptive*: the worker and the endpoints build their
-answers as they always did, and the answers are checked at the boundary.
+answers as plain dicts, and the answers are checked at the boundary.
 Nothing here changes what a payload says, only what it is allowed to say.
 """
 

@@ -59,10 +59,6 @@ class Box(Primitive):
         """Evaluate SDF at point(s) p."""
         return Box.sdf(p, self.params["size"].xyz)
 
-    def to_functional(self):
-        """Return pure function for compilation."""
-        return Box.sdf
-
     def patch_fields(self):
         """Six face half-space distances, derived from the sdf structure.
 

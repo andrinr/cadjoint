@@ -2499,7 +2499,7 @@ same instability §16.5 measured from the mesh side. The honest summary is
 that the drawn feature edges are inside the method's own noise, and that a
 seam acceptance test with hysteresis would be worth more than either arm.
 
-## 17.5 Deliberately not taken: compiling the Hermite gradient
+## 17.5 Deliberately not taken: compiling the Hermite gradient (done since — §19.8)
 
 `edge_hermite_data` computes `gradient = jax.vmap(jax.grad(sdf))` and reads it
 three times — the Newton slope, the final normals, the degenerate-gradient

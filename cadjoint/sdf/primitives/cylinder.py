@@ -57,10 +57,6 @@ class Cylinder(Primitive):
         """Evaluate SDF at point(s) p."""
         return Cylinder.sdf(p, self.params["radius"].value, self.params["height"].value)
 
-    def to_functional(self):
-        """Return pure function for compilation."""
-        return Cylinder.sdf
-
     def patch_fields(self):
         """Side surface plus the two caps, from the sdf's max composition.
 

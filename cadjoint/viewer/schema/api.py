@@ -39,11 +39,10 @@ from pydantic import BaseModel, Field
 from cadjoint.viewer.schema.payloads import (
     BRepInspectionPayload,
     CompilePayload,
-    DomainEntry,
     MeshEdgePayload,
     Open,
     Strict,
-    StudyBcDescription,
+    StudyDescription,
     Vector3,
     WorkerFailure,
 )
@@ -57,8 +56,7 @@ from cadjoint.viewer.schema.requests import (
 API_VERSION = 2
 """The version of this contract.
 
-1 was every server before the contract carried a number; a frontend that
-finds no ``api_version`` in ``/api/session`` is talking to one of those.
+A server whose ``/api/session`` carries no ``api_version`` is version 1.
 """
 
 API_VERSION_HEADER = "X-Cadjoint-Api"
@@ -303,24 +301,6 @@ class ResultSummary(Open):
     mass: float | None = None
     safety_factor: float | None = None
     refinement: Refinement | None = None
-
-
-class StudyDescription(Open):
-    """A study's own ``describe()``, as a solved study echoes it.
-
-    The compile payload's :class:`~.payloads.StudyPayload` is this plus where
-    the study is written; a solve reports only what the study says of itself.
-    """
-
-    name: str
-    kind: Literal["thermal", "elastic", "flow"]
-    resolution: int | list[int] | None = None
-    bounds: list[float] | None = None
-    size: list[float] | None = None
-    mesh: str | None = None
-    domain: DomainEntry | None = None
-    material: dict[str, float | str] = Field(default_factory=dict)
-    bcs: list[StudyBcDescription]
 
 
 # ── Simulate and mesh inspection ────────────────────────────────────────────
@@ -784,8 +764,6 @@ class Route:
         stream: The response is NDJSON, one :data:`response` model per line.
         file: A success is a file attachment rather than JSON; only a failure
             is JSON (see ``X-Cadjoint-Export`` and :class:`ExportSummary`).
-        aliases: Older paths that still answer, for clients built before the
-            route moved under ``/api/``.
     """
 
     method: Literal["GET", "POST"]
@@ -798,7 +776,6 @@ class Route:
     tracked: bool = False
     stream: bool = False
     file: bool = False
-    aliases: tuple[str, ...] = ()
 
 
 ROUTES: tuple[Route, ...] = (
@@ -811,16 +788,8 @@ ROUTES: tuple[Route, ...] = (
         CompileRequest,
         (CompilePayload, Failure),
         tracked=True,
-        aliases=("/compile",),
     ),
-    Route(
-        "POST",
-        "/api/patch",
-        "PatchResponse",
-        PatchRequest,
-        (PatchResponse,),
-        aliases=("/patch",),
-    ),
+    Route("POST", "/api/patch", "PatchResponse", PatchRequest, (PatchResponse,)),
     Route("POST", "/api/mesh", "MeshResponse", CompileRequest, (MeshResult, Failure), tracked=True),
     Route("POST", "/api/brep", "BrepResponse", CompileRequest, (BrepResult, Failure), tracked=True),
     Route(

@@ -23,8 +23,8 @@ class Difference(BooleanOp):
             ``Difference(a, b)`` is a blended one and a caller who wants the
             sharp operation has to ask for ``smoothness=0``. The value does
             not scale with the part: 0.1 is a tenth of a unit whatever the
-            unit stands for, which on a normalised engine block came to
-            20 mm and removed a water jacket. See
+            unit stands for, enough on a large part to erase a thin
+            internal feature. See
             :mod:`cadjoint.sdf.boolean.smooth` for what the blend costs —
             it moves the field by up to ``smoothness`` per operation, and
             by the full amount wherever the operands agree.
@@ -64,9 +64,8 @@ class Difference(BooleanOp):
         """The body's material, tinted by each tool near the surface that tool cut.
 
         Folds over *every* tool, the way :meth:`Union.material_at` folds over
-        every operand: this used to read ``self.sdfs[0]`` and ``self.sdfs[1]``
-        only, so a part cut by more than one tool — which is every part —
-        took its material from the first cut and ignored the rest.
+        every operand, so a part cut by more than one tool takes its
+        material from every cut, not just the first.
         """
         from cadjoint.sdf.boolean.base import blend_materials
 
@@ -100,7 +99,3 @@ class Difference(BooleanOp):
         order's guarantees and why a ``smoothness > 0`` difference declines.
         """
         return _operand_patch_fields(self, negate_tools=True)
-
-    def to_functional(self):
-        """Return pure function for compilation."""
-        return Difference.sdf

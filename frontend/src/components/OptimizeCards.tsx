@@ -4,7 +4,7 @@
  * geometry and the simulation it drives.
  *
  * `Optimization(...)` declarations come from the compile payload; the cards
- * edit their steps/learning_rate through /patch and run them through
+ * edit their steps/learning_rate through /api/patch and run them through
  * POST /api/optimize. A successful run returns the program with the
  * optimized literals written back, adopted exactly like a patch response;
  * a study-backed run additionally returns the optimized design's solved
@@ -58,7 +58,7 @@ import { Card, CardHeader, CardList, NumberField, Sparkline } from "./ui";
 import type { OptimizationPayload, OptimizeResponse } from "../types";
 
 export interface OptimizeCardsProps {
-  /** Serialized /patch queue owned by the app shell. */
+  /** Serialized /api/patch queue owned by the app shell. */
   onPatch: (body: Record<string, unknown>) => Promise<void>;
   /** Adopt server-produced source like a patch response (commit + rerun). */
   onAdoptSource: (source: string) => Promise<void>;
@@ -153,14 +153,14 @@ export function OptimizeCards(props: OptimizeCardsProps) {
     setOptimizeRun({
       name,
       source: payload.source,
-      history: payload.history ?? [],
-      trajectory: payload.trajectory ?? [],
-      parameters: payload.parameters ?? {},
-      initial: payload.initial ?? {},
+      history: payload.history,
+      trajectory: payload.trajectory,
+      parameters: payload.parameters,
+      initial: payload.initial,
       study: declared?.study ?? null,
     });
     setOptimizePlayer({
-      frame: Math.max(playbackFrames((payload.trajectory ?? []).length).length - 1, 0),
+      frame: Math.max(playbackFrames(payload.trajectory.length).length - 1, 0),
       playing: false,
     });
     const simulate = payload.simulate;
@@ -269,14 +269,14 @@ export function OptimizeCards(props: OptimizeCardsProps) {
       setOptimizeRun({
         name: optimization.name,
         source: response.source,
-        history: response.history ?? [],
-        trajectory: response.trajectory ?? [],
-        parameters: response.parameters ?? {},
-        initial: response.initial ?? {},
+        history: response.history,
+        trajectory: response.trajectory,
+        parameters: response.parameters,
+        initial: response.initial,
         study: optimization.study ?? null,
       });
       setOptimizePlayer({
-        frame: Math.max(playbackFrames((response.trajectory ?? []).length).length - 1, 0),
+        frame: Math.max(playbackFrames(response.trajectory.length).length - 1, 0),
         playing: false,
       });
       // A study-backed run ends with the optimized design's solved field —
@@ -309,7 +309,7 @@ export function OptimizeCards(props: OptimizeCardsProps) {
       // initial design to the optimized one IS the result. Whichever
       // trajectory player is mounted where the user lands (this card, or
       // the Results tab for study-backed runs) consumes it.
-      if ((response.trajectory ?? []).length > 1) setOptimizeAutoPlay(true);
+      if (response.trajectory.length > 1) setOptimizeAutoPlay(true);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : String(caught));
     } finally {

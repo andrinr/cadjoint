@@ -1,7 +1,7 @@
 /**
  * The named edits the panes can make to the program.
  *
- * Every viewer and panel action is one `/patch` operation, and the op names
+ * Every viewer and panel action is one `/api/patch` operation, and the op names
  * and their payload keys are the app's half of that contract. Collecting the
  * wrappers here keeps the shell's JSX free of request literals and gives the
  * contract one place to read: if the server renames an argument, it changes
@@ -19,8 +19,8 @@
  * two edits queued back to back can disagree about what "line 91" meant. A
  * stable id does not move. Both are sent (`addressing`): the id is the real
  * address, the line is the fallback for an entry the identity table could not
- * name, and neither call sites nor signatures had to change to get it —
- * the shell already knows which node lives at the line it was handed.
+ * name. Call sites pass only the line: the shell already knows which node
+ * lives at the line it is handed.
  */
 
 import { nodeById, nodes, selection } from "../state";

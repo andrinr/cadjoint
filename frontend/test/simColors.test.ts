@@ -28,9 +28,8 @@ import {
   type Rgb,
 } from "../src/simColors";
 import { AXIS_RGB, CHROME, hexToRgb, wgslTokens } from "../src/tokens";
+import { distance } from "./helpers";
 
-const distance = (a: Rgb, b: Rgb): number =>
-  Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
 
 const bcEntries = Object.entries(BC_TYPE_COLORS) as [string, Rgb][];
 
@@ -44,15 +43,15 @@ describe("field vs quality ramps", () => {
 
   it("both start dark: the cold end of a field separates from paper", () => {
     // The polarity of this contract flips with the ground. On a dark viewport
-    // the assertion was that the ramps' *high* ends read (13.8 and 16.3:1
-    // there) while their cold ends vanished into the background at 1.17 and
-    // 1.19:1. On paper the mirror holds: the cold ends carry 12.1 and 16.9:1
+    // the ramps' *high* ends read (13.8 and 16.3:1 there) while their cold
+    // ends vanish into the background at 1.17 and 1.19:1. On paper the mirror
+    // holds: the cold ends carry 12.1 and 16.9:1
     // and the hot ends measure 1.02 and 1.15:1.
     //
     // Which end merges is a real trade, not a wash — the hot end is the end
-    // anyone is looking at — and it is why the FEM surface now draws a
+    // anyone is looking at — and it is why the FEM surface draws a
     // silhouette contour (see fs_sim in viewer/simulation.wgsl). Luminance is
-    // no longer what separates a hot region from the ground; hue is, at 19.2
+    // not what separates a hot region from the ground; hue is, at 19.2
     // ΔOKLab, plus a drawn edge.
     expect(contrastRatio(fieldRamp(0), VIEWPORT_BACKGROUND)).toBeGreaterThan(7);
     expect(contrastRatio(qualityRamp(0), VIEWPORT_BACKGROUND)).toBeGreaterThan(7);

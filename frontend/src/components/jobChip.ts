@@ -1,10 +1,9 @@
 /**
  * What the toolbar's running-work chip says, given everything that is running.
  *
- * Split out of `Toolbar.tsx` because it is the answer to a question the user
- * asked out loud — *"if there is multiple running processes, are they all
- * shown there?"* — and an answer worth stating in a test rather than only in
- * pixels. Nothing here knows about Solid or the DOM: it takes the job
+ * Kept out of `Toolbar.tsx` so that whether every running process is shown
+ * is stated in a test rather than only in pixels. Nothing here knows about
+ * Solid or the DOM: it takes the job
  * registry's running set plus the app's own `busy` clock and returns the
  * sentence.
  *
@@ -16,7 +15,6 @@
  *    debounce window, the worker spawn. `busy` is the exact answer to "is the
  *    picture on screen the picture of the code", so the compile row exists
  *    from the edit, and adopts the registry's job id as soon as one appears.
- *    That is the case the deleted in-viewport indicator used to cover.
  * 2. **A lint is never a chip.** It fires on a pause in typing, which would
  *    make the chip blink several times a minute while you write code.
  * 3. **The compile leads.** It is the one job that decides whether what is on

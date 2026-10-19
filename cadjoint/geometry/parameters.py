@@ -12,7 +12,7 @@ Types:
 Helpers:
 - as_parameter: Auto-convert raw values to Parameter objects
 
-For constraint systems (distances, angles, parallel, etc.), see constraints.py (future).
+For constraint systems (distances, angles, parallel, etc.), see :mod:`cadjoint.constraints`.
 """
 
 from dataclasses import dataclass, field
@@ -71,17 +71,6 @@ class Parameter:
     def fixed(self) -> bool:
         """Whether this parameter is fixed (non-optimizable)."""
         return not self.free
-
-    def extract_value(self) -> Union[float, Array]:
-        """Extract raw numeric value for computation.
-
-        Base implementation returns .value.
-        Subclasses like Vector override to return .xyz.
-
-        Returns:
-            Raw numeric value (float or Array)
-        """
-        return self.value
 
     def __repr__(self):
         status = "FIXED" if self.fixed else "FREE"

@@ -116,7 +116,7 @@ __all__ = [
 #: The plugin slot this mesher fills — the one
 #: :data:`cadjoint.plugins.registry.BUILTIN_PACKAGES` files ``tet_gmsh``
 #: under.  Kinds are resolved by string, so this is the enum's value.
-TET_MESHER_KIND = PluginKind.TET_MESHER.value
+TET_MESHER_KIND = PluginKind.TET_MESHER
 
 #: Gmsh's 3D algorithm number for HXT — the parallel Delaunay refinement
 #: that makes this route worth taking at all.

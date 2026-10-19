@@ -17,7 +17,7 @@ differences. This note records what runs today, the honest limits, and the follo
 | Tesseract plugin ABI (local, no Docker) | working, gradients bit-identical to direct | `cadjoint/fem/tesseracts/thermal_jaxfem/` |
 | Elastic solve packaged as a tesseract | working, gradients bit-identical to direct | `cadjoint/fem/tesseracts/elastic_jaxfem/` |
 | Differentiable Dirichlet *values* (thermal, direct backend) | working via lifted solve, FD-validated | `JaxFemBackend.thermal` + `tests/fem/test_dirichlet_gradient.py` |
-| Programmatic node selection (`Nodes` + boolean algebra) | working, serializable | `cadjoint/fem/selection.py` |
+| Programmatic node selection (`Nodes` + boolean algebra) | working, serializable | `cadjoint/studies/selection.py` |
 | Heat-flux (Neumann) BCs on the direct backend | working, analytic-validated | `JaxFemBackend.thermal` surface maps |
 
 ### Versions
@@ -111,7 +111,7 @@ jax-fem consumes directly (it reorders to basix internally).
 
 ## BC selection design: programmatic node selections
 
-**Now: first-class vertex selection** (`cadjoint/fem/selection.py`), replacing the
+**Now: first-class vertex selection** (`cadjoint/studies/selection.py`), replacing the
 earlier `FaceSelector` face-group orientation ("the current face groups are not
 so good to work with" — the face-group ids depended on the mesher's
 gradient-axis tagging, which is opaque for anything non-box-like and useless
@@ -225,14 +225,14 @@ missing piece is a trust-region rule for when to re-freeze topology.
 
 `tests/fem/`: solver-dependent files `pytest.importorskip` on `jax_fem` /
 `tesseract_core` / `tesseract_jax`, so the suite skips (not fails) without
-them. `test_hexmesh.py` (mesher only), `test_selection.py` (node-selection
-layer: primitives, algebra, describe round-trip, `faces_from_nodes` — no
-solver), `test_simulate.py` (incl. selection-vs-predicate parity and the
-analytic heat-flux profile), `test_study.py`, `test_tesseract_backend.py`
+them. `test_hexmesh.py` (mesher only), `test_simulate.py` (incl.
+selection-vs-predicate parity and the analytic heat-flux profile),
+`test_study.py`, `test_tesseract_backend.py`
 (elastic parity + bit-identical gradients + a generous overhead-timing
 bound), `test_dirichlet_gradient.py` (lifted Dirichlet values vs FD, through
 node selections), `test_end_to_end.py`, plus the bracket demo and
-render-payload files.
+render-payload files. The node-selection layer (primitives, algebra, describe
+round-trip, `faces_from_nodes`) is tested in `tests/studies/test_selection.py`.
 
 ## Bracket demo: a realistic part through the whole chain
 

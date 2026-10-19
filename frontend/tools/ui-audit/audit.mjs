@@ -805,7 +805,7 @@ async function enterState(page, state, settle) {
   await page.getByTestId(`editmode-${state.mode}`).click();
   await page.waitForTimeout(150);
   if (state.tab) {
-    const tab = page.getByTestId(`sim-tab-${state.tab}`);
+    const tab = page.getByTestId(`window-tab-${state.tab}`);
     await tab.waitFor({ state: "visible", timeout: 15_000 });
     await tab.click();
   }
@@ -859,14 +859,14 @@ async function populate(page, warn) {
   // Mesh first, then the solve: inspecting a mesh replaces the panel's
   // current result, so solving last leaves both tabs populated.
   try {
-    await page.getByTestId("sim-tab-meshes").click();
+    await page.getByTestId("window-tab-meshes").click();
     await page.locator("[data-testid^=mesh-inspect-]").first().click({ timeout: 10_000 });
     await page.waitForSelector("[data-testid=mesh-stats]", { timeout: 240_000 });
   } catch (error) {
     warn(`--solve: mesh did not inspect (${String(error).split("\n")[0]})`);
   }
   try {
-    await page.getByTestId("sim-tab-studies").click();
+    await page.getByTestId("window-tab-studies").click();
     await page.locator("[data-testid^=simulate-run-]").first().click({ timeout: 10_000 });
     await page.waitForSelector("[data-testid=simulate-result-summary]", { timeout: 240_000 });
   } catch (error) {

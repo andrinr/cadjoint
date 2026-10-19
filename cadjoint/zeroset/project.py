@@ -1,12 +1,11 @@
 """The one projection: Newton onto the common zero set of one, two or three fields.
 
-Every place that put a point *on* the model used to carry its own Newton
-loop — the mesh node motion (one field), the edge overlay's seams (two or
-three leaf fields at once), the cut-cell surface, the GPU solve.  They
-are the same computation, and they disagreed only where it mattered: at a
-crease, one field's Newton steps between the faces that meet there while
-the multi-field one lands on their intersection.  This is that
-computation, once, differentiable, and the CPU counterpart of
+Every place that puts a point *on* the model — the mesh node motion (one
+field), the edge overlay's seams (two or three leaf fields at once), the
+cut-cell surface, the GPU solve — runs this one computation.  Sharing it
+matters at a crease, where one field's Newton steps between the faces that
+meet there while the multi-field one lands on their intersection.  This is
+the computation once, differentiable, and the CPU counterpart of
 :class:`~cadjoint.zeroset.gpu.Projector`'s kernel.
 
 Minimum-norm gauge: with the k field gradients as rows of J, the step is
@@ -15,7 +14,7 @@ Gram matrix is regularised at a scale relative to its trace so a near
 tangency does not blow the step up, and a point whose fields are not
 transversal at the start (the smallest Gram eigenvalue under a hundredth of
 the mean) is refused: it stays where it was.  A displacement clamp keeps a
-stray point from leaving its basin, the same clamp the meshes always had.
+stray point from leaving its basin.
 """
 
 from __future__ import annotations
@@ -255,10 +254,9 @@ def _iterate(
     rather than one evaluated before the loop.  At iteration 0 the sweep's
     point is ``start``, so it is the same matrix, and the program carries
     one copy of ``system`` — for :func:`project_table` a whole walk of the
-    table and its reverse pass — instead of two.  That halves the starter's
-    table programs (1.39 MB → 0.71 MB of HLO, 3.3 s → 1.4 s of XLA for the
-    one-surface class); ``research/performance.md`` §19 has the numbers and
-    what it moves (a few float64 ulps at a handful of nodes, nothing above).
+    table and its reverse pass — instead of two, which roughly halves the
+    table programs' HLO and XLA time; ``research/performance.md`` §19 has the
+    numbers and what it moves (a few float64 ulps at a handful of nodes).
 
     Args:
         system: ``x -> (values, jacobian, gram)``, from :func:`_system`.
@@ -441,9 +439,9 @@ def _selected(
     walk, seeded one column at a time, which is ``jax.value_and_grad`` of
     that column's field and nothing else — the other columns' seeds are
     exact zeros.  Reverse mode, and not the three forward tangents that
-    would also serve, because reverse is what the per-field form used and
-    the last bits have to agree with it; measured, forward mode is also the
-    larger program (118 096 equations against 52 507).
+    would also serve, because the last bits have to agree with the
+    per-field ``value_and_grad``; forward mode is also the larger program
+    (about twice the equations).
 
     The ``count`` seeds are pushed through **one** ``vmap``-ed reverse pass
     rather than ``count`` separate ones.  They run the same arithmetic on
@@ -488,9 +486,9 @@ def _table_fingerprint(model: Any) -> str:
     """A digest of everything a table program bakes in: the nodes and the root.
 
     θ is an argument of the program, not part of it, so it is left out;
-    the parameter names never reach the walker.  Hashing the starter's
-    1 213 nodes costs 0.3 ms and the shield's 12 392 costs 3.5 ms, against
-    seconds of XLA for a miss.
+    the parameter names never reach the walker.  Hashing even a
+    ten-thousand-node table costs milliseconds, against seconds of XLA for
+    a miss.
     """
     import hashlib
     import json
@@ -514,13 +512,11 @@ def _table_program(
     walk of the table (:func:`_selected`), so the traced program is the
     size of the table and **does not grow with the number of groups**.
 
-    That is the whole point.  The unrolled form this replaces put a
-    complete Newton kernel — a ``fori_loop`` carrying a linear solve, an
-    einsum and an ``eigvalsh`` — in the jaxpr once per group, and on
-    ``scenes/motor_shield.py`` (147 groups, 6 645 table nodes) that jaxpr
-    reached 15.2 GB of RSS after 24 minutes of tracing without finishing,
-    which killed every CI run in this repository's history.  The same
-    structure here traces in seconds (``research/performance.md`` §18).
+    That is the whole point.  Unrolling a complete Newton kernel — a
+    ``fori_loop`` carrying a linear solve, an einsum and an ``eigvalsh`` —
+    into the jaxpr once per group does not finish tracing on
+    ``scenes/motor_shield.py`` (147 groups); this structure traces in
+    seconds (``research/performance.md`` §18).
 
     **One jitted program per class, chained, rather than one for all three.**
     The classes are disjoint — a point has one incidence — so each reads and
@@ -541,10 +537,9 @@ def _table_program(
 
     *Structure* means the table's content (:func:`_table_fingerprint`), not
     the :class:`~cadjoint.zeroset.table.Model` object.  Every
-    ``SimMesh.build`` lowers its scene afresh, so an ``id()`` key missed on
-    every rebuild of an unchanged scene and recompiled the same programs —
-    identical HLO, ~1.3 MB and up to 5 s of XLA each on the starter — once
-    per build.  Two models with equal nodes and root lower to the same
+    ``SimMesh.build`` lowers its scene afresh, so an ``id()`` key would miss
+    on every rebuild of an unchanged scene and recompile identical programs
+    once per build.  Two models with equal nodes and root lower to the same
     program, so sharing it cannot change a bit of the result.
 
     Args:

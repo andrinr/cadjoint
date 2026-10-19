@@ -17,7 +17,7 @@ import numpy as np
 import pytest
 
 from cadjoint.geometry.parameters import Scalar
-from cadjoint.materials import CATALOGUE, aluminium_6061, aluminum_6061, catalogue, copper_c11000
+from cadjoint.materials import CATALOGUE, aluminium_6061, catalogue, copper_c11000
 from cadjoint.render.material import (
     BOUNDS,
     OPTICAL_PROPERTIES,
@@ -164,9 +164,6 @@ class TestCatalogue:
         first, second = aluminium_6061(), aluminium_6061()
         assert first is not second
         assert first.params["density"] is not second.params["density"]
-
-    def test_us_spelling_is_an_alias(self):
-        assert aluminum_6061 is aluminium_6061
 
     def test_catalogue_helper_returns_fresh_materials(self):
         materials = catalogue()

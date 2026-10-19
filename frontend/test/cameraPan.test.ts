@@ -4,9 +4,9 @@
  * The property that matters is geometric, not numeric: whatever the yaw and
  * pitch, a pan must slide the target across the screen and never towards or
  * away from the eye, and a horizontal drag must stay level in a Z-up world.
- * A second, hand-rolled basis in `panCamera` once broke exactly this — it was
- * written Y-up while the camera is Z-up, so a sideways drag climbed out of the
- * ground plane.  These tests fail on that basis and pass on the shared one.
+ * A hand-rolled Y-up basis for a Z-up camera breaks exactly this — a sideways
+ * drag climbs out of the ground plane — so these tests fail on such a basis
+ * and pass on the shared one.
  */
 import { describe, expect, it } from "vitest";
 import { panCamera } from "../src/components/viewer/camera";

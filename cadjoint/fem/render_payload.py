@@ -60,6 +60,14 @@ def cell_to_node_scalar(mesh: Any, cell_values: np.ndarray) -> np.ndarray:
     return sums / np.maximum(counts, 1.0)
 
 
+def finite_range(values: np.ndarray) -> list[float]:
+    """``[min, max]`` over the finite entries (``[0, 0]`` when there are none), to 6 places."""
+    finite = values[np.isfinite(values)]
+    low = float(finite.min()) if finite.size else 0.0
+    high = float(finite.max()) if finite.size else 0.0
+    return [round(low, 6), round(high, 6)]
+
+
 def surface_render_payload(surface: Surface, node_scalar: np.ndarray) -> dict[str, Any]:
     """The viewer's boundary-surface payload for any discretization.
 
@@ -93,9 +101,6 @@ def surface_render_payload(surface: Surface, node_scalar: np.ndarray) -> dict[st
     triangles = _triangulate(compact)
     positions = points[used]
     scalars = scalar[used]
-    finite = scalars[np.isfinite(scalars)]
-    low = float(finite.min()) if finite.size else 0.0
-    high = float(finite.max()) if finite.size else 0.0
     groups: list[dict[str, Any]] = []
     offset = 0
     for group_id, faces in surface.groups:
@@ -107,7 +112,7 @@ def surface_render_payload(surface: Surface, node_scalar: np.ndarray) -> dict[st
         "scalars": [round(float(value), 6) for value in scalars],
         "indices": [int(value) for value in triangles.reshape(-1)],
         "groups": groups,
-        "range": [round(low, 6), round(high, 6)],
+        "range": finite_range(scalars),
         "vertex_count": int(used.shape[0]),
     }
 

@@ -3,7 +3,7 @@
  * SimMesh objects, and the quality-histogram binning behind the inline SVG.
  *
  * Meshes are declared in the scene program; the panel edits them only through
- * /patch source operations, mirroring how studies.ts treats studies.
+ * /api/patch source operations, mirroring how studies.ts treats studies.
  */
 
 import type { SimMeshPayload, StudyPayload } from "./types";

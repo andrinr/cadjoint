@@ -69,8 +69,8 @@ One Python program declares every stage, and JAX differentiates through each:
   `apply`/`vjp` interface, implemented as a
   [Tesseract](https://github.com/pasteurlabs/tesseract-core) and run
   in-process, in a container or remotely
-- **Rendering**: a forward raymarcher in JAX, and a StableHLO → WGSL shader
-  compiler for the browser
+- **Rendering**: a forward raymarcher in JAX, and a WGSL shader emitter for
+  the browser
 - **Playground**: a WebGPU app in which every edit rewrites the Python source
   that produced it
 

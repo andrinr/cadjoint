@@ -91,7 +91,7 @@ Model. Scenes and Processes are parked in the tray in every mode.
 | Where | What |
 |---|---|
 | Top left | The tool rail, and beside it the grid readout: `GRID 1.00 m · XY` (spacing on a 1-2-5 ladder, and the world plane it rules) and `VIEW ISO · +X−Y+Z`; a `>` prefix means the view is not to scale |
-| Top right | The viewport bar — projection toggle and **Render** settings — over the view cube |
+| Top right | The viewport bar — skeleton toggle (`⇧C`), projection toggle and **Render** settings — over the view cube |
 | Bottom left | The axis triad (X red, Y green, Z blue); in Simulate, the field legend |
 | Bottom centre | The hint, shown only while a step is in progress or a handle or plane is hovered |
 | Bottom right | The performance readout: FPS (`idle` when nothing redraws), CPU ms/frame, RES, NODES, and ELEMENTS and TRIS while a mesh is shown |
@@ -163,7 +163,9 @@ value back.
 
 **Objects** is the read-only tree of the scene: sketches with their point
 counts and the features built from them, primitives with their dimensions,
-each with its material. Clicking a feature row (`EXTRUDE line 154`) points
+each with its material. Booleans nest their operands, an object used twice
+appears again as a reference, an unnamed boolean reads "Union of a, b…", and
+objects the scene does not use collect under "Not in scene". Clicking a feature row (`EXTRUDE line 154`) points
 Properties at it.
 
 **Properties** lists the arguments the selected element was written with.
@@ -494,8 +496,7 @@ frontend's types are generated from the same models into `payloads.d.ts`
 (`python -m cadjoint.viewer.schema.emit`). The contract is versioned:
 `GET /api/session` reports `api_version`, every response carries it in
 `X-Cadjoint-Api`, and a page built for another version says so instead of
-misreading the server. `/compile` and `/patch` moved to `/api/compile` and
-`/api/patch`; the old paths still answer.
+misreading the server.
 `tests/viewer/test_parity_roundtrip.py` checks that every operation's result
 parses, is deterministic and shows exactly the requested change, and that
 every `set_*` is idempotent.

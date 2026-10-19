@@ -5,8 +5,8 @@ boundary as plain typed arrays, the forward solve runs as an opaque
 ``apply`` endpoint (jax-fem's PETSc-assembled Newton is not jax-traceable),
 and gradients are served by a hand-written ``vector_jacobian_product``
 endpoint backed by jax-fem's adjoint.  A third-party — even non-JAX —
-solver plugs into cadjoint by shipping exactly this file shape and pointing
-``cadjoint.fem.backends.TesseractBackend(api_path=...)`` at it.
+solver plugs into cadjoint by shipping exactly this file shape and
+registering it as a ``thermal_solver`` plugin.
 
 Element types: the schema is element-agnostic — ``cells`` is ``(T, K)``
 and ``K`` picks the element (4 = TET4, 8 = HEX8, 10 = TET10; meshio node

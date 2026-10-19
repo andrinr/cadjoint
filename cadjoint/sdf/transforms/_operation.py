@@ -4,8 +4,8 @@
 single child, and they need the same three things: a child list that tolerates
 a plain lambda, a material lookup that follows the point through the
 transform, and a guarded way to read a world direction off a parameter or a
-geometric reference.  Keeping that here rather than in one of them stops
-`patterns` importing privates from `fields` for no reason other than history.
+geometric reference.  They live here rather than in one of them so no
+transform module imports another's privates.
 """
 
 from __future__ import annotations

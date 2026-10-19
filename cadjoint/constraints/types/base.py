@@ -23,7 +23,8 @@ class Constraint(Fluent):
 
     Constraints are represented as residual equations c(x) = 0.
     The Jacobian ∂c/∂x is computed via AD over the flat residual function
-    in dof.py, not per-constraint.
+    (:func:`cadjoint.constraints.residual.build_residual_fn`), not
+    per-constraint.
 
     Subclasses must implement:
     - compute_residual(): Returns constraint violation c(x)

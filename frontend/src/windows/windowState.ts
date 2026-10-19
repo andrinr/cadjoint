@@ -96,10 +96,6 @@ export function reduceModeWindows(state: ModeWindows, action: WindowAction): Mod
   return { ...state, [id]: next };
 }
 
-export function isOpen(state: ModeWindows, id: WindowId): boolean {
-  return state[id] === "open";
-}
-
 /** Windows parked in the tray, in the canonical window order. */
 export function minimisedWindows(state: ModeWindows): WindowId[] {
   return WINDOW_IDS.filter((id) => state[id] === "minimised");

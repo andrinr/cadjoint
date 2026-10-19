@@ -26,10 +26,18 @@ from __future__ import annotations
 import contextlib
 from collections.abc import Iterator
 from dataclasses import asdict, dataclass
-from typing import Any
+from typing import Any, Literal, TypeVar, overload
 
 from cadjoint.enums import PluginKind
-from cadjoint.plugins.contracts import CONTRACT_VERSION
+from cadjoint.plugins.contracts import (
+    CONTRACT_VERSION,
+    KIND_CONTRACTS,
+    BRepExtractor,
+    Drag,
+    FeatureEdges,
+    NodeMap,
+    StepExporter,
+)
 
 __all__ = [
     "CONTRACT_VERSION",
@@ -52,14 +60,8 @@ __all__ = [
 #: The distribution that fills the private kinds.
 PROVIDER = "diff-brep"
 
-#: The plugin kinds the private tier provides, in the memo's order.
-KINDS: tuple[str, ...] = (
-    PluginKind.NODE_MAP.value,
-    PluginKind.FEATURE_EDGES.value,
-    PluginKind.BREP.value,
-    PluginKind.STEP_EXPORT.value,
-    PluginKind.DRAG.value,
-)
+#: The plugin kinds the private tier provides: the kinds with a contract.
+KINDS: tuple[PluginKind, ...] = tuple(KIND_CONTRACTS)
 
 #: What the viewer's title block prints under the mesh line without the tier.
 EDGES_LATTICE_NOTE = "EDGES LATTICE · DIFF-BREP NOT INSTALLED"
@@ -68,24 +70,24 @@ GEOMETRY_FROZEN_NOTE = "GEOMETRY FROZEN · DIFF-BREP NOT INSTALLED"
 
 #: The one sentence per kind, written for a public user.
 _MESSAGES: dict[str, str] = {
-    PluginKind.NODE_MAP.value: (
+    PluginKind.NODE_MAP: (
         "node positions of a Gmsh mesh do not follow the design without diff-brep: "
         "the mesh is frozen geometry. Use mesher='tetgen' for a differentiable mesh, "
         "or install diff-brep."
     ),
-    PluginKind.FEATURE_EDGES.value: (
+    PluginKind.FEATURE_EDGES: (
         "feature edges are read off the lattice without diff-brep; the exact edge "
         "curves of the derived B-rep are the private tier's."
     ),
-    PluginKind.BREP.value: (
+    PluginKind.BREP: (
         "the derived B-rep is the private tier's; without diff-brep there is no B-rep "
         "object, only the dual-contour mesh."
     ),
-    PluginKind.STEP_EXPORT.value: (
+    PluginKind.STEP_EXPORT: (
         "STEP export is faceted without diff-brep; analytic planes and cylinders from "
         "the derived B-rep are the private tier's."
     ),
-    PluginKind.DRAG.value: (
+    PluginKind.DRAG: (
         "dragging a B-rep handle solves the design through the derived B-rep, which "
         "is the private tier's; install diff-brep."
     ),
@@ -264,6 +266,21 @@ def require(kind: str) -> Any:
     return current.plugin(entry.plugin)
 
 
+_Default = TypeVar("_Default")
+
+
+@overload
+def component(kind: Literal[PluginKind.NODE_MAP]) -> NodeMap | None: ...
+@overload
+def component(kind: Literal[PluginKind.FEATURE_EDGES]) -> FeatureEdges | None: ...
+@overload
+def component(kind: Literal[PluginKind.BREP]) -> BRepExtractor | None: ...
+@overload
+def component(kind: Literal[PluginKind.STEP_EXPORT]) -> StepExporter | None: ...
+@overload
+def component(kind: Literal[PluginKind.DRAG]) -> Drag | None: ...
+@overload
+def component(kind: str, *, default: _Default) -> Any | _Default: ...
 def component(kind: str, *, default: Any = None) -> Any:
     """The imported object filling ``kind``, or ``default`` when it is absent.
 

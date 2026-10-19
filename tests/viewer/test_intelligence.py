@@ -412,7 +412,7 @@ def test_warm_lint_and_completion_stay_inside_the_keystroke_budget():
 def test_every_intelligence_endpoint_answers_over_http():
     from urllib.request import urlopen
 
-    from tests.test_playground import post, running_server
+    from tests.helpers import post, running_server
 
     source = CONSTRUCTION_IMPORT + "SketchPlane("
     with running_server() as base:

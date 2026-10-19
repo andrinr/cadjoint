@@ -11,9 +11,7 @@ worker boundary refuses a reply its model does not allow.
 from __future__ import annotations
 
 import json
-import threading
 from collections.abc import Iterator
-from contextlib import contextmanager
 from typing import Any
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
@@ -28,32 +26,16 @@ from cadjoint.viewer._example_scene import EXAMPLE_SOURCE
 from cadjoint.viewer.schema import api, payloads, worker
 from cadjoint.viewer.schema.emit import typescript_source
 from cadjoint.viewer.source_map.constraints import CONSTRAINT_CLASS_KINDS
+from tests.helpers import running_server, session_token
 
 ROUTES = {route.path: route for route in api.ROUTES}
 
 
-@contextmanager
-def serving() -> Iterator[tuple[str, str]]:
-    """A live playground on a free port, and its session token."""
-    server = playground.create_server(0)
-    thread = threading.Thread(target=server.serve_forever, daemon=True)
-    thread.start()
-    try:
-        host, port = server.server_address
-        base = f"http://{host}:{port}"
-        with urlopen(f"{base}/api/session") as response:
-            token = json.loads(response.read())["token"]
-        yield base, token
-    finally:
-        server.shutdown()
-        server.server_close()
-        thread.join(timeout=2)
-
-
 @pytest.fixture(scope="module")
 def live() -> Iterator[tuple[str, str]]:
-    with serving() as pair:
-        yield pair
+    """A live playground on a free port, and its session token."""
+    with running_server() as base:
+        yield base, session_token(base)
 
 
 def call(
@@ -97,17 +79,8 @@ def matches(route: api.Route, document: dict[str, Any]) -> BaseModel:
 
 def test_every_buffered_and_streamed_post_route_is_in_the_table():
     served = set(playground._post_routes()) | set(playground._stream_routes())
-    named = {route.path for route in api.ROUTES} | {
-        alias for route in api.ROUTES for alias in route.aliases
-    }
+    named = {route.path for route in api.ROUTES}
     assert served <= named, f"routes without a contract entry: {sorted(served - named)}"
-
-
-def test_the_moved_routes_still_answer_at_their_old_paths():
-    routes = playground._post_routes()
-    assert routes["/compile"] is not None and routes["/patch"] is not None
-    assert ROUTES["/api/compile"].aliases == ("/compile",)
-    assert ROUTES["/api/patch"].aliases == ("/patch",)
 
 
 def test_every_route_in_the_table_is_answered(live):
@@ -202,9 +175,14 @@ def test_an_invalid_optimize_request_streams_a_done_line_within_the_contract(liv
 # ── the worker boundary ─────────────────────────────────────────────────────
 
 
-def test_every_worker_mode_has_a_request_and_a_reply_model():
-    assert set(worker.WORKER_REQUESTS) == set(worker.WORKER_REPLIES)
-    assert set(worker.WORKER_REQUESTS) == set(worker.WorkerMode.__args__)
+def test_every_worker_mode_has_a_contract_a_handler_and_a_timeout_message():
+    from cadjoint.viewer import _worker_client
+    from cadjoint.viewer.worker import main
+
+    modes = set(worker.WorkerMode.__args__)
+    assert set(worker.MODES) == modes
+    assert set(main.HANDLERS) == modes
+    assert set(_worker_client._MODE_NOUNS) == modes
 
 
 def test_a_reply_outside_its_model_becomes_a_contract_failure():

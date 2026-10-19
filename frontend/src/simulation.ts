@@ -5,16 +5,13 @@
  * the viridis ramp (kept in sync with the constants baked into
  * simulation.wgsl) and the clip-plane math behind the ParaView-style slicing
  * slider. Boundary-condition state lives in the scene program itself — the
- * panel edits it through /patch, so there is no client-side BC model here.
+ * panel edits it through /api/patch, so there is no client-side BC model here.
  * No DOM, no signals — unit-testable as-is.
  */
 
 // Every color role (field ramp, quality ramp, overlays, edges) lives in
-// simColors.ts; these re-exports keep the ramp's historical home working.
-import { fieldRamp, fieldRampCss } from "./simColors";
-
-/** Map a normalized scalar through the FIELD (viridis) ramp. */
-export const viridis = fieldRamp;
+// simColors.ts.
+import { fieldRampCss } from "./simColors";
 
 /** CSS linear-gradient for the field legend, sampled from the same ramp. */
 export const rampCss = fieldRampCss;
@@ -163,4 +160,35 @@ export function slicePlane(
   const fraction = Math.min(1, Math.max(0, slice.fraction));
   const offset = low - margin + fraction * (high - low + 2 * margin);
   return { normal, offset };
+}
+
+/**
+ * The boundary of a face group, as line-list index pairs.
+ *
+ * `indices[start, start + count)` is the group's triangle list. An edge two
+ * of its triangles share is interior — including the diagonal that splits
+ * each hex face in two — and an edge only one of them has is the group's
+ * outline, which is all the hover draws.
+ */
+export function groupOutline(
+  indices: ArrayLike<number>,
+  start: number,
+  count: number,
+): Uint32Array<ArrayBuffer> {
+  const seen = new Map<string, [number, number, number]>();
+  const end = Math.min(start + count, indices.length);
+  for (let base = start; base + 2 < end; base += 3) {
+    const corners = [indices[base], indices[base + 1], indices[base + 2]];
+    for (let side = 0; side < 3; side++) {
+      const a = corners[side];
+      const b = corners[(side + 1) % 3];
+      const key = a < b ? `${a},${b}` : `${b},${a}`;
+      const entry = seen.get(key);
+      if (entry) entry[2] += 1;
+      else seen.set(key, [a, b, 1]);
+    }
+  }
+  const pairs: number[] = [];
+  for (const [a, b, uses] of seen.values()) if (uses === 1) pairs.push(a, b);
+  return new Uint32Array(pairs);
 }

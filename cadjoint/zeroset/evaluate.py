@@ -69,10 +69,9 @@ class _Walker:
     — at a warp's image, at a shape, at a census surface.  A sixth of a
     real part's expression nodes are point-independent (the arithmetic that
     turns parameters into a transform), and materialising each of them as a
-    full column used to cost a ``broadcast_in_dim`` *and*, because a Python
-    float is weakly typed and the points are not, a no-op
-    ``convert_element_type``: on ``scenes/motor_shield.py`` those two
-    primitives alone were 6 100 of one walk's 20 217 equations.  Same
+    full column costs a ``broadcast_in_dim`` *and*, because a Python float
+    is weakly typed and the points are not, a no-op
+    ``convert_element_type`` — close to a third of a walk's equations.  Same
     arithmetic, same last bit — a broadcast and a scalar multiply differ
     only in how much of it XLA has to schedule, and XLA's compile cost is
     superlinear in that (``research/performance.md`` §18).

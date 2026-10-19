@@ -44,6 +44,17 @@ from typing import Any, Callable, Protocol, runtime_checkable
 
 import numpy as np
 
+from cadjoint.descriptions import (
+    BoxSelectionDescription,
+    CombinedSelectionDescription,
+    ComplementSelectionDescription,
+    CylinderSelectionDescription,
+    HalfspaceSelectionDescription,
+    PredicateSelectionDescription,
+    SelectionDescription,
+    SideSelectionDescription,
+    SphereSelectionDescription,
+)
 from cadjoint.enums import Side, SideLike, parse, values
 from cadjoint.studies._validate import require_triplet
 
@@ -143,7 +154,7 @@ class NodeSelection:
             raise ValueError(f"Selection {self.describe()} matched no boundary nodes.")
         return indices
 
-    def describe(self) -> dict[str, Any]:
+    def describe(self) -> SelectionDescription:
         """JSON-ready description: kind plus numeric parameters."""
         raise NotImplementedError
 
@@ -188,7 +199,7 @@ class _Box(NodeSelection):
         high = np.asarray(self.max_corner)
         return np.all((points >= low) & (points <= high), axis=-1)
 
-    def describe(self) -> dict[str, Any]:
+    def describe(self) -> BoxSelectionDescription:
         return {
             "kind": "box",
             "min_corner": list(self.min_corner),
@@ -205,7 +216,7 @@ class _Sphere(NodeSelection):
         offsets = points - np.asarray(self.center)
         return np.sum(offsets * offsets, axis=-1) <= self.radius**2
 
-    def describe(self) -> dict[str, Any]:
+    def describe(self) -> SphereSelectionDescription:
         return {"kind": "sphere", "center": list(self.center), "radius": self.radius}
 
 
@@ -217,7 +228,7 @@ class _Halfspace(NodeSelection):
     def _contains(self, points: np.ndarray) -> np.ndarray:
         return (points - np.asarray(self.point)) @ np.asarray(self.normal) >= 0.0
 
-    def describe(self) -> dict[str, Any]:
+    def describe(self) -> HalfspaceSelectionDescription:
         return {"kind": "halfspace", "point": list(self.point), "normal": list(self.normal)}
 
 
@@ -239,7 +250,7 @@ class _Cylinder(NodeSelection):
             inside &= np.abs(axial) <= self.half_length
         return inside
 
-    def describe(self) -> dict[str, Any]:
+    def describe(self) -> CylinderSelectionDescription:
         return {
             "kind": "cylinder",
             "center": list(self.center),
@@ -272,7 +283,7 @@ class _Side(NodeSelection):
         tol = self.tol if self.tol is not None else _default_side_tol(mesh)
         return coords >= extreme - tol if positive else coords <= extreme + tol
 
-    def describe(self) -> dict[str, Any]:
+    def describe(self) -> SideSelectionDescription:
         return {"kind": "side", "side": str(self.side), "tol": self.tol}
 
 
@@ -295,7 +306,7 @@ class _Predicate(NodeSelection):
     def _contains(self, points: np.ndarray) -> np.ndarray:
         return self.fn(points)
 
-    def describe(self) -> dict[str, Any]:
+    def describe(self) -> PredicateSelectionDescription:
         return {"kind": "predicate", "name": getattr(self.fn, "__name__", "<callable>")}
 
 
@@ -319,7 +330,7 @@ class _Combined(NodeSelection):
         right = self.right.mask(mesh)
         return left & right if self.op == "and" else left | right
 
-    def describe(self) -> dict[str, Any]:
+    def describe(self) -> CombinedSelectionDescription:
         return {"kind": self.op, "operands": [self.left.describe(), self.right.describe()]}
 
 
@@ -337,7 +348,7 @@ class _Complement(NodeSelection):
     def mask(self, mesh: BoundaryMesh) -> np.ndarray:
         return boundary_node_mask(mesh) & ~self.operand.mask(mesh)
 
-    def describe(self) -> dict[str, Any]:
+    def describe(self) -> ComplementSelectionDescription:
         return {"kind": "not", "operand": self.operand.describe()}
 
 
@@ -499,8 +510,8 @@ def selection_from_description(payload: dict[str, Any]) -> NodeSelection:
             payload["center"],
             payload["axis"],
             payload["radius"],
-            inner=payload.get("inner", 0.0),
-            half_length=payload.get("half_length"),
+            inner=payload["inner"],
+            half_length=payload["half_length"],
         )
     if kind == "side":
         return Nodes.side(payload["side"], payload.get("tol"))

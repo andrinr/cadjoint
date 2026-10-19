@@ -229,8 +229,7 @@ describe("a flow study is authored like the other two", () => {
     expect(addBcRequest(flow, { ...defaultDraft("flow"), bcType: "inlet" }).value).toBe(0.02);
   });
 
-  // The claim above used to be tested only through those two helpers, and
-  // the panel threw anyway: every row renders `describeSelection(bc.nodes)`
+  // The helpers alone do not cover the panel: every row renders `describeSelection(bc.nodes)`
   // unconditionally, and an inlet, an outlet and the duct walls are faces of
   // the lattice with no selection at all. `scenes/duct_sink.py` ships one.
   it("names every one of its condition types", () => {

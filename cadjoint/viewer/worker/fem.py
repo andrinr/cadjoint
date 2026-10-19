@@ -10,21 +10,19 @@ through :mod:`cadjoint.viewer.worker.payloads`.
 
 from __future__ import annotations
 
-import contextlib
-import io
 from typing import Any
 
 import numpy as np
 
+from cadjoint.capture import one_named
 from cadjoint.viewer.worker.payloads import (
-    _element_edge_pairs,
-    _render_surface_payload,
+    _mesh_surface,
     _study_payload,
 )
 from cadjoint.viewer.worker.scene import (
     _FEM_UNAVAILABLE_MESSAGE,
     _execute_scene,
-    _named_study,
+    captured_output,
 )
 
 
@@ -44,7 +42,7 @@ def _simulate_study(scene: Any, studies: list[Any], request: dict[str, Any]) -> 
     """
     import jax.numpy as jnp
 
-    study = _named_study(studies, request.get("name"))
+    study = one_named(studies, request.get("name"), "study")
 
     try:
         import jax_fem  # noqa: F401
@@ -64,11 +62,10 @@ def _simulate_study(scene: Any, studies: list[Any], request: dict[str, Any]) -> 
 
 def _simulate_source(request: dict[str, Any]) -> dict[str, Any]:
     """Run the FEM simulation mode: exec scene -> declared study -> payload."""
-    captured = io.StringIO()
-    with contextlib.redirect_stdout(captured), contextlib.redirect_stderr(captured):
+    with captured_output() as output:
         namespace = _execute_scene(request["source"])
         result = _simulate_study(namespace["scene"], namespace["__studies__"], request)
-    result["output"] = captured.getvalue()[-8_000:]
+    result["output"] = output()
     return result
 
 
@@ -141,8 +138,7 @@ def _inspect_mesh(
     else:  # cut cells: no elements, so nothing to grade — a flat surface
         metric_name = None
         node_quality = np.ones(mesh.num_points, dtype=np.float64)
-    payload = _render_surface_payload(mesh, node_quality)
-    payload["edges"] = [int(index) for index in _element_edge_pairs(mesh).reshape(-1)]
+    payload = _mesh_surface(mesh, node_quality)
     return {
         "ok": True,
         "kind": "mesh_inspect",
@@ -156,11 +152,10 @@ def _inspect_mesh(
 
 def _mesh_inspect_source(request: dict[str, Any]) -> dict[str, Any]:
     """Run the mesh-inspection mode: exec scene -> build SimMesh -> payload."""
-    captured = io.StringIO()
-    with contextlib.redirect_stdout(captured), contextlib.redirect_stderr(captured):
+    with captured_output() as output:
         namespace = _execute_scene(request["source"])
         result = _inspect_mesh(
             namespace["scene"], namespace["__sim_meshes__"], namespace["__studies__"], request
         )
-    result["output"] = captured.getvalue()[-8_000:]
+    result["output"] = output()
     return result

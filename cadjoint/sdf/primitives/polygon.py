@@ -178,7 +178,7 @@ def _polygon_distance(p: Array, vertices: list[Array], axis: Array | None = None
             inside the solid of revolution — so it is left out of the
             distance and kept in the sign.  The distance to the remaining
             edges is then the 3D distance, provided the profile stays on
-            one side of the axis (issue #50).
+            one side of the axis.
 
     Returns:
         Signed distance, shape ``(...)``. Negative inside.
@@ -403,9 +403,6 @@ class ExtrudedPolygon(Primitive):
         values = {k: v.value for k, v in self.params.items() if k != "depth"}
         return ExtrudedPolygon.sdf(p, self.params["depth"].value, **values)
 
-    def to_functional(self):
-        return ExtrudedPolygon.sdf
-
     def patch_fields(self):
         """Per-edge wall planes plus the two caps — tilted when drafted.
 
@@ -511,9 +508,6 @@ class RevolvedPolygon(Primitive):
     def __call__(self, p: Array) -> Array:
         values = {k: v.value for k, v in self.params.items() if k != "offset"}
         return RevolvedPolygon.sdf(p, self.params["offset"].value, **values)
-
-    def to_functional(self):
-        return RevolvedPolygon.sdf
 
     def patch_fields(self):
         """One field per profile edge, in revolved (radial, height) coords.

@@ -8,9 +8,9 @@ contract those callers write against; :class:`~cadjoint.fem.hexmesh.HexMesh`,
 implement it, each carrying its own patch resolution, solver dispatch,
 frozen-topology motion, surface and element quality.
 
-The point of the seam is where the branching used to be.  Adding cut cells
-touched six modules because each asked ``isinstance(mesh, TetMesh)`` for
-its own reason; now a family answers those questions itself, once.
+The seam replaces ``isinstance(mesh, TetMesh)`` branching in the callers: a
+family answers those questions itself, once, so adding one touches only its
+own module.
 
 What a caller says to a discretization is a *problem* — conditions as
 selections, materials as numbers or per-element fields — and gets back the

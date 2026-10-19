@@ -10,11 +10,11 @@
  * from being spread across four files.
  *
  * The four simulation windows — Meshes, Studies, Optimize, Results — are
- * separate windows in the dock now, and the dock gives each one its own Solid
+ * separate windows in the dock, and the dock gives each one its own Solid
  * root. One shared controller therefore cannot live in any of them: it is
  * created once in the app shell and handed to each window, and each window
  * calls {@link SimulateController.attach} for as long as it is mounted. That
- * count is what used to be the panel's own lifetime — the first window to
+ * count is the simulation's lifetime — the first window to
  * mount restores the last result and hands the viewport to the mesh view, and
  * the last one to unmount hands it back to the raymarched scene. It also
  * keeps a solve that lands while no simulation window is open (a study-backed
@@ -93,7 +93,7 @@ import type { Renderer } from "../../viewer/renderer";
 /** What the app shell hands the controller when it creates it. */
 export interface SimulateControllerProps {
   renderer: Renderer;
-  /** Serialized /patch queue owned by the app shell. */
+  /** Serialized /api/patch queue owned by the app shell. */
   onPatch: (body: Record<string, unknown>) => Promise<void>;
   /** Adopt server-produced source like a patch response (optimize runs). */
   onAdoptSource: (source: string) => Promise<void>;
@@ -140,9 +140,9 @@ export function createSimulateController(props: SimulateControllerProps) {
   /**
    * How many simulation windows are mounted, and which.
    *
-   * `attach` is the windows' half of the old panel lifecycle: a count that
-   * rises as they mount and falls as they unmount, with the transitions
-   * through zero standing in for the panel's `onMount` and `onCleanup`.
+   * `attach` keeps a count that rises as windows mount and falls as they
+   * unmount; the transitions through zero are the simulation's mount and
+   * cleanup.
    */
   const [mounted, setMounted] = createSignal<readonly SimWindow[]>([]);
   const attached = () => mounted().length > 0;
@@ -169,9 +169,8 @@ export function createSimulateController(props: SimulateControllerProps) {
   /**
    * Persistence across the panel's own lifetime.
    *
-   * Leaving Simulate mode disposes this panel's Solid root, so before the
-   * job registry a solved field died with the mode switch and had to be paid
-   * for again. What is kept now is four fields — the job id, the hash of the
+   * Leaving Simulate mode disposes this panel's Solid root, so what is kept
+   * is four fields — the job id, the hash of the
    * program it ran on, its kind and its name — and the payload is fetched
    * back from `/api/jobs/<id>/result` when the panel mounts again.
    */
@@ -416,8 +415,7 @@ export function createSimulateController(props: SimulateControllerProps) {
   /**
    * Raise the Results window: a solve just landed in it.
    *
-   * The old panel switched its own tab. A window cannot do that to itself, so
-   * this asks the dock — and only when a simulation window is mounted at all,
+   * A window cannot raise itself, so this asks the dock — and only when a simulation window is mounted at all,
    * so an optimization run from the Model desk does not push a Results window
    * into a desk that never asked for one.
    */

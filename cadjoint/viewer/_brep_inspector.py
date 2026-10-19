@@ -377,9 +377,9 @@ def brep_inspection(scene: Any) -> dict[str, Any]:
     """
     from cadjoint import tier
 
-    component = tier.component(PluginKind.BREP.value)
+    component = tier.component(PluginKind.BREP)
     if component is None:
-        return {"available": False, "reason": tier.message(PluginKind.BREP.value)}
+        return {"available": False, "reason": tier.message(PluginKind.BREP)}
     grid = _overlay_grid()
     cell = float(np.max(np.asarray(grid.spacing, dtype=np.float64)))
     timings: dict[str, float] = {}
@@ -395,7 +395,7 @@ def brep_inspection(scene: Any) -> dict[str, Any]:
         timings["extract"] = time.perf_counter() - started
         curves = None
         curves_note: str | None = None
-        drawer = tier.component(PluginKind.FEATURE_EDGES.value)
+        drawer = tier.component(PluginKind.FEATURE_EDGES)
         if drawer is None:
             curves_note = "feature_edges kind not installed: edges are the graph's seeds"
         else:

@@ -14,7 +14,6 @@ import { describe, expect, it } from "vitest";
 import {
   PHYSICAL_PROPERTIES,
   formatPhysical,
-  hasPhysicalBlock,
   physicalRows,
   statedRows,
 } from "../src/materialProperties";
@@ -43,6 +42,9 @@ function material(overrides: Partial<MaterialDefinition> = {}): MaterialDefiniti
     opacity: 1,
     ior: 1,
     reflectivity: 0,
+    physical: {},
+    units: {},
+    free: {},
     spans: {},
     ...overrides,
   };
@@ -69,17 +71,11 @@ describe("printing an SI magnitude", () => {
 });
 
 describe("the rows the inspector draws", () => {
-  it("draws nothing at all when the server sends no physical block", () => {
-    expect(hasPhysicalBlock(material())).toBe(false);
-    expect(physicalRows(material())).toEqual([]);
-  });
-
   it("offers every property, unstated, for a material that states none", () => {
     const declared = material({
       physical: Object.fromEntries(PHYSICAL_PROPERTIES.map(({ key }) => [key, null])),
       units: UNITS,
     });
-    expect(hasPhysicalBlock(declared)).toBe(true);
     // Seven rows, all of them an offer rather than a reading. A row that is
     // not drawn is an offer nobody can take.
     expect(physicalRows(declared)).toHaveLength(PHYSICAL_PROPERTIES.length);

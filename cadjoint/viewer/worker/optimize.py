@@ -13,28 +13,25 @@ The step caps that bound one HTTP-sized run live here.
 
 from __future__ import annotations
 
-import contextlib
-import io
 import json
 import sys
 from typing import Any
 
+from cadjoint.capture import one_named
 from cadjoint.viewer.worker.payloads import _study_payload
 from cadjoint.viewer.worker.scene import (
     _FEM_UNAVAILABLE_MESSAGE,
     _execute_scene,
-    _named_optimization,
+    captured_output,
 )
 
 # The server validates requested step counts, but the declaration itself may
 # ask for more than one HTTP-bounded run should pay for; the worker caps both.
 OPTIMIZE_STEP_LIMIT = 200
-# Study-backed runs solve a FEM problem (plus its adjoint) per step.  Measured
-# per-step wall clock at the declared scene resolutions: starter thermal
-# ~3.7 s steady (~17 s on JIT/topology-refreeze steps), bracket elastic
-# compliance ~5-7 s steady (~20 s on refreeze), plus ~8 s for the final
-# fresh-mesh evaluation — so 30 steps stays under the server's 300-second
-# /api/optimize budget with headroom even for the heavier elastic runs.
+# Study-backed runs solve a FEM problem (plus its adjoint) per step: ~4-7 s
+# steady at the scene resolutions, ~20 s on a JIT/topology-refreeze step,
+# plus ~8 s for the final fresh-mesh evaluation, so 30 steps keeps one run
+# to a few minutes.
 STUDY_OPTIMIZE_STEP_LIMIT = 30
 
 
@@ -70,7 +67,7 @@ def _run_optimization(
 
     from cadjoint.viewer.patch import set_parameter_values
 
-    optimization = _named_optimization(namespace["__optimizations__"], request.get("name"))
+    optimization = one_named(namespace["__optimizations__"], request.get("name"), "optimization")
     steps = request.get("steps")
     steps = optimization.steps if steps is None else int(steps)
     study_backed = optimization.study is not None
@@ -149,9 +146,8 @@ def _optimize_source(request: dict[str, Any]) -> dict[str, Any]:
     pipe.
     """
     progress_out = sys.stdout
-    captured = io.StringIO()
-    with contextlib.redirect_stdout(captured), contextlib.redirect_stderr(captured):
+    with captured_output() as output:
         namespace = _execute_scene(request["source"])
         result = _run_optimization(request["source"], namespace, request, progress_out)
-    result["output"] = captured.getvalue()[-8_000:]
+    result["output"] = output()
     return result

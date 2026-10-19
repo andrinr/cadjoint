@@ -1,4 +1,5 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
+import { dismissBanner, editorText } from "./helpers/app";
 import { pickOption } from "./helpers/select";
 
 /**
@@ -20,8 +21,7 @@ async function waitForDock(page: Page) {
 test.beforeEach(async ({ page }) => {
   await page.goto("/");
   await waitForDock(page);
-  const dismiss = page.getByRole("button", { name: "Dismiss" });
-  if (await dismiss.isVisible().catch(() => false)) await dismiss.click();
+  await dismissBanner(page);
 });
 
 /** Drag a tab onto a point, the way dockview's pointer strategy expects. */
@@ -44,19 +44,6 @@ async function dragTabTo(page: Page, tab: Locator, to: { x: number; y: number })
 }
 
 const groupCount = (page: Page) => page.locator(".dv-groupview").count();
-
-/** The editor's whole document, read from CodeMirror rather than the DOM. */
-async function editorText(page: Page): Promise<string> {
-  return page.evaluate(() => {
-    type DocView = { view?: { state: { doc: { toString(): string } } } };
-    const content = document.querySelector("[data-testid=editor] .cm-content") as
-      | (HTMLElement & { cmView?: DocView; cmTile?: DocView })
-      | null;
-    const view = content?.cmView?.view ?? content?.cmTile?.view;
-    if (view) return view.state.doc.toString();
-    return content?.innerText ?? "";
-  });
-}
 
 test("the model desk opens docked, tabbed, and with a viewport that cannot be closed", async ({
   page,
@@ -121,7 +108,7 @@ test("a window can be dragged onto another's tab strip to stack them", async ({ 
 });
 
 test("a window minimises to the tray and comes back", async ({ page }) => {
-  // The tray is never empty now — Processes is parked in every desk — so
+  // The tray is never empty — Processes is parked in every desk — so
   // what is asserted is which windows are in it, not whether it exists.
   await expect(page.getByTestId("window-restore-objects")).toHaveCount(0);
 
@@ -353,10 +340,9 @@ test("the Window menu floats a window, docks it again, and resets the layout", a
 /**
  * The process monitor, and the persistence it exists to make possible.
  *
- * Before the job registry a result lived only in the panel that asked for
- * it: leaving Simulate mode disposed that panel's Solid root and a nine-
- * second solve went with it. These tests are the proof that it no longer
- * does — and that the proof is not a cache trick, because the number of
+ * Leaving Simulate mode disposes the panel's Solid root; a nine-second solve
+ * survives it because the result lives in the job registry, not the panel.
+ * These tests prove that — and that the proof is not a cache trick, because the number of
  * `/api/simulate` requests is counted, not assumed.
  */
 
@@ -434,8 +420,8 @@ test("a solved field survives a mode switch and is fetched back by job id", asyn
   await expect(page.getByTestId("simulate-legend")).toContainText("temperature");
   expect(solves()).toBe(1);
 
-  // Leave Simulate. The panel's Solid root is disposed with the desk — this
-  // is exactly the moment the result used to be lost.
+  // Leave Simulate. The panel's Solid root is disposed with the desk — a
+  // result held only by the panel would be lost here.
   await page.getByTestId("editmode-model").click();
   await expect(page.getByTestId("simulate-panel")).toHaveCount(0);
 
@@ -452,10 +438,10 @@ test("a solved field survives a mode switch and is fetched back by job id", asyn
 
   // Now change the program. The result still describes the old text, so it
   // stays on screen and says so — throwing it away would be worse.
-  await page.getByTestId("sim-tab-meshes").click();
+  await page.getByTestId("window-tab-meshes").click();
   await page.getByTestId("mesh-arg-sink-mesh-padding").fill("0.03");
   await page.getByTestId("mesh-arg-sink-mesh-padding").blur();
-  await page.getByTestId("sim-tab-results").click();
+  await page.getByTestId("window-tab-results").click();
   await expect(page.getByTestId("simulate-stale")).toBeVisible({ timeout: 60_000 });
   await expect(page.getByTestId("simulate-legend")).toContainText("temperature");
   expect(solves()).toBe(1);
@@ -533,9 +519,9 @@ test("an optimization trajectory outlives a mode switch and a reload", async ({ 
 /**
  * The Simulate desk.
  *
- * Simulation used to be one window with a tab strip inside it, which meant
- * four views the dock could not move, split, float or park independently.
- * They are ordinary windows now, and "Simulate" is what arranges them.
+ * Simulation is four ordinary windows, not one window with a tab strip, so
+ * the dock can move, split, float or park each independently. "Simulate" is
+ * what arranges them.
  */
 test("the Simulate desk arranges four windows that move like any other", async ({
   page,
@@ -555,16 +541,14 @@ test("the Simulate desk arranges four windows that move like any other", async (
   await expect(page.getByTestId("simulate-panel")).toBeVisible();
   await expect(page.getByTestId("results-panel")).toBeVisible();
 
-  // The old tab strip's ids live on the dock's tabs, so the control that
-  // used to switch a tab is the control that raises the window.
-  await page.getByTestId("sim-tab-meshes").click();
+  // Clicking a window's tab raises that window in its group.
+  await page.getByTestId("window-tab-meshes").click();
   await expect(page.getByTestId("meshes-panel")).toBeVisible();
   await expect(page.getByTestId("simulate-panel")).toHaveCount(0);
-  await page.getByTestId("sim-tab-studies").click();
+  await page.getByTestId("window-tab-studies").click();
   await expect(page.getByTestId("simulate-panel")).toBeVisible();
 
-  // And they are windows in every sense: close one and the Window menu has
-  // it back, which a tab inside a panel never offered.
+  // Close one and the Window menu brings it back.
   await page.getByTestId("window-close-results").click();
   await expect(page.getByTestId("results-panel")).toHaveCount(0);
   await page.getByTestId("menu-window").click();
@@ -574,7 +558,7 @@ test("the Simulate desk arranges four windows that move like any other", async (
 
   // Optimize is one window with two homes rather than two copies of a card
   // list: the Model desk tabs it behind Materials, this desk behind Results.
-  await page.getByTestId("sim-tab-optimize").click();
+  await page.getByTestId("window-tab-optimize").click();
   await expect(page.getByTestId("optimize-panel")).toBeVisible();
   await page.getByTestId("editmode-model").click();
   await page.getByTestId("window-tab-optimize").click();
@@ -680,11 +664,10 @@ test("the scene browser describes what is saved and opens one", async ({ page })
 /**
  * A solve that fails has to say so where it was asked for.
  *
- * The failure this is written against: switching a mesh to TET10 made the
- * solver refuse the surface, and the only sign in the UI was the previous
+ * Switching a mesh to TET10 makes the solver refuse the surface. Without the
+ * solver's message in the Results window, the only sign would be the previous
  * result still on screen with a "stale" chip — which reads as "still
- * thinking", not as "that run failed". The solver's own words went to the
- * server log.
+ * thinking", not as "that run failed".
  */
 test("a failed solve shows the solver's message in the Results window", async ({
   page,

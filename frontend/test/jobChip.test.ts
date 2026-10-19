@@ -1,12 +1,9 @@
 /**
  * The one running-work indicator, and what it says when several things run.
  *
- * There used to be two: a chip in the top bar, backed by the job registry and
- * cancellable, and a "COMPILING" overlay in the viewport driven by `busy`.
- * The chip survives, so it has to cover the case the overlay covered — a
- * compile the registry has not registered yet — and it has to answer the
- * question that came with the request: *"if there is multiple running
- * processes, are they all shown there?"*
+ * The chip in the top bar, backed by the job registry and cancellable, is the
+ * only one. So it covers a compile the registry has not registered yet, and it
+ * says whether several running processes are all shown.
  */
 
 import { describe, expect, it } from "vitest";
@@ -21,8 +18,7 @@ function job(kind: RunningJob["kind"], id: string, name = ""): RunningJob {
 
 describe("what the chip is for", () => {
   it("shows a compile the registry has not heard of yet", () => {
-    // The case the deleted viewport overlay covered: the edit has been made,
-    // the debounce has not elapsed, no job exists. The app is behind its own
+    // The edit has been made, the debounce has not elapsed, no job exists. The app is behind its own
     // code and must say so.
     const rows = chipJobs([], NOW - 2_000, NOW);
     expect(rows).toHaveLength(1);

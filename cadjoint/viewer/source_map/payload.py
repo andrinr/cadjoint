@@ -450,7 +450,6 @@ def _profile_entry(
     else:
         spans = [None] * len(profile.vertices)
 
-    u, v, normal = profile.plane.frame()
     world = [[float(x) for x in point] for point in profile.world_vertices()]
     count = len(world)
     node_id = f"profile_{index}"
@@ -466,10 +465,7 @@ def _profile_entry(
         "editable": call is not None and spans[0] is not None,
         "edges": [[world[i], world[(i + 1) % count]] for i in range(count)],
         "plane": {
-            "origin": [float(x) for x in profile.plane.origin.xyz],
-            "u": [float(x) for x in u],
-            "v": [float(x) for x in v],
-            "normal": [float(x) for x in normal],
+            **profile.plane.describe(),
             "stableId": f"plane:{token}" if token else None,
             "reference": (
                 {
@@ -501,7 +497,7 @@ def _profile_entry(
         "spans": {},
         # Where the sketch is *declared*, so selecting it can reveal the
         # statement rather than nothing: a profile publishes no argument
-        # spans at all, which used to leave the editor with nowhere to go.
+        # spans at all.
         "statementSpan": statement_span(source, line),
         "constraints": _stamped_constraints(
             _profile_constraints(profile, source, line, traceable), token

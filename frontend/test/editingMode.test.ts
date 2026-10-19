@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   EDITING_MODES,
+  EDITING_MODE_STORAGE_KEY,
   autoEnterSketchMode,
   createToolVisibleInMode,
   cycleEditingMode,
@@ -10,17 +11,7 @@ import {
   railGroupsForMode,
 } from "../src/editingMode";
 import type { ConstructionNode } from "../src/types";
-
-function memoryStorage(initial: string | null = null) {
-  let value = initial;
-  return {
-    getItem: () => value,
-    setItem: (_key: string, next: string) => {
-      value = next;
-    },
-    value: () => value,
-  };
-}
+import { memoryStorage } from "./helpers";
 
 const profileNode = (id: string): ConstructionNode =>
   ({ id, kind: "profile" }) as ConstructionNode;
@@ -128,9 +119,9 @@ describe("editing mode persistence", () => {
 
   it("falls back to model for unknown or missing values", () => {
     expect(loadEditingMode(memoryStorage())).toBe("model");
-    expect(loadEditingMode(memoryStorage("banana"))).toBe("model");
+    expect(loadEditingMode(memoryStorage({ [EDITING_MODE_STORAGE_KEY]: "banana" }))).toBe("model");
     // The retired Render mode: a stale persisted value maps to model.
-    expect(loadEditingMode(memoryStorage("render"))).toBe("model");
+    expect(loadEditingMode(memoryStorage({ [EDITING_MODE_STORAGE_KEY]: "render" }))).toBe("model");
     expect(loadEditingMode(undefined)).toBe("model");
   });
 });

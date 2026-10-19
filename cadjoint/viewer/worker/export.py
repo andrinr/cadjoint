@@ -8,18 +8,12 @@ each already write what those passes produce.  This module is the seam between t
 request names an object and a :class:`~cadjoint.enums.ExportFormat`, the
 worker extracts and writes it, and the response is the file.
 
-The two halves live together because they share the vocabulary — which
+This module is the worker's half, :func:`export_scene`: execute the
+program, resolve the named object, extract on a lattice sized to the
+object, and write.  It also holds the vocabulary both halves share — which
 format takes which options, how the file is named, what content type it
-travels under:
-
-- **In the server** (:func:`export_source`): validate the request against
-  :class:`~cadjoint.viewer.schema.requests.ExportRequest`, run the worker
-  with a temporary path to write to, and hand the bytes back with their
-  filename and content type.  The route in :mod:`cadjoint.viewer.playground`
-  registers the run as an ``export`` job, so the Processes window sees it
-  and can cancel it, and sends the bytes as an attachment.
-- **In the worker** (:func:`export_scene`): execute the program, resolve
-  the named object, extract on a lattice sized to the object, and write.
+travels under.  The server's half, which runs this in a child process and
+hands the bytes back, is :mod:`cadjoint.viewer._export_client`.
 
 **Which STEP writer.**  Two exist, and one of them is the private tier's.
 :func:`cadjoint.meshing.export.save_step` — public, always available —
@@ -46,9 +40,6 @@ comparison baseline the tests use.
 
 from __future__ import annotations
 
-import contextlib
-import io
-import tempfile
 from pathlib import Path
 from typing import Any
 
@@ -61,19 +52,11 @@ from cadjoint.viewer.schema.requests import ExportRequest
 __all__ = [
     "EXPORT_CONTENT_TYPES",
     "EXPORT_EXTENSIONS",
-    "EXPORT_TIMEOUT_SECONDS",
     "export_filename",
     "export_scene",
-    "export_source",
     "validate_export_request",
 ]
 
-# A geometry export is one lattice sweep plus, for STEP, the graph
-# extraction the mesh overlay pays for every scene (~17 s warm on the
-# starter at the overlay's resolution, and the request may ask for finer).
-# A VTK export is a full solve, so it takes the simulate budget instead
-# (see :func:`export_source`).  Either is visible and cancellable as a job.
-EXPORT_TIMEOUT_SECONDS = 300
 
 #: The file extension each format is written under.
 EXPORT_EXTENSIONS: dict[ExportFormat, str] = {
@@ -135,62 +118,6 @@ def validate_export_request(
     return None, parsed
 
 
-# ── the server half ─────────────────────────────────────────────────────────
-
-
-def export_source(request: dict[str, Any], timeout: float | None = None) -> dict[str, Any]:
-    """Validate an export request and write the file in a disposable child process.
-
-    The worker writes to a temporary path this process owns; the bytes are
-    read back and the directory removed before returning, so nothing is
-    left on disk and nothing large crosses the worker's JSON pipe.
-
-    Args:
-        request: The raw request body.
-        timeout: The worker budget; by default :data:`EXPORT_TIMEOUT_SECONDS`,
-            or the simulate budget for ``vtk`` (which solves the study).
-
-    Returns:
-        On success ``{"ok": True, "format", "name", "filename",
-        "content_type", "size", "data": bytes, "report", "output"}``; on
-        failure the worker's ``{"ok": False, "error"}`` (with
-        ``error_kind="fem_unavailable"`` when a VTK export has no solver).
-    """
-    from cadjoint.viewer._worker_client import SIMULATE_TIMEOUT_SECONDS, _run_worker
-
-    error, parsed = validate_export_request(request)
-    if error is not None or parsed is None:
-        return error or {"ok": False, "error": "Invalid export request."}
-    if timeout is None:
-        timeout = (
-            SIMULATE_TIMEOUT_SECONDS
-            if parsed.format is ExportFormat.VTK
-            else EXPORT_TIMEOUT_SECONDS
-        )
-    filename = export_filename(parsed.name, parsed.format)
-    with tempfile.TemporaryDirectory(prefix="cadjoint-export-") as folder:
-        path = Path(folder) / filename
-        extra = parsed.model_dump(mode="json", exclude={"source"})
-        extra["path"] = str(path)
-        result = _run_worker(parsed.source, "export", timeout, extra=extra)
-        if not result.get("ok"):
-            return result
-        if not path.is_file():
-            return {"ok": False, "error": "The export worker finished without writing a file."}
-        data = path.read_bytes()
-    return {
-        "ok": True,
-        "format": parsed.format.value,
-        "name": parsed.name,
-        "filename": filename,
-        "content_type": EXPORT_CONTENT_TYPES[parsed.format],
-        "size": len(data),
-        "data": data,
-        "report": result.get("report") or {},
-        "output": result.get("output", ""),
-    }
-
-
 # ── the worker half ─────────────────────────────────────────────────────────
 
 
@@ -230,7 +157,7 @@ def _object_grid(sdf: Any, resolution: int) -> Any:
     The bounds come from :func:`cadjoint.meshing.bounds.fit_bounds`, which
     scans growing cubes until one holds the part, so a 100 mm part
     modelled in millimetres is not clipped to the ±3 default volume and a
-    plate thinner than the scan spacing is still found (issue #49).
+    plate thinner than the scan spacing is still found.
     ``resolution`` counts cells along the longest axis and the other two
     axes take proportionally fewer, which keeps the spacing isotropic — a
     cube of cells over a flat plate would spend most of its budget on the
@@ -272,9 +199,9 @@ def _write_geometry(obj: Any, request: ExportRequest, path: Path) -> dict[str, A
         # see the module docstring.
         from cadjoint import tier
 
-        exporter = tier.component(PluginKind.STEP_EXPORT.value)
+        exporter = tier.component(PluginKind.STEP_EXPORT)
         if exporter is None:
-            report["tier"] = tier.message(PluginKind.STEP_EXPORT.value)
+            report["tier"] = tier.message(PluginKind.STEP_EXPORT)
         else:
             try:
                 written = exporter.step_export(obj, grid, path)
@@ -317,9 +244,10 @@ def _write_result(
     """Solve (or reuse) the named study and write its fields as VTK."""
     import jax.numpy as jnp
 
-    from cadjoint.viewer.worker.scene import _FEM_UNAVAILABLE_MESSAGE, _named_study
+    from cadjoint.capture import one_named
+    from cadjoint.viewer.worker.scene import _FEM_UNAVAILABLE_MESSAGE
 
-    study = _named_study(studies, request.name)
+    study = one_named(studies, request.name, "study")
     try:
         import jax_fem  # noqa: F401
     except ImportError:
@@ -350,15 +278,14 @@ def export_scene(request: dict[str, Any]) -> dict[str, Any]:
     if not path.name:
         return {"ok": False, "error": "The export worker was given no path to write to."}
 
-    from cadjoint.viewer.worker.scene import _execute_scene
+    from cadjoint.viewer.worker.scene import _execute_scene, captured_output
 
-    captured = io.StringIO()
-    with contextlib.redirect_stdout(captured), contextlib.redirect_stderr(captured):
+    with captured_output() as output:
         namespace = _execute_scene(parsed.source)
         if parsed.format is ExportFormat.VTK:
             result = _write_result(namespace["scene"], namespace["__studies__"], parsed, path)
         else:
             report = _write_geometry(_named_object(namespace, parsed.name), parsed, path)
             result = {"ok": True, "report": report}
-    result["output"] = captured.getvalue()[-8_000:]
+    result["output"] = output()
     return result

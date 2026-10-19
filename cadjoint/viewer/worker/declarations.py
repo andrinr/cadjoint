@@ -57,15 +57,32 @@ def _bc_ids(source: str, study_index: int) -> dict[int, str]:
     }
 
 
-#: The study kinds the viewer can *author*.
-#:
-#: Equal to :class:`~cadjoint.enums.StudyKind` now that the patch layer
-#: writes all three, and kept as its own name because the two have differed
-#: before and the reason they may differ again is worth stating: what a
-#: scene can *contain* is wider than what the GUI can *write*, and a kind
-#: this set does not hold still reports ``editable: false`` and sends the
-#: user to the code rather than offering controls nothing backs.
+#: The study kinds the viewer can *author*.  A declared kind outside this
+#: set reports ``editable: false`` and sends the user to the code.
 _AUTHORABLE_KINDS = frozenset(values(StudyKind))
+
+
+def _span(value: Any) -> list[int] | None:
+    return list(value) if value is not None else None
+
+
+def _located(
+    index: int, statement: Any, stable_ids: dict[int, str], editable: bool = True
+) -> dict[str, Any]:
+    """The :class:`~cadjoint.viewer.schema.payloads.Located` fields of one entry.
+
+    ``statement`` is the declaration's located source statement, or None
+    when the declarations could not be aligned with the source.
+    """
+    if statement is None:
+        return {"index": index, "stableId": None, "line": None, "span": None, "editable": False}
+    return {
+        "index": index,
+        "stableId": stable_ids.get(index),
+        "line": statement.statement.lineno,
+        "span": list(statement.call_span),
+        "editable": editable,
+    }
 
 
 def _study_entries(studies: list[Any], source: str) -> list[dict[str, Any]]:
@@ -92,12 +109,12 @@ def _study_entries(studies: list[Any], source: str) -> list[dict[str, Any]]:
     """
     statements = locate_study_statements(source) or []
     stable_ids = _declaration_ids(source, "study")
+    described = [study.describe() for study in studies]
     aligned = len(statements) == len(studies) and all(
-        statement.kind == study.describe()["kind"] for statement, study in zip(statements, studies)
+        statement.kind == entry["kind"] for statement, entry in zip(statements, described)
     )
     entries: list[dict[str, Any]] = []
     for index, study in enumerate(studies):
-        described = study.describe()
         statement = statements[index] if aligned else None
         bc_spans: tuple[Any, ...] = ()
         if statement is not None and len(statement.bc_spans) == len(study.bcs):
@@ -105,24 +122,21 @@ def _study_entries(studies: list[Any], source: str) -> list[dict[str, Any]]:
         bc_ids = _bc_ids(source, index) if statement is not None else {}
         entries.append(
             {
-                **described,
-                "index": index,
-                "stableId": stable_ids.get(index) if statement is not None else None,
-                "line": statement.statement.lineno if statement is not None else None,
-                "span": list(statement.call_span) if statement is not None else None,
-                "editable": statement is not None and described["kind"] in _AUTHORABLE_KINDS,
-                "mesh_span": list(statement.mesh_span)
-                if statement is not None and statement.mesh_span is not None
-                else None,
-                "domain_span": list(statement.domain_span)
-                if statement is not None and statement.domain_span is not None
-                else None,
+                **described[index],
+                **_located(
+                    index,
+                    statement,
+                    stable_ids,
+                    editable=described[index]["kind"] in _AUTHORABLE_KINDS,
+                ),
+                "mesh_span": _span(statement.mesh_span) if statement is not None else None,
+                "domain_span": _span(statement.domain_span) if statement is not None else None,
                 "bcs": [
                     {
                         **bc.describe(),
                         "stableId": bc_ids.get(position),
                         "serializable": bc.serializable,
-                        "span": list(bc_spans[position]) if bc_spans else None,
+                        "span": _span(bc_spans[position]) if bc_spans else None,
                     }
                     for position, bc in enumerate(study.bcs)
                 ],
@@ -150,16 +164,7 @@ def _mesh_entries(sim_meshes: list[Any], source: str) -> list[dict[str, Any]]:
     entries: list[dict[str, Any]] = []
     for index, mesh in enumerate(sim_meshes):
         statement = statements[index] if aligned else None
-        entries.append(
-            {
-                **mesh.describe(),
-                "index": index,
-                "stableId": stable_ids.get(index) if statement is not None else None,
-                "line": statement.statement.lineno if statement is not None else None,
-                "span": list(statement.call_span) if statement is not None else None,
-                "editable": statement is not None,
-            }
-        )
+        entries.append({**mesh.describe(), **_located(index, statement, stable_ids)})
     return entries
 
 
@@ -187,20 +192,12 @@ def _optimization_entries(
     entries: list[dict[str, Any]] = []
     for index, optimization in enumerate(optimizations):
         statement = statements[index] if aligned else None
-
-        def span(value) -> list[int] | None:
-            return list(value) if value is not None else None
-
         entries.append(
             {
                 **optimization.describe(scene),
-                "index": index,
-                "stableId": stable_ids.get(index) if statement is not None else None,
-                "line": statement.statement.lineno if statement is not None else None,
-                "span": span(statement.call_span) if statement is not None else None,
-                "editable": statement is not None,
-                "steps_span": span(statement.steps_span) if statement is not None else None,
-                "learning_rate_span": span(statement.learning_rate_span)
+                **_located(index, statement, stable_ids),
+                "steps_span": _span(statement.steps_span) if statement is not None else None,
+                "learning_rate_span": _span(statement.learning_rate_span)
                 if statement is not None
                 else None,
             }

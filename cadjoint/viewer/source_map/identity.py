@@ -4,8 +4,8 @@ Line numbers are a *position*, not an identity.  A payload built by one
 compile carries the lines the statements sat on at that moment, and any
 edit in the editor — a blank line, an import, an ``add_sketch`` that
 inserts three lines above the profile — moves them silently.  Every patch
-request that still carries the old line then addresses the wrong
-statement, or nothing at all.
+request that carries a stale line then addresses the wrong statement, or
+nothing at all.
 
 This module gives each addressable thing a name derived from the *AST
 path* and the name the program assigned it, so it survives every edit that
@@ -174,7 +174,7 @@ def _statements_by_node(tree: ast.Module) -> dict[int, ast.stmt]:
 
     Built in one walk rather than re-walking the tree once per call: the
     identity table asks this question for every construction call in the
-    program, and on the starter scene that was the bulk of its cost.
+    program.
     """
     owners: dict[int, ast.stmt] = {}
     for statement in tree.body:

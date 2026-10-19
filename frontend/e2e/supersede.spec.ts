@@ -1,14 +1,13 @@
 import { createHash } from "node:crypto";
 
 import { expect, test, type Page } from "@playwright/test";
+import { setEditorText } from "./helpers/app";
 
 /**
  * Chained edits, against a server that is really slow to answer.
  *
- * The report was *"there is a fundamental problem with chaining operations…
- * when I drag an object twice, before the first one compiled, that should
- * cancel the first drag and just apply the second one"*. Unit tests pin the
- * ordering rule; this pins the whole loop, on the real server, with two edits
+ * Dragging an object twice before the first drag has compiled cancels the
+ * first and applies only the second. Unit tests pin the ordering rule; this pins the whole loop, on the real server, with two edits
  * eight seconds apart in compile time and one second apart in wall time:
  *
  * - the **second** program is what ends up on screen, never the first;
@@ -58,21 +57,6 @@ async function jobs(page: Page): Promise<JobSummary[]> {
   return snapshot.jobs;
 }
 
-/** Replace the whole document without compiling it. */
-async function setSource(page: Page, source: string) {
-  await page.evaluate((text) => {
-    type EditorLike = {
-      view?: { state: { doc: { length: number } }; dispatch: (spec: unknown) => void };
-    };
-    const content = document.querySelector("[data-testid=editor] .cm-content") as
-      | (HTMLElement & { cmView?: EditorLike; cmTile?: EditorLike })
-      | null;
-    const view = content?.cmView?.view ?? content?.cmTile?.view;
-    if (!view) throw new Error("no CodeMirror view");
-    view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: text } });
-  }, source);
-}
-
 /**
  * Wait until the app agrees with its own source again.
  *
@@ -96,7 +80,7 @@ test("the newest edit wins, and the one it replaced is cancelled", async ({ page
 
   // The first edit. Its compile sleeps for eight seconds, which is the whole
   // point: it is still running when the second edit arrives.
-  await setSource(page, FIRST);
+  await setEditorText(page, FIRST);
   await page.getByTestId("run").click();
 
   // The app says so immediately — the indicator is up before the request has
@@ -120,7 +104,7 @@ test("the newest edit wins, and the one it replaced is cancelled", async ({ page
     .toBe(true);
 
   // The second edit, while the first is still compiling.
-  await setSource(page, SECOND);
+  await setEditorText(page, SECOND);
   await page.getByTestId("run").click();
 
   await waitForIdle(page);

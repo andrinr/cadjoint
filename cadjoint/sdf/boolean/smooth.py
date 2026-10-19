@@ -35,8 +35,7 @@ or two, so no NURBS represents it exactly at any degree.
 0.1 was chosen for the unit-sized geometry in the shipped scenes, where it is
 a tenth of the smallest feature and reads as a fillet.  On a scene whose unit
 stands for something larger it is whatever 0.1 of that unit happens to be,
-which on a normalised engine block came to 20 mm and removed the water
-jacket.  Set it explicitly whenever the scene's unit is not roughly the scale
+enough to erase a thin internal feature.  Set it explicitly whenever the scene's unit is not roughly the scale
 of its smallest feature.
 """
 

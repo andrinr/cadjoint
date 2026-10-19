@@ -5,13 +5,9 @@
  * against the rule that closes it. That is the whole idiom, and it exists here
  * rather than in each panel so that changing it is one edit.
  *
- * It used to open with a filled accent cell carrying a number, from a CSS
- * counter. The number is gone: a drawing numbers its zones so that a written
- * reference can point at one, and nothing in this app ever pointed at a
- * section by number, which left the loudest block on the panel carrying no
- * information. There is nothing to remove from this file's markup — the
- * numbers were a `::before` in `styles.css` and never a prop, which is what
- * made deleting them one edit.
+ * Sections are not numbered: a drawing numbers its zones so that a written
+ * reference can point at one, and nothing in this app refers to a section by
+ * number.
  *
  * `count` is the right-hung figure the reference puts at the end of the rule:
  * how many things the section holds, or the unit its readouts are in.

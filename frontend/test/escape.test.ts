@@ -1,9 +1,9 @@
 /**
  * Escape backs out one step at a time.
  *
- * The old handler cleared the pending pick, the pending loft, the probe, the
- * selection, the tool and the mode in one statement, so a single press threw
- * the user to the top from wherever they were. These cases pin the ladder:
+ * Clearing the pending pick, the pending loft, the probe, the selection, the
+ * tool and the mode in one statement would throw the user to the top from
+ * wherever they were. These cases pin the ladder:
  * each press names exactly one rung, and the rungs below it are untouched.
  */
 
@@ -21,7 +21,7 @@ const nothing: EscapeState = {
   awayFromModel: false,
 };
 
-/** Every rung set at once — the state a single press used to flatten. */
+/** Every rung set at once. */
 const everything: EscapeState = {
   gesture: true,
   pendingConstraint: true,
@@ -76,8 +76,8 @@ describe("escapeLevel", () => {
   });
 
   it("keeps the hint bar's promise once nothing else is pending", () => {
-    // "Esc returns to model" is still true — it is just no longer the first
-    // thing Escape does.
+    // "Esc returns to model" holds — as the last thing Escape does, not the
+    // first.
     expect(escapeLevel({ ...nothing, awayFromModel: true })).toBe("mode");
   });
 

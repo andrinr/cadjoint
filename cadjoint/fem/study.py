@@ -58,15 +58,24 @@ from __future__ import annotations
 from dataclasses import KW_ONLY, dataclass, field
 from typing import Any
 
+from cadjoint.capture import one_named
+from cadjoint.descriptions import (
+    DirichletDescription,
+    ElasticStudyDescription,
+    FixedDescription,
+    HeatFluxDescription,
+    ThermalStudyDescription,
+    TractionDescription,
+)
 from cadjoint.enums import BoundaryConditionType, StudyKind
 from cadjoint.fem.cutfem import CutMesh
 from cadjoint.fem.discretization import Discretization
 from cadjoint.fem.hexmesh import HexMesh
 from cadjoint.fem.properties import FROM_MATERIAL
-from cadjoint.fem.simmesh import _CAPTURED_MESHES, SimMesh, _anonymous, _domain_entry
+from cadjoint.fem.simmesh import SimMesh, _anonymous, _domain_entry, declared_sim_meshes
 from cadjoint.fem.tetmesh import TetMesh
 from cadjoint.meshing import DEFAULT_BOUNDS, DEFAULT_SIZE
-from cadjoint.studies import NodeSelection, capture_studies, register_study, require_triplet
+from cadjoint.studies import NodeSelection, register_study, require_triplet
 
 __all__ = [
     "FROM_MATERIAL",
@@ -76,22 +85,8 @@ __all__ = [
     "HeatFlux",
     "ThermalStudy",
     "Traction",
-    "capture_studies",
-    "register_study",
     "study_mesh",
 ]
-
-# Same domain convention as the viewer's simulate path (compile worker).
-_DEFAULT_BOUNDS = DEFAULT_BOUNDS
-_DEFAULT_SIZE = DEFAULT_SIZE
-
-#: Private spelling kept for the two study classes below.
-_register = register_study
-
-# ``capture_studies`` and ``register_study`` (in ``__all__`` above) are
-# re-exported so ``from cadjoint.fem.study import capture_studies`` keeps
-# naming the registry the studies in this module land in; they are defined
-# in :mod:`cadjoint.studies.capture`, which the flow package shares.
 
 
 def _expect_selection(nodes: Any, bc_kind: str) -> NodeSelection:
@@ -124,7 +119,7 @@ class Dirichlet:
         """Whether :meth:`describe` round-trips (false for predicates)."""
         return self.nodes.serializable
 
-    def describe(self) -> dict[str, Any]:
+    def describe(self) -> DirichletDescription:
         """JSON-ready description."""
         return {
             "type": BoundaryConditionType.DIRICHLET.value,
@@ -152,7 +147,7 @@ class HeatFlux:
         """Whether :meth:`describe` round-trips (false for predicates)."""
         return self.nodes.serializable
 
-    def describe(self) -> dict[str, Any]:
+    def describe(self) -> HeatFluxDescription:
         """JSON-ready description."""
         return {
             "type": BoundaryConditionType.HEAT_FLUX.value,
@@ -175,7 +170,7 @@ class Fixed:
         """Whether :meth:`describe` round-trips (false for predicates)."""
         return self.nodes.serializable
 
-    def describe(self) -> dict[str, Any]:
+    def describe(self) -> FixedDescription:
         """JSON-ready description."""
         return {"type": BoundaryConditionType.FIXED.value, "nodes": self.nodes.describe()}
 
@@ -196,7 +191,7 @@ class Traction:
         """Whether :meth:`describe` round-trips (false for predicates)."""
         return self.nodes.serializable
 
-    def describe(self) -> dict[str, Any]:
+    def describe(self) -> TractionDescription:
         """JSON-ready description."""
         return {
             "type": BoundaryConditionType.TRACTION.value,
@@ -338,16 +333,11 @@ def _resolve_mesh_reference(mesh: Any) -> SimMesh:
     if isinstance(mesh, SimMesh):
         return mesh
     if isinstance(mesh, str):
-        captured = _CAPTURED_MESHES.get()
-        declared = [candidate for candidate in (captured or []) if candidate.name == mesh]
-        if len(declared) == 1:
-            return declared[0]
-        if len(declared) > 1:
-            raise ValueError(f"The program declares more than one mesh named {mesh!r}.")
-        names = ", ".join(repr(candidate.name) for candidate in (captured or [])) or "none"
-        raise ValueError(
-            f"No declared SimMesh named {mesh!r} (declared: {names}). "
-            "Declare one before the study, or pass the SimMesh instance itself."
+        return one_named(
+            declared_sim_meshes(),
+            mesh,
+            "SimMesh",
+            hint="Declare one before the study, or pass the SimMesh instance itself.",
         )
     raise ValueError(
         f"mesh must be a SimMesh or the name of a declared one, got {type(mesh).__name__}."
@@ -394,9 +384,9 @@ def _validate_common(study: Any, kind: str, allowed_bcs: tuple[type, ...]) -> No
     if len(counts) != 3 or any(int(count) != count or count < 1 for count in counts):
         raise ValueError("resolution must be a positive integer or a triplet of them.")
     study.bounds = require_triplet(
-        study.bounds if study.bounds is not None else _DEFAULT_BOUNDS, "bounds"
+        study.bounds if study.bounds is not None else DEFAULT_BOUNDS, "bounds"
     )
-    study.size = require_triplet(study.size if study.size is not None else _DEFAULT_SIZE, "size")
+    study.size = require_triplet(study.size if study.size is not None else DEFAULT_SIZE, "size")
 
 
 def _solve_mesh(
@@ -544,9 +534,9 @@ class ThermalStudy:
         self.conductivity = _property_argument(
             self.conductivity, "conductivity", lambda value: value > 0.0
         )
-        _register(self)
+        register_study(self)
 
-    def describe(self) -> dict[str, Any]:
+    def describe(self) -> ThermalStudyDescription:
         """JSON-ready payload: everything the viewer needs to display it."""
         return {
             "name": self.name,
@@ -675,9 +665,9 @@ class ElasticStudy:
         self.poisson = _property_argument(self.poisson, "poisson", lambda value: 0.0 <= value < 0.5)
         if self.gravity is not None:
             self.gravity = require_triplet(self.gravity, "gravity")
-        _register(self)
+        register_study(self)
 
-    def describe(self) -> dict[str, Any]:
+    def describe(self) -> ElasticStudyDescription:
         """JSON-ready payload: everything the viewer needs to display it."""
         return {
             "name": self.name,

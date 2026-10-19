@@ -22,8 +22,7 @@ Anisotropy caveat: FR-4 and single-crystal silicon are strongly anisotropic and
 the solver is isotropic, so those entries pick one documented direction — read
 the docstring before trusting a number.
 
-Names use the British spelling ``aluminium``; ``aluminum_6061`` is provided as
-an alias.
+Names use the British spelling ``aluminium``.
 """
 
 from __future__ import annotations
@@ -35,7 +34,6 @@ from cadjoint.render.material import Material
 __all__ = [
     "CATALOGUE",
     "aluminium_6061",
-    "aluminum_6061",
     "catalogue",
     "copper_c11000",
     "fr4",
@@ -70,10 +68,6 @@ def aluminium_6061() -> Material:
         thermal_expansion=23.6e-6,
         yield_strength=276e6,
     )
-
-
-#: US-spelling alias for :func:`aluminium_6061`.
-aluminum_6061 = aluminium_6061
 
 
 def copper_c11000() -> Material:
@@ -283,7 +277,7 @@ def pla() -> Material:
     )
 
 
-#: Name → factory for every catalogue entry (the US alias is not repeated).
+#: Name → factory for every catalogue entry.
 CATALOGUE: dict[str, Callable[[], Material]] = {
     "aluminium_6061": aluminium_6061,
     "copper_c11000": copper_c11000,

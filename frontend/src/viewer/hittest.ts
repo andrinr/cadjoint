@@ -25,8 +25,8 @@ export interface EdgeHit {
   distance: number;
 }
 
-/** Squared distance from a point to a segment, plus where along it that lands. */
-function pointSegmentDistance(
+/** Distance from (px, py) to the segment a–b; a degenerate segment is its start point. */
+export function pointSegmentDistance(
   px: number,
   py: number,
   ax: number,

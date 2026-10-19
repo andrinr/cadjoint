@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { chromium, expect, test, type Browser, type Page } from "@playwright/test";
+import { expect, test } from "@playwright/test";
+import { openViewer, SCENES, waitForCompile } from "./helpers/app";
 
 /**
  * A thermal study on cut cells runs from the Studies window like any other.
@@ -11,50 +12,14 @@ import { chromium, expect, test, type Browser, type Page } from "@playwright/tes
  * result summary and the quality toggle all behave, with nothing to grade.
  */
 
-const PORT = process.env.CADJOINT_E2E_PORT ?? 8799;
-const SCENES = resolve(import.meta.dirname, "..", "..", "scenes");
+/** How long a compile of this spec's scenes may take. */
+const COMPILE_TIMEOUT = 120_000;
+
 const SHOTS = process.env.CADJOINT_E2E_SHOTS ?? "";
-
-async function waitForCompile(page: Page) {
-  await expect(page.getByTestId("status")).not.toHaveText(/^(|Starting…)$/, {
-    timeout: 120_000,
-  });
-  await expect(page.getByTestId("toolbar-busy")).toHaveCount(0, { timeout: 120_000 });
-}
-
-async function openViewer(): Promise<{ browser: Browser; page: Page; errors: string[] } | null> {
-  const browser = await chromium.launch({
-    args: [
-      "--enable-unsafe-webgpu",
-      "--enable-features=Vulkan,WebGPU",
-      "--use-angle=metal",
-      "--use-gl=angle",
-      "--ignore-gpu-blocklist",
-      "--enable-gpu",
-    ],
-  });
-  const page = await browser.newPage({ viewport: { width: 1400, height: 900 } });
-  const errors: string[] = [];
-  page.on("pageerror", (error) => errors.push(error.message));
-  page.on("console", (message) => {
-    if (message.type() === "error") errors.push(message.text());
-  });
-  await page.goto(`http://127.0.0.1:${PORT}/`);
-  const adapter = await page.evaluate(async () => {
-    if (!navigator.gpu) return null;
-    return (await navigator.gpu.requestAdapter()) ? "available" : null;
-  });
-  if (!adapter) {
-    await browser.close();
-    return null;
-  }
-  await waitForCompile(page);
-  return { browser, page, errors };
-}
 
 test("the starter's heat study solves on cut cells from the Studies window", async ({}, testInfo) => {
   test.setTimeout(400_000);
-  const opened = await openViewer();
+  const opened = await openViewer({ timeout: COMPILE_TIMEOUT });
   test.skip(opened === null, "No WebGPU adapter in this browser build");
   if (!opened) return;
   const { browser, page, errors } = opened;
@@ -93,7 +58,7 @@ test("the starter's heat study solves on cut cells from the Studies window", asy
   await page.getByTestId("run").click();
   const compileBody = JSON.parse((await compiled).request().postData() ?? "{}") as { source?: string };
   expect(compileBody.source ?? "").toContain('method="cutfem"');
-  await waitForCompile(page);
+  await waitForCompile(page, COMPILE_TIMEOUT);
 
   await page.getByTestId("editmode-simulate").click();
   await expect(page.getByTestId("simulate-study-sink-conduction")).toBeVisible();

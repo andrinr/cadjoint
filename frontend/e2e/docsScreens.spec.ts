@@ -1,4 +1,5 @@
-import { chromium, expect, test, type Browser, type Page } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
+import { flip, openViewer, waitForCompile } from "./helpers/app";
 
 /**
  * The docs' screenshots, taken from the running app.
@@ -15,54 +16,17 @@ import { chromium, expect, test, type Browser, type Page } from "@playwright/tes
  * is a screenshot of nothing.
  */
 
-const PORT = process.env.CADJOINT_E2E_PORT ?? 8799;
+/** How long a compile of this spec's scenes may take. */
+const COMPILE_TIMEOUT = 120_000;
+
 const SHOTS = process.env.CADJOINT_DOCS_SCREENS ?? "";
 /** Comma-separated attempt names to run; empty runs them all. */
 const ONLY = (process.env.CADJOINT_DOCS_ONLY ?? "").split(",").filter(Boolean);
-
-async function waitForCompile(page: Page) {
-  await expect(page.getByTestId("status")).not.toHaveText(/^(|Starting…)$/, { timeout: 120_000 });
-  await expect(page.getByTestId("toolbar-busy")).toHaveCount(0, { timeout: 120_000 });
-}
-
-async function openViewer(): Promise<{ browser: Browser; page: Page } | null> {
-  const browser = await chromium.launch({
-    args: [
-      "--enable-unsafe-webgpu",
-      "--enable-features=Vulkan,WebGPU",
-      "--use-angle=metal",
-      "--use-gl=angle",
-      "--ignore-gpu-blocklist",
-      "--enable-gpu",
-    ],
-  });
-  const page = await browser.newPage({ viewport: { width: 1400, height: 900 } });
-  await page.goto(`http://127.0.0.1:${PORT}/`);
-  const adapter = await page.evaluate(async () =>
-    navigator.gpu && (await navigator.gpu.requestAdapter()) ? "available" : null,
-  );
-  if (!adapter) {
-    await browser.close();
-    return null;
-  }
-  await waitForCompile(page);
-  const dismiss = page.getByRole("button", { name: "Dismiss" });
-  if (await dismiss.isVisible().catch(() => false)) await dismiss.click();
-  return { browser, page };
-}
 
 async function shot(page: Page, name: string, settle = 1200) {
   await page.waitForTimeout(settle);
   await page.screenshot({ path: `${SHOTS}/${name}.png` });
   console.log(`shot ${name}`);
-}
-
-/** Open the render popover's customize editor and flip one switch, then close it. */
-async function flip(page: Page, toggle: string) {
-  await page.getByTestId("display-options").click();
-  await page.getByTestId("render-customize").click();
-  await page.getByTestId(toggle).click();
-  await page.getByTestId("display-options").click();
 }
 
 /** One screenshot's steps; a control that is not there within its timeout skips the shot, logged. */
@@ -118,7 +82,7 @@ async function parked(page: Page, ids: string[], steps: () => Promise<void>, col
 test("the docs screenshots", async () => {
   test.skip(!SHOTS, "set CADJOINT_DOCS_SCREENS to the output directory");
   test.setTimeout(1_800_000);
-  const opened = await openViewer();
+  const opened = await openViewer({ timeout: COMPILE_TIMEOUT, dismiss: true });
   test.skip(opened === null, "No WebGPU adapter in this browser build");
   if (!opened) return;
   const { browser, page } = opened;
@@ -209,7 +173,6 @@ test("the docs screenshots", async () => {
     await page.keyboard.press("Escape");
   });
 
-
   await attempt("simulate-studies", async () => {
     await page.getByTestId("editmode-simulate").click();
     await page.waitForTimeout(500);
@@ -276,12 +239,12 @@ test("the docs screenshots", async () => {
       const input = page.getByTestId(field).first();
       await input.fill(value);
       await input.press("Enter");
-      await waitForCompile(page);
+      await waitForCompile(page, COMPILE_TIMEOUT);
     }
     await page.getByTestId("optimize-run-cool-sink").click();
     await page.getByTestId("optimize-result-cool-sink").waitFor({ timeout: 1_800_000 });
     // The end of a run replays its last design: wait for that compile too.
-    await waitForCompile(page);
+    await waitForCompile(page, COMPILE_TIMEOUT);
     // Objects and Properties go to the tray too, so the Optimize card has
     // the column's height and its trajectory player is in view.
     await parked(page, ["editor", "objects", "properties"], async () => {

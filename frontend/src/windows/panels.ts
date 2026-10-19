@@ -54,16 +54,6 @@ export interface WindowDef {
    * without being imposed.
    */
   parked?: boolean;
-  /**
-   * A second test hook on the tab's own label.
-   *
-   * The four simulation windows used to be tabs of one Simulate panel, and
-   * the audit tool and the end-to-end suite reach for them by the names that
-   * tab strip had. They are ordinary windows now, so the dock's tab strip
-   * *is* that strip — and the label carries the old id so the control the
-   * tests click is still the control that raises the window.
-   */
-  tabTestId?: string;
 }
 
 export const WINDOW_DEFS: readonly WindowDef[] = [
@@ -73,10 +63,10 @@ export const WINDOW_DEFS: readonly WindowDef[] = [
   { id: "properties", title: "Properties", modes: ["model", "sketch"] },
   { id: "materials", title: "Materials", modes: ["model"] },
   { id: "sketch", title: "Sketch", modes: ["sketch"] },
-  { id: "meshes", title: "Meshes", modes: ["simulate"], tabTestId: "sim-tab-meshes" },
-  { id: "studies", title: "Studies", modes: ["simulate"], tabTestId: "sim-tab-studies" },
-  { id: "optimize", title: "Optimize", modes: ["model", "simulate"], tabTestId: "sim-tab-optimize" },
-  { id: "results", title: "Results", modes: ["simulate"], tabTestId: "sim-tab-results" },
+  { id: "meshes", title: "Meshes", modes: ["simulate"] },
+  { id: "studies", title: "Studies", modes: ["simulate"] },
+  { id: "optimize", title: "Optimize", modes: ["model", "simulate"] },
+  { id: "results", title: "Results", modes: ["simulate"] },
   { id: "scenes", title: "Scenes", modes: [], parked: true },
   { id: "processes", title: "Processes", modes: [], parked: true },
 ];
@@ -84,10 +74,6 @@ export const WINDOW_DEFS: readonly WindowDef[] = [
 const BY_ID = new Map<string, WindowDef>(WINDOW_DEFS.map((def) => [def.id, def]));
 
 export const WINDOW_IDS: readonly WindowId[] = WINDOW_DEFS.map((def) => def.id);
-
-export function windowDef(id: string): WindowDef | undefined {
-  return BY_ID.get(id);
-}
 
 export function isWindowId(id: string): id is WindowId {
   return BY_ID.has(id);
@@ -99,11 +85,6 @@ export function windowTitle(id: string): string {
 
 export function isPermanent(id: string): boolean {
   return BY_ID.get(id)?.permanent === true;
-}
-
-/** The tab label's compatibility test hook, when the window has one. */
-export function tabTestId(id: string): string | undefined {
-  return BY_ID.get(id)?.tabTestId;
 }
 
 /** Whether a window's default state is parked in the tray, not docked. */

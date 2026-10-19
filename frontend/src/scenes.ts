@@ -4,7 +4,7 @@
  * The naming rules mirror the server's (`sanitize_scene_name` in
  * `_scenes.py`) so a bad name is refused in the dialog instead of
  * round-tripping to a 4xx. The discard guard lives here because two places
- * now replace the whole program — the File menu and the Scenes window — and
+ * replace the whole program — the File menu and the Scenes window — and
  * asking the question in two different wordings would be two different
  * promises about the same unsaved work.
  */

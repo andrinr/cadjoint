@@ -8,8 +8,8 @@ import {
   rampCss,
   resolveResultView,
   slicePlane,
-  viridis,
 } from "../src/simulation";
+import { fieldRamp as viridis } from "../src/simColors";
 
 describe("viridis ramp", () => {
   it("matches the colormap's endpoints and midpoint", () => {
