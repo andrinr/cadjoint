@@ -3200,6 +3200,10 @@ ul.task-list li input[type="checkbox"] {
 <td><a href="#cadjoint.optimize.Optimization.run">run</a></td>
 <td>Minimize the objective over the target’s free parameters.</td>
 </tr>
+<tr class="odd">
+<td><a href="#cadjoint.optimize.Optimization.study_target">study_target</a></td>
+<td>The object whose free parameters a study-backed run optimizes.</td>
+</tr>
 </tbody>
 </table>
 <section id="cadjoint.optimize.Optimization.describe" class="level3">
@@ -3335,9 +3339,15 @@ ul.task-list li input[type="checkbox"] {
 </tr>
 </tbody>
 </table>
-
-
 </section>
+</section>
+<section id="cadjoint.optimize.Optimization.study_target" class="level3">
+<h3 class="anchored" data-anchor-id="cadjoint.optimize.Optimization.study_target">study_target</h3>
+<pre class="python"><code>optimize.Optimization.study_target(scene=None)</code></pre>
+<p>The object whose free parameters a study-backed run optimizes.</p>
+<p>The study’s meshed domain when it declares one (on its SimMesh or on the study itself); otherwise the <code>scene</code> the caller supplies — the same field the study would mesh at solve time. <code>None</code> when neither is available (describe degrades, run raises). Callers that write optimized values back (<code>apply_parameters</code>) write them here. Only defined for a study-backed optimization (<code>study=</code> given).</p>
+
+
 </section>
 </section>
 </section>

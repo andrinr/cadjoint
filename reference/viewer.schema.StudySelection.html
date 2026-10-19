@@ -3077,9 +3077,9 @@ ul.task-list li input[type="checkbox"] {
 
 <section id="cadjoint.viewer.schema.StudySelection" class="level1">
 <h1>viewer.schema.StudySelection</h1>
-<pre class="python"><code>viewer.schema.StudySelection()</code></pre>
+<p><code>viewer.schema.StudySelection</code></p>
 <p>A serialized node selection, mirroring <code>cadjoint.studies.selection</code>.</p>
-<p>Composite selections nest: <code>and</code>/<code>or</code> carry <code>operands</code>, <code>not</code> carries <code>operand</code>, and the leaves carry their own geometry. The per-kind fields are optional here because one model has to cover all of them; <code>kind</code> says which are meaningful.</p>
+<p>One model per selection class, discriminated on <code>kind</code>, so the frontend evaluates exactly these shapes with an exhaustive switch. Closed, although it is a <code>describe()</code>: a test describes one selection of every class, so a class added there without a model here fails rather than reaching a frontend that cannot evaluate it (as <code>cylinder</code> once did).</p>
 
 
 </section>
