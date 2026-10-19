@@ -37,6 +37,7 @@ from typing import Annotated, Any, Literal
 from pydantic import BaseModel, Field
 
 from cadjoint.viewer.schema.payloads import (
+    BRepInspectionPayload,
     CompilePayload,
     DomainEntry,
     MeshEdgePayload,
@@ -158,6 +159,18 @@ class MeshResult(Strict):
 
     ok: Literal[True]
     mesh_edges: MeshEdgePayload | None
+    output: str
+
+
+class BrepResult(Strict):
+    """``POST /api/brep``: the derived B-rep, for the inspector.
+
+    Without the private tier this is still ``ok``: ``brep.available`` is
+    false and ``brep.reason`` says why.
+    """
+
+    ok: Literal[True]
+    brep: BRepInspectionPayload
     output: str
 
 
@@ -612,7 +625,7 @@ class SceneSaveResult(Strict):
 # ── The job registry ────────────────────────────────────────────────────────
 
 JobKind = Literal[
-    "compile", "mesh", "mesh_inspect", "simulate", "optimize", "export", "lint", "warmup"
+    "compile", "mesh", "brep", "mesh_inspect", "simulate", "optimize", "export", "lint", "warmup"
 ]
 JobStatus = Literal["queued", "running", "done", "failed", "cancelled"]
 
@@ -809,6 +822,7 @@ ROUTES: tuple[Route, ...] = (
         aliases=("/patch",),
     ),
     Route("POST", "/api/mesh", "MeshResponse", CompileRequest, (MeshResult, Failure), tracked=True),
+    Route("POST", "/api/brep", "BrepResponse", CompileRequest, (BrepResult, Failure), tracked=True),
     Route(
         "POST",
         "/api/mesh_refresh",

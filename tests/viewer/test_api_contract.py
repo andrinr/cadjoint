@@ -156,6 +156,7 @@ CHEAP_REQUESTS: list[tuple[str, str, dict | None]] = [
     # through the job registry, so `job_id` is checked too.
     ("POST", "/api/compile", {"source": 3}),
     ("POST", "/api/mesh", {"source": 3}),
+    ("POST", "/api/brep", {"source": 3}),
     ("POST", "/api/simulate", {"source": "scene = None"}),
     ("POST", "/api/mesh_inspect", {"source": "scene = None", "name": ""}),
     ("POST", "/api/export", {"source": "scene = None", "format": "nope"}),

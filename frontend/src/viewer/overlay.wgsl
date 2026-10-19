@@ -403,3 +403,41 @@ fn vs_face(@location(0) point: vec3<f32>, @location(1) color: vec4<f32>) -> Face
 fn fs_face(input: FaceVertex) -> @location(0) vec4<f32> {
   return input.color;
 }
+
+// ── B-rep inspector faces ───────────────────────────────────────────────────
+//
+// The derived B-rep's own tessellation, drawn *instead of* the raymarched
+// solid while the inspector is on: what the extraction found, facet for
+// facet, one categorical colour per face. Opaque and depth-writing, with no
+// camera nudge — it is the surface, not something drawn on one — so the
+// B-rep's edges and vertices that follow land on it like overlays on the
+// solid. Flat-shaded from screen-space derivatives, the simulation surface's
+// trick: the facets are the finding, so they should show.
+
+struct BrepVertex {
+  @builtin(position) position : vec4<f32>,
+  @location(0)       color    : vec4<f32>,
+  @location(1)       world    : vec3<f32>,
+};
+
+@vertex
+fn vs_brep(@location(0) point: vec3<f32>, @location(1) color: vec4<f32>) -> BrepVertex {
+  var out: BrepVertex;
+  var clip = o.view_proj * vec4<f32>(point, 1.0);
+  clip.w = max(clip.w, 1e-4);
+  out.position = clip;
+  out.color = color;
+  out.world = point;
+  return out;
+}
+
+@fragment
+fn fs_brep(input: BrepVertex) -> @location(0) vec4<f32> {
+  let normal = normalize(cross(dpdx(input.world), dpdy(input.world)));
+  let eye = normalize(o.camera_pos.xyz - input.world);
+  // Facing ratio, sign-free: a triangle wound either way shades the same,
+  // so a face the tessellation turned inside out is still readable.
+  let facing = abs(dot(normal, eye));
+  let shade = 0.62 + 0.38 * facing;
+  return vec4<f32>(input.color.rgb * shade, 1.0);
+}

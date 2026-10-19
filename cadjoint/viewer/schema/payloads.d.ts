@@ -519,6 +519,77 @@ export interface MeshEdgePayload {
   edges?: "graph" | "lattice";
 }
 
+/** The derived B-rep, or why there is none (``available`` false). */
+export interface BRepInspectionPayload {
+  available: boolean;
+  reason?: string | null;
+  error?: string | null;
+  positions?: number[] | null;
+  triangles?: number[] | null;
+  triangle_face?: number[] | null;
+  faces?: BRepFacePayload[] | null;
+  edges?: BRepEdgePayload[] | null;
+  vertices?: BRepVertexPayload[] | null;
+  diagnostics?: BRepDiagnostics | null;
+}
+
+/** One face of the derived B-rep, for the inspector's readout. */
+export interface BRepFacePayload {
+  id: number;
+  kind: string;
+  surface: string;
+  analytic: boolean;
+  patch: number;
+  leaf: number;
+  leaf_type?: string | null;
+  area?: number | null;
+}
+
+/** One face-pair boundary chain, kinded by how it reached the screen. */
+export interface BRepEdgePayload {
+  id: number;
+  kind: string;
+  state: string;
+  faces: number[];
+  patches: number[];
+  vertices: number[];
+  closed: boolean;
+  analytic: boolean;
+  residual?: number | null;
+  crossing?: number | null;
+  points: number[];
+  off_surface: number;
+}
+
+/** One solved corner of the derived B-rep. */
+export interface BRepVertexPayload {
+  id: number;
+  kind: string;
+  point: [number, number, number];
+  faces: number[];
+  residual?: number | null;
+}
+
+/** Counts, the path that produced the B-rep, and why the exact one refused. */
+export interface BRepDiagnostics {
+  faces: number;
+  edges: number;
+  vertices: number;
+  source: string;
+  exact: boolean;
+  fallback_reason?: string | null;
+  surfaces: Record<string, number>;
+  edge_kinds: Record<string, number>;
+  vertex_kinds: Record<string, number>;
+  off_surface_tolerance: number;
+  off_surface_edges: number;
+  feature_curves?: string | null;
+  cell: number;
+  resolution: number;
+  stats: Record<string, number | string | boolean>;
+  timings: Record<string, number>;
+}
+
 /** ``GET /api/session``: the write token, the starter program, the contract version. */
 export interface SessionResponse {
   ok: true;
@@ -566,6 +637,18 @@ export interface CompileRequest {
 export interface MeshResult {
   ok: true;
   mesh_edges: MeshEdgePayload | null;
+  output: string;
+}
+
+/**
+ * ``POST /api/brep``: the derived B-rep, for the inspector.
+ *
+ * Without the private tier this is still ``ok``: ``brep.available`` is
+ * false and ``brep.reason`` says why.
+ */
+export interface BrepResult {
+  ok: true;
+  brep: BRepInspectionPayload;
   output: string;
 }
 
@@ -999,7 +1082,7 @@ export interface JobSample {
 /** A job as ``GET /api/jobs`` lists it: everything but the result and samples. */
 export interface JobSummary {
   job_id: string;
-  kind: "compile" | "mesh" | "mesh_inspect" | "simulate" | "optimize" | "export" | "lint" | "warmup";
+  kind: "compile" | "mesh" | "brep" | "mesh_inspect" | "simulate" | "optimize" | "export" | "lint" | "warmup";
   status: "queued" | "running" | "done" | "failed" | "cancelled";
   fields: Record<string, string | number | boolean>;
   source_hash: string | null;
@@ -1025,7 +1108,7 @@ export interface JobSummary {
 
 export interface JobDetail {
   job_id: string;
-  kind: "compile" | "mesh" | "mesh_inspect" | "simulate" | "optimize" | "export" | "lint" | "warmup";
+  kind: "compile" | "mesh" | "brep" | "mesh_inspect" | "simulate" | "optimize" | "export" | "lint" | "warmup";
   status: "queued" | "running" | "done" | "failed" | "cancelled";
   fields: Record<string, string | number | boolean>;
   source_hash: string | null;
@@ -1619,6 +1702,9 @@ export type CompileResponse = CompilePayload | Failure;
 /** What `POST /api/mesh` answers with. */
 export type MeshResponse = MeshResult | Failure;
 
+/** What `POST /api/brep` answers with. */
+export type BrepResponse = BrepResult | Failure;
+
 /** What `POST /api/mesh_refresh` answers with. */
 export type MeshRefreshResponse = MeshRefreshResult | Failure;
 
@@ -1674,6 +1760,7 @@ export interface ApiRoutes {
   "/api/compile": { method: "POST"; request: CompileRequest; response: CompileResponse; tracked: true; stream: false; file: false };
   "/api/patch": { method: "POST"; request: PatchRequest; response: PatchResponse; tracked: false; stream: false; file: false };
   "/api/mesh": { method: "POST"; request: CompileRequest; response: MeshResponse; tracked: true; stream: false; file: false };
+  "/api/brep": { method: "POST"; request: CompileRequest; response: BrepResponse; tracked: true; stream: false; file: false };
   "/api/mesh_refresh": { method: "POST"; request: MeshRefreshRequest; response: MeshRefreshResponse; tracked: false; stream: false; file: false };
   "/api/simulate": { method: "POST"; request: SimulateRequest; response: SimulateResponse; tracked: true; stream: false; file: false };
   "/api/mesh_inspect": { method: "POST"; request: MeshInspectRequest; response: MeshInspectResponse; tracked: true; stream: false; file: false };

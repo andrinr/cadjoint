@@ -138,6 +138,8 @@ export interface CompileCycle {
    */
   refreshOverlay: (overrides: Readonly<Record<string, readonly number[]>>) => void;
   wgsl: Accessor<WgslPreview | null>;
+  /** The program the viewer currently shows, once it compiled; lazy overlays key on it. */
+  compiledSource: Accessor<string | null>;
 }
 
 /** The free parameters of a program, whole parameters at a time, by name. */
@@ -630,5 +632,5 @@ export function createCompileCycle(options: CompileCycleOptions): CompileCycle {
     pumpLive();
   };
 
-  return { run, applyPatch, adoptSource, ghostCompile, refreshOverlay, wgsl };
+  return { run, applyPatch, adoptSource, ghostCompile, refreshOverlay, wgsl, compiledSource };
 }

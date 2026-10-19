@@ -313,7 +313,7 @@ the settings under the selected preset, with Save and Reset.
 | Resolution | Draft, High, Ultra |
 | Marching | Step cap, Refine hit |
 | Diagnostics | Bounds culling |
-| Effects | Path tracing, X-ray, Reflections, Hide solid, Feature edges, Mesh wireframe |
+| Effects | Path tracing, X-ray, Reflections, Hide solid, Feature edges, Mesh wireframe, B-rep inspector |
 | Annotations | Ground grid, Construction overlay, Sketch geometry, All sketch planes, Constraints (Fixed badges, Distance dimensions, Dimension values) |
 
 ### Distance-field views
@@ -351,6 +351,32 @@ curves exactly instead; the compile payload says which source drew them
 (`lattice` or `graph`).
 
 [![Feature edges drawn over the heat sink's creases and seams, with a mesh job counting in the toolbar's job chip](assets/screens/feature-edges.png)](assets/screens/feature-edges.png)
+
+### B-rep inspector
+
+**B-rep inspector** replaces the solid with the B-rep the private tier
+derived (the `brep` [plugin kind](plugins.qmd#the-five-in-process-kinds)), on
+the same 64³ grid, so an extraction can be judged by eye. Each face is drawn
+from the extraction's own tessellation in a categorical colour that no
+neighbour shares. Edges are stroked by kind: `traced` and `sampled` are the
+curves the feature-edge overlay draws, and every other boundary chain the
+graph built keeps its own state (`blend`, `tangent`, `coincident`, …, or
+`undrawn` for a crossing the overlay dropped). A kind the viewer has no tone
+for is drawn in grey under its own name. Vertices are dots.
+
+The card in the top-left corner gives the counts and the path. That is
+`Exact · analytic`, or the dual-contouring fallback with the reason the exact
+path refused. Hovering a face shows its id, surface type (plane, cylinder,
+sphere, cone, blend or faceted) and owning patch. Hovering an edge shows its
+faces and how far it lies off the solid. Hovering a vertex shows its position.
+**Highlight off-surface** marks the edges whose points sit more than a tenth
+of a cell off the scene's zero set, which is how a curve under a smooth
+blend gives itself away. Each legend row is a switch that hides its kind.
+
+The B-rep is requested lazily through `POST /api/brep` and only while the
+inspector is on. Without diff-brep the switch is greyed out with the reason;
+when the extraction raises, the card prints the exception and the frame it
+came from, and the solid stays on screen.
 
 ### Quality and path tracing
 

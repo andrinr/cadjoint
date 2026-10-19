@@ -22,6 +22,7 @@ from typing import Any, Literal
 from pydantic import BaseModel, ValidationError
 
 from cadjoint.viewer.schema.api import (
+    BrepResult,
     MeshInspectResult,
     MeshResult,
     OptimizeResult,
@@ -30,7 +31,7 @@ from cadjoint.viewer.schema.api import (
 from cadjoint.viewer.schema.payloads import CompilePayload, Strict, WorkerFailure
 from cadjoint.viewer.schema.requests import ExportRequest
 
-WorkerMode = Literal["compile", "mesh", "simulate", "mesh_inspect", "optimize", "export"]
+WorkerMode = Literal["compile", "mesh", "brep", "simulate", "mesh_inspect", "optimize", "export"]
 
 
 # ── Requests ────────────────────────────────────────────────────────────────
@@ -43,6 +44,11 @@ class CompileWorkerRequest(Strict):
 
 class MeshWorkerRequest(Strict):
     mode: Literal["mesh"]
+    source: str
+
+
+class BrepWorkerRequest(Strict):
+    mode: Literal["brep"]
     source: str
 
 
@@ -112,6 +118,7 @@ class ExportWorkerReply(Strict):
 WORKER_REQUESTS: dict[str, type[BaseModel]] = {
     "compile": CompileWorkerRequest,
     "mesh": MeshWorkerRequest,
+    "brep": BrepWorkerRequest,
     "simulate": SimulateWorkerRequest,
     "mesh_inspect": MeshInspectWorkerRequest,
     "optimize": OptimizeWorkerRequest,
@@ -122,6 +129,7 @@ WORKER_REQUESTS: dict[str, type[BaseModel]] = {
 WORKER_REPLIES: dict[str, type[BaseModel]] = {
     "compile": CompilePayload,
     "mesh": MeshWorkerReply,
+    "brep": BrepResult,
     "simulate": SimulateResult,
     "mesh_inspect": MeshInspectResult,
     "optimize": OptimizeResult,

@@ -611,6 +611,100 @@ class MeshEdgePayload(Strict):
     edges: Literal["graph", "lattice"] = "graph"
 
 
+# ── B-rep inspector ─────────────────────────────────────────────────────────
+#
+# What ``mode="brep"`` serves (:mod:`cadjoint.viewer._brep_inspector`).  The
+# kinds and states are plain strings on purpose: they are the private tier's
+# vocabulary, passed through, so a new edge state reaches the viewer without
+# a schema change.
+
+
+class BRepFacePayload(Strict):
+    """One face of the derived B-rep, for the inspector's readout."""
+
+    id: int
+    # The private tier's structural kind (``plane``, ``blend``, ``revolution``…).
+    kind: str
+    # What the viewer prints: a certified closed form, ``blend`` or ``faceted``.
+    surface: str
+    analytic: bool
+    # Global patch index; -1 for a blend face, which lies on no patch.
+    patch: int
+    leaf: int
+    leaf_type: str | None = None
+    area: float | None = None
+
+
+class BRepEdgePayload(Strict):
+    """One face-pair boundary chain, kinded by how it reached the screen."""
+
+    id: int
+    # ``traced`` / ``sampled`` when the feature-edge overlay drew it, otherwise
+    # the graph's state (``blend``, ``tangent``, …) or ``undrawn``.
+    kind: str
+    state: str
+    faces: list[int]
+    patches: list[int]
+    vertices: list[int]
+    closed: bool
+    analytic: bool
+    residual: float | None = None
+    crossing: float | None = None
+    # Flat ``x, y, z`` polyline.
+    points: list[float]
+    # Largest ``|f|`` of the scene along the curve, in model units.
+    off_surface: float
+
+
+class BRepVertexPayload(Strict):
+    """One solved corner of the derived B-rep."""
+
+    id: int
+    kind: str
+    point: Vector3
+    faces: list[int]
+    residual: float | None = None
+
+
+class BRepDiagnostics(Strict):
+    """Counts, the path that produced the B-rep, and why the exact one refused."""
+
+    faces: int
+    edges: int
+    vertices: int
+    source: str
+    exact: bool
+    fallback_reason: str | None = None
+    surfaces: dict[str, int]
+    edge_kinds: dict[str, int]
+    vertex_kinds: dict[str, int]
+    off_surface_tolerance: float
+    off_surface_edges: int
+    feature_curves: str | None = None
+    cell: float
+    resolution: int
+    stats: dict[str, float | int | str | bool]
+    timings: dict[str, float]
+
+
+class BRepInspectionPayload(Strict):
+    """The derived B-rep, or why there is none (``available`` false)."""
+
+    available: bool
+    reason: str | None = None
+    # The extraction raised: the failure, in one line, is what there is to see.
+    error: str | None = None
+    # Flat ``x, y, z`` positions, flat triangle indices into them, and the
+    # face id of every triangle.
+    positions: list[float] | None = None
+    triangles: list[int] | None = None
+    triangle_face: list[int] | None = None
+    faces: list[BRepFacePayload] | None = None
+    edges: list[BRepEdgePayload] | None = None
+    vertices: list[BRepVertexPayload] | None = None
+    diagnostics: BRepDiagnostics | None = None
+
+
 class ShaderParameter(Strict):
     """One design parameter's slot in the shader's uniform buffer.
 

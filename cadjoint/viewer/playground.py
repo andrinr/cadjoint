@@ -19,6 +19,11 @@ every response carries it in ``X-Cadjoint-Api``.
 - ``POST /api/mesh_refresh`` re-solve the last extracted mesh edges at new
                          parameter values, at fixed topology, without
                          running the source (a drag's live overlay)
+- ``POST /api/brep``     derive the B-rep through the private tier and return
+                         its faces (with their tessellation), edges, vertices
+                         and diagnostics, for the inspector (lazily, like
+                         ``/api/mesh``); ``brep.available`` is false without
+                         diff-brep
 - ``POST /api/simulate`` run a study the program declares (``cadjoint.fem``)
                          picked by ``name`` (``kind="study"``); the response
                          carries the solved surface, the result summary, and
@@ -132,6 +137,7 @@ from cadjoint.viewer._worker_client import (
     OPTIMIZE_TIMEOUT_SECONDS,
     SIMULATE_KINDS,
     SIMULATE_TIMEOUT_SECONDS,
+    brep_source,
     compile_source,
     mesh_inspect_source,
     mesh_source,
@@ -158,6 +164,7 @@ __all__ = [
     "SIMULATE_KINDS",
     "SIMULATE_TIMEOUT_SECONDS",
     "STATIC_ROOT",
+    "brep_source",
     "compile_source",
     "complete_source",
     "create_server",
@@ -206,6 +213,12 @@ def _post_routes() -> dict[str, Callable[[dict[str, Any]], dict[str, Any]]]:
             lambda payload: record_compile(
                 payload.get("source"),
                 OVERLAYS.absorb(payload.get("source"), mesh_source(payload.get("source"))),
+            ),
+        ),
+        "/api/brep": _tracked(
+            "brep",
+            lambda payload: record_compile(
+                payload.get("source"), brep_source(payload.get("source"))
             ),
         ),
         # Not a job: a refresh is one GPU dispatch, answered in milliseconds.
