@@ -39,11 +39,10 @@ from pydantic import BaseModel, Field
 from cadjoint.viewer.schema.payloads import (
     BRepInspectionPayload,
     CompilePayload,
-    DomainEntry,
     MeshEdgePayload,
     Open,
     Strict,
-    StudyBcDescription,
+    StudyDescription,
     Vector3,
     WorkerFailure,
 )
@@ -303,24 +302,6 @@ class ResultSummary(Open):
     mass: float | None = None
     safety_factor: float | None = None
     refinement: Refinement | None = None
-
-
-class StudyDescription(Open):
-    """A study's own ``describe()``, as a solved study echoes it.
-
-    The compile payload's :class:`~.payloads.StudyPayload` is this plus where
-    the study is written; a solve reports only what the study says of itself.
-    """
-
-    name: str
-    kind: Literal["thermal", "elastic", "flow"]
-    resolution: int | list[int] | None = None
-    bounds: list[float] | None = None
-    size: list[float] | None = None
-    mesh: str | None = None
-    domain: DomainEntry | None = None
-    material: dict[str, float | str] = Field(default_factory=dict)
-    bcs: list[StudyBcDescription]
 
 
 # ── Simulate and mesh inspection ────────────────────────────────────────────

@@ -519,25 +519,36 @@ class DomainEntry(Open):
     type: str
 
 
-class StudyPayload(Open):
-    """One study declared in the scene program.
-
-    ``kind`` names what a program may *contain*;
-    :class:`~cadjoint.enums.StudyKind` names what the viewer can *create and
-    edit* through the patch endpoints.  The two are equal today — a
-    :class:`cadjoint.flow.FlowStudy` is displayed and written like the other
-    two, though it discretises a fixed lattice rather than a mesh, so it
-    carries a ``resolution`` and no ``mesh``.
-
-    They are kept as separate vocabularies because they have differed and
-    may again: ``flow`` was in this one and not the enum for as long as the
-    patch layer could not write a ``FlowStudy``, and widening the enum ahead
-    of that would have made ``add_study`` advertise a kind it could not
-    produce.  A kind here and not in the enum reports ``editable: false``.
-    """
+class Located(BaseModel):
+    """Where a declaration is written: the fields the worker adds to its ``describe()``."""
 
     index: int
     stableId: str | None
+    line: int | None
+    span: Span | None
+    editable: bool
+
+
+class FluidDescription(Strict):
+    """A flow study's fluid and scheme, as :meth:`cadjoint.flow.FlowStudy.describe` reports it."""
+
+    reynolds: float | None
+    viscosity: float
+    inlet_speed: float
+    alpha_max: float
+    scheme: str
+    peclet_cell: float
+    richardson: float
+
+
+class StudyDescription(Open):
+    """A study's own ``describe()`` (:data:`cadjoint.descriptions.StudyDescription`).
+
+    ``source`` is a thermal study's, ``gravity`` an elastic study's and
+    ``fluid`` a flow study's.  A flow study discretises a fixed lattice, so
+    it carries a ``resolution`` and no ``mesh``.
+    """
+
     name: str
     kind: Literal["thermal", "elastic", "flow"]
     resolution: int | list[int] | None = None
@@ -546,20 +557,29 @@ class StudyPayload(Open):
     mesh: str | None = None
     domain: DomainEntry | None = None
     material: dict[str, float | str] = Field(default_factory=dict)
-    line: int | None
-    span: Span | None
-    editable: bool
+    source: float | None = None
+    gravity: Vector3 | None = None
+    fluid: FluidDescription | None = None
+    bcs: list[StudyBcDescription]
+
+
+class StudyPayload(StudyDescription, Located):
+    """One study declared in the scene program.
+
+    ``kind`` names what a program may contain;
+    :class:`~cadjoint.enums.StudyKind` names what the patch endpoints can
+    write.  A kind here and not in the enum reports ``editable: false``.
+    """
+
     mesh_span: Span | None = None
     domain_span: Span | None = None
     bcs: list[StudyBc]
 
 
-class SimMeshPayload(Open):
+class SimMeshPayload(Located, Open):
     """One ``SimMesh`` declared in the scene program."""
 
     kind: Literal["mesh"]
-    index: int
-    stableId: str | None
     name: str
     resolution: int | list[int]
     bounds: list[float] | None = None
@@ -572,17 +592,12 @@ class SimMeshPayload(Open):
     mesher: Literal["tetgen", "gmsh"] | None = None
     frozen_geometry: bool = False
     domain: DomainEntry | None = None
-    line: int | None
-    span: Span | None
-    editable: bool
 
 
-class OptimizationPayload(Open):
+class OptimizationPayload(Located, Open):
     """One ``Optimization(...)`` declared in the scene program."""
 
     kind: Literal["optimization"]
-    index: int
-    stableId: str | None
     name: str
     steps: int
     learning_rate: float
@@ -592,9 +607,8 @@ class OptimizationPayload(Open):
     study: str | None = None
     metric: str | None = None
     remesh_every: int | None = None
-    line: int | None
-    span: Span | None
-    editable: bool
+    regularizer: str | None = None
+    regularizer_weight: float | None = None
     steps_span: Span | None = None
     learning_rate_span: Span | None = None
 

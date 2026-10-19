@@ -93,6 +93,7 @@ from typing import Any, Callable
 import numpy as np
 
 from cadjoint.capture import Capture, one_named
+from cadjoint.descriptions import OptimizationDescription
 from cadjoint.enums import (
     GradientPath,
     GradientPathLike,
@@ -569,7 +570,7 @@ class Optimization:
         free, _, _ = extract_parameters(target)
         return free
 
-    def describe(self, scene: Any = None) -> dict[str, Any]:
+    def describe(self, scene: Any = None) -> OptimizationDescription:
         """JSON-ready payload: everything the viewer needs to display it.
 
         Args:

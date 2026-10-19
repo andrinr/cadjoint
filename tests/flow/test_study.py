@@ -18,7 +18,6 @@ import pytest
 from cadjoint import extract_parameters, functionalize
 from cadjoint.fem import Nodes
 from cadjoint.flow import (
-    FLOW_STUDY_KIND,
     EnergyConfig,
     FlowStudy,
     HeatSource,
@@ -112,7 +111,7 @@ class TestDeclaration:
 
         payload = _study(name="described").describe()
 
-        assert payload["kind"] == FLOW_STUDY_KIND
+        assert payload["kind"] == "flow"
         assert payload["name"] == "described"
         assert payload["resolution"] == [8, 14, 8]
         assert [bc["type"] for bc in payload["bcs"]] == [

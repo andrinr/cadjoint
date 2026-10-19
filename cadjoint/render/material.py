@@ -39,6 +39,7 @@ from typing import Any
 
 from jax import Array
 
+from cadjoint.descriptions import MaterialDescription
 from cadjoint.fluent import Fluent
 from cadjoint.geometry.parameters import Parameter, Scalar, Vector
 
@@ -348,7 +349,7 @@ class Material(Fluent):
         """
         return {k: m2[k] * (1.0 - t) + m1[k] * t for k in m1}
 
-    def describe(self) -> dict[str, Any]:
+    def describe(self) -> MaterialDescription:
         """JSON-ready payload of every property, for the viewer's inspector.
 
         Returns:

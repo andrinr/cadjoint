@@ -50,6 +50,7 @@ from typing import Any
 import numpy as np
 
 from cadjoint.capture import Capture
+from cadjoint.descriptions import SimMeshDescription
 from cadjoint.enums import (
     MeshMethod,
     MeshMethodLike,
@@ -234,7 +235,7 @@ class SimMesh:
 
     # ── declaration ─────────────────────────────────────────────────────────
 
-    def describe(self) -> dict[str, Any]:
+    def describe(self) -> SimMeshDescription:
         """JSON-ready declaration payload: everything the viewer displays.
 
         The ``domain`` entry records the selected object by its ``name``

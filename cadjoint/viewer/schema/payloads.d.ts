@@ -318,24 +318,13 @@ export interface MaterialDefinition {
 }
 
 /**
- * One study declared in the scene program.
+ * A study's own ``describe()`` (:data:`cadjoint.descriptions.StudyDescription`).
  *
- * ``kind`` names what a program may *contain*;
- * :class:`~cadjoint.enums.StudyKind` names what the viewer can *create and
- * edit* through the patch endpoints.  The two are equal today — a
- * :class:`cadjoint.flow.FlowStudy` is displayed and written like the other
- * two, though it discretises a fixed lattice rather than a mesh, so it
- * carries a ``resolution`` and no ``mesh``.
- *
- * They are kept as separate vocabularies because they have differed and
- * may again: ``flow`` was in this one and not the enum for as long as the
- * patch layer could not write a ``FlowStudy``, and widening the enum ahead
- * of that would have made ``add_study`` advertise a kind it could not
- * produce.  A kind here and not in the enum reports ``editable: false``.
+ * ``source`` is a thermal study's, ``gravity`` an elastic study's and
+ * ``fluid`` a flow study's.  A flow study discretises a fixed lattice, so
+ * it carries a ``resolution`` and no ``mesh``.
  */
-export interface StudyPayload {
-  index: number;
-  stableId: string | null;
+export interface StudyDescription {
   name: string;
   kind: "thermal" | "elastic" | "flow";
   resolution?: number | number[] | null;
@@ -344,12 +333,52 @@ export interface StudyPayload {
   mesh?: string | null;
   domain?: DomainEntry | null;
   material?: Record<string, number | string>;
+  source?: number | null;
+  gravity?: [number, number, number] | null;
+  fluid?: FluidDescription | null;
+  bcs: StudyBcDescription[];
+  /** Fields the object's own describe() may add. */
+  [key: string]: unknown;
+}
+
+/** A flow study's fluid and scheme, as :meth:`cadjoint.flow.FlowStudy.describe` reports it. */
+export interface FluidDescription {
+  reynolds: number | null;
+  viscosity: number;
+  inlet_speed: number;
+  alpha_max: number;
+  scheme: string;
+  peclet_cell: number;
+  richardson: number;
+}
+
+/**
+ * One study declared in the scene program.
+ *
+ * ``kind`` names what a program may contain;
+ * :class:`~cadjoint.enums.StudyKind` names what the patch endpoints can
+ * write.  A kind here and not in the enum reports ``editable: false``.
+ */
+export interface StudyPayload {
+  index: number;
+  stableId: string | null;
   line: number | null;
   span: [number, number] | null;
   editable: boolean;
+  name: string;
+  kind: "thermal" | "elastic" | "flow";
+  resolution?: number | number[] | null;
+  bounds?: number[] | null;
+  size?: number[] | null;
+  mesh?: string | null;
+  domain?: DomainEntry | null;
+  material?: Record<string, number | string>;
+  source?: number | null;
+  gravity?: [number, number, number] | null;
+  fluid?: FluidDescription | null;
+  bcs: StudyBc[];
   mesh_span?: [number, number] | null;
   domain_span?: [number, number] | null;
-  bcs: StudyBc[];
   /** Fields the object's own describe() may add. */
   [key: string]: unknown;
 }
@@ -469,9 +498,12 @@ export interface DomainEntry {
 
 /** One ``SimMesh`` declared in the scene program. */
 export interface SimMeshPayload {
-  kind: "mesh";
   index: number;
   stableId: string | null;
+  line: number | null;
+  span: [number, number] | null;
+  editable: boolean;
+  kind: "mesh";
   name: string;
   resolution: number | number[];
   bounds?: number[] | null;
@@ -481,18 +513,18 @@ export interface SimMeshPayload {
   mesher?: "tetgen" | "gmsh" | null;
   frozen_geometry?: boolean;
   domain?: DomainEntry | null;
-  line: number | null;
-  span: [number, number] | null;
-  editable: boolean;
   /** Fields the object's own describe() may add. */
   [key: string]: unknown;
 }
 
 /** One ``Optimization(...)`` declared in the scene program. */
 export interface OptimizationPayload {
-  kind: "optimization";
   index: number;
   stableId: string | null;
+  line: number | null;
+  span: [number, number] | null;
+  editable: boolean;
+  kind: "optimization";
   name: string;
   steps: number;
   learning_rate: number;
@@ -502,9 +534,8 @@ export interface OptimizationPayload {
   study?: string | null;
   metric?: string | null;
   remesh_every?: number | null;
-  line: number | null;
-  span: [number, number] | null;
-  editable: boolean;
+  regularizer?: string | null;
+  regularizer_weight?: number | null;
   steps_span?: [number, number] | null;
   learning_rate_span?: [number, number] | null;
   /** Fields the object's own describe() may add. */
@@ -768,26 +799,6 @@ export interface ResultSummary {
   mass?: number | null;
   safety_factor?: number | null;
   refinement?: Refinement | null;
-  /** Fields the object's own describe() may add. */
-  [key: string]: unknown;
-}
-
-/**
- * A study's own ``describe()``, as a solved study echoes it.
- *
- * The compile payload's :class:`~.payloads.StudyPayload` is this plus where
- * the study is written; a solve reports only what the study says of itself.
- */
-export interface StudyDescription {
-  name: string;
-  kind: "thermal" | "elastic" | "flow";
-  resolution?: number | number[] | null;
-  bounds?: number[] | null;
-  size?: number[] | null;
-  mesh?: string | null;
-  domain?: DomainEntry | null;
-  material?: Record<string, number | string>;
-  bcs: StudyBcDescription[];
   /** Fields the object's own describe() may add. */
   [key: string]: unknown;
 }

@@ -95,7 +95,6 @@ from cadjoint.flow.steady import (
 from cadjoint.flow.study import (
     BC_KINDS,
     CUBIC_CELL_TOLERANCE,
-    FLOW_STUDY_KIND,
     FORCED_CONVECTION_RICHARDSON,
     FlowStudy,
     FlowStudyResult,
@@ -114,7 +113,6 @@ __all__ = [
     "CUBIC_CELL_TOLERANCE",
     "DEFAULT_ALPHA_MAX",
     "EnergyConfig",
-    "FLOW_STUDY_KIND",
     "FORCED_CONVECTION_RICHARDSON",
     "FlowConfig",
     "FlowGrid",

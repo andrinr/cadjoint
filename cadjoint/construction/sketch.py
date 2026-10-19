@@ -59,6 +59,7 @@ import jax.numpy as jnp
 import numpy as np
 from jax import Array
 
+from cadjoint.descriptions import PlaneDescription
 from cadjoint.fluent import Fluent
 from cadjoint.geometry.parameters import Parameter, Vector, Vector2, as_parameter
 from cadjoint.geometry.vectors import unit
@@ -442,7 +443,7 @@ class SketchPlane(Fluent):
         xy = jnp.asarray(xy)
         return self.origin.xyz + xy[..., :1] * u + xy[..., 1:2] * v
 
-    def describe(self) -> dict:
+    def describe(self) -> PlaneDescription:
         """Serialize the plane's frame for the viewer."""
         u, v, n = self.frame()
         return {

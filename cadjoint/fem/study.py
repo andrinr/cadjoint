@@ -59,6 +59,14 @@ from dataclasses import KW_ONLY, dataclass, field
 from typing import Any
 
 from cadjoint.capture import one_named
+from cadjoint.descriptions import (
+    DirichletDescription,
+    ElasticStudyDescription,
+    FixedDescription,
+    HeatFluxDescription,
+    ThermalStudyDescription,
+    TractionDescription,
+)
 from cadjoint.enums import BoundaryConditionType, StudyKind
 from cadjoint.fem.cutfem import CutMesh
 from cadjoint.fem.discretization import Discretization
@@ -111,7 +119,7 @@ class Dirichlet:
         """Whether :meth:`describe` round-trips (false for predicates)."""
         return self.nodes.serializable
 
-    def describe(self) -> dict[str, Any]:
+    def describe(self) -> DirichletDescription:
         """JSON-ready description."""
         return {
             "type": BoundaryConditionType.DIRICHLET.value,
@@ -139,7 +147,7 @@ class HeatFlux:
         """Whether :meth:`describe` round-trips (false for predicates)."""
         return self.nodes.serializable
 
-    def describe(self) -> dict[str, Any]:
+    def describe(self) -> HeatFluxDescription:
         """JSON-ready description."""
         return {
             "type": BoundaryConditionType.HEAT_FLUX.value,
@@ -162,7 +170,7 @@ class Fixed:
         """Whether :meth:`describe` round-trips (false for predicates)."""
         return self.nodes.serializable
 
-    def describe(self) -> dict[str, Any]:
+    def describe(self) -> FixedDescription:
         """JSON-ready description."""
         return {"type": BoundaryConditionType.FIXED.value, "nodes": self.nodes.describe()}
 
@@ -183,7 +191,7 @@ class Traction:
         """Whether :meth:`describe` round-trips (false for predicates)."""
         return self.nodes.serializable
 
-    def describe(self) -> dict[str, Any]:
+    def describe(self) -> TractionDescription:
         """JSON-ready description."""
         return {
             "type": BoundaryConditionType.TRACTION.value,
@@ -528,7 +536,7 @@ class ThermalStudy:
         )
         register_study(self)
 
-    def describe(self) -> dict[str, Any]:
+    def describe(self) -> ThermalStudyDescription:
         """JSON-ready payload: everything the viewer needs to display it."""
         return {
             "name": self.name,
@@ -659,7 +667,7 @@ class ElasticStudy:
             self.gravity = require_triplet(self.gravity, "gravity")
         register_study(self)
 
-    def describe(self) -> dict[str, Any]:
+    def describe(self) -> ElasticStudyDescription:
         """JSON-ready payload: everything the viewer needs to display it."""
         return {
             "name": self.name,
