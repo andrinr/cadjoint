@@ -129,6 +129,10 @@ class KindStatus(Strict):
     contract_version: int | None
     compatible: bool
     reason: str | None
+    label: str
+    """The tag the viewer shows beside the feature, e.g. ``"Faceted · public tier"``."""
+    message: str | None = None
+    """Without the kind: what the public tier does instead (:func:`cadjoint.tier.message`)."""
 
 
 class CapabilitiesResponse(Strict):

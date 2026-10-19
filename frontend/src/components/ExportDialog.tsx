@@ -29,7 +29,8 @@ import {
 import { formatBytes } from "../jobs";
 import { sceneName, setStatus, source, studies } from "../state";
 import type { ExportFormat } from "../types";
-import { DialogHeader, Select, ToggleSwitch } from "./ui";
+import { tierMissing } from "../tier";
+import { DialogHeader, Select, TierReason, TierTag, ToggleSwitch } from "./ui";
 import "./export.css";
 
 export interface ExportDialogProps {
@@ -61,6 +62,8 @@ export function ExportDialog(props: ExportDialogProps) {
   const [error, setError] = createSignal("");
 
   const info = () => formatInfo(format());
+  /** STEP without the private tier: the faceted writer, said at the choice. */
+  const facetedStep = () => tierMissing("step_export");
   const targets = createMemo(() => exportTargets(format(), source(), studyNames()));
   /** A study format with nothing to write is the one case the form refuses. */
   const nothingToExport = () => info().takes === "study" && targets().length === 0;
@@ -81,7 +84,7 @@ export function ExportDialog(props: ExportDialogProps) {
       name: name(),
       resolution: resolution(),
       binary: binary(),
-      analytic: analytic(),
+      analytic: analytic() && !facetedStep(),
       mergePlanar: mergePlanar(),
     });
     if (!body.name) {
@@ -131,10 +134,18 @@ export function ExportDialog(props: ExportDialogProps) {
         >
           <div class="export-row">
             <label class="export-field">
-              Format
+              <span>
+                Format
+                <Show when={format() === "step"}>
+                  <TierTag kind="step_export" testId="export-tier" />
+                </Show>
+              </span>
               <Select
                 value={format()}
-                options={EXPORT_FORMATS.map((entry) => ({ value: entry.value, label: entry.label }))}
+                options={EXPORT_FORMATS.map((entry) => ({
+                  value: entry.value,
+                  label: entry.value === "step" && facetedStep() ? "STEP · faceted" : entry.label,
+                }))}
                 onChange={(value) => pickFormat(value as ExportFormat)}
                 disabled={busy()}
                 testId="export-format"
@@ -148,7 +159,7 @@ export function ExportDialog(props: ExportDialogProps) {
                       option().key === "binary"
                         ? binary()
                         : option().key === "analytic"
-                          ? analytic()
+                          ? analytic() && !facetedStep()
                           : mergePlanar()
                     }
                     onChange={(checked) => {
@@ -156,7 +167,7 @@ export function ExportDialog(props: ExportDialogProps) {
                       else if (option().key === "analytic") setAnalytic(checked);
                       else setMergePlanar(checked);
                     }}
-                    disabled={busy()}
+                    disabled={busy() || (option().key === "analytic" && facetedStep())}
                     testId={`export-option-${option().key}`}
                   >
                     {option().label}
@@ -222,9 +233,16 @@ export function ExportDialog(props: ExportDialogProps) {
           </div>
 
           <p class="dialog-note" data-testid="export-note">
-            {nothingToExport()
-              ? "The program declares no study to export a result from."
-              : info().note}
+            <Show
+              when={format() === "step" && facetedStep()}
+              fallback={
+                nothingToExport()
+                  ? "The program declares no study to export a result from."
+                  : info().note
+              }
+            >
+              <TierReason kind="step_export" testId="export-tier-reason" />
+            </Show>
           </p>
 
           <Show when={error()}>

@@ -14,6 +14,7 @@ import type {
   ApiRoutes,
   ApiVersion,
   BrepResponse,
+  CapabilitiesResponse,
   CompileResponse,
   CompleteResponse,
   ExportRequest,
@@ -383,6 +384,15 @@ export async function exportFile(body: ExportRequest): Promise<ExportOutcome> {
 }
 
 /** List saved scene files in the server's `scenes` workspace. */
+/**
+ * Which private-tier kinds this server can reach (`cadjoint.tier`), with the
+ * tag and the sentence the viewer shows beside each feature they limit.
+ */
+export async function capabilities(): Promise<CapabilitiesResponse> {
+  const response = await fetch("/api/capabilities");
+  return readJson<CapabilitiesResponse>(response);
+}
+
 export async function listScenes(): Promise<SceneListResponse> {
   const response = await fetch("/api/scenes");
   return readJson<SceneListResponse>(response);

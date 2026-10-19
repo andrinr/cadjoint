@@ -588,6 +588,7 @@ input[type="checkbox"] {
 .selection-chip,
 .plane-label,
 .shortcut-groups kbd,
+.tier-tag,
 .scene-materials .sim-kind {
   flex: 0 0 auto;
   display: inline-flex;
@@ -4177,4 +4178,43 @@ button.icon {
 
 .brep-alert {
   color: var(--danger-ink);
+}
+
+/* ── tier tags ─────────────────────────────────────────────────────────────
+   What a feature is in this install: a value chip (K4) beside the feature.
+   The public form's edge is dashed — approximate, said without a hue — and
+   its reason is one line of ink-3 under the control. */
+.tier-tag {
+  margin-left: var(--gap);
+  vertical-align: middle;
+}
+
+.tier-tag.tier-public {
+  border-style: dashed;
+  border-color: var(--rule-strong);
+}
+
+.tier-reason {
+  display: block;
+  color: var(--ink-3);
+  font: var(--text-body);
+  letter-spacing: var(--track-body);
+  white-space: normal;
+}
+
+/* Inside a switch the label column stacks its spans and sets them in caps;
+   the chip is a value, so it keeps its own case and its own width. */
+.switch .tier-tag {
+  display: inline-flex;
+  flex-direction: row;
+  align-self: flex-start;
+  margin-left: 0;
+  font: var(--text-body);
+  letter-spacing: var(--track-body);
+  text-transform: var(--case-body);
+  font-variant-numeric: var(--numeric-body);
+}
+
+.switch .tier-reason {
+  color: var(--ink-3);
 }

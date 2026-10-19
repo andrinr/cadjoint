@@ -129,6 +129,27 @@ export const components: SectionDef = {
         hue.
       </Rule>
 
+      <Rule
+        id="K4b"
+        why="A feature that runs on the approximate path in the public tier must say so where it is chosen, not degrade silently."
+        examples={
+          <Plate label="tier chip: private tier, public tier, the reason under a disabled control">
+            <div class="dl-row-of">
+              <span class="tier-tag">Exact surfaces · private tier</span>
+              <span class="tier-tag tier-public">Faceted · public tier</span>
+            </div>
+            <small class="tier-reason">
+              STEP export is faceted in the public tier: triangles from dual contouring.
+            </small>
+          </Plate>
+        }
+      >
+        A tier chip is a value chip that states what a feature is in this install: what you get, then where it comes
+        from. The public form has a dashed edge, still the one 1px weight and no hue. Where the exact path is missing,
+        one line of <code>ink-3</code> under the control gives the server's reason (<code>cadjoint.tier.message</code>),
+        and a control that cannot run is disabled rather than hidden.
+      </Rule>
+
       <h3>Menus</h3>
       <Rule
         id="K5"

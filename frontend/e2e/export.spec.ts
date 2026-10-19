@@ -35,8 +35,17 @@ test("File → Export… downloads the starter scene as a binary STL", async ({ 
   await expect(page.getByTestId("export-name")).toHaveValue("scene");
   await expect(page.getByTestId("export-resolution")).toHaveValue("64");
   await pickOption(page, "export-format", "step");
-  await expect(page.getByTestId("export-note")).toContainText("B-rep");
-  await expect(page.getByTestId("export-option-analytic")).toBeChecked();
+  const exact = (await page.evaluate(async () => (await fetch("/api/capabilities")).json())).kinds
+    .step_export.available as boolean;
+  if (exact) {
+    await expect(page.getByTestId("export-note")).toContainText("B-rep");
+    await expect(page.getByTestId("export-option-analytic")).toBeChecked();
+  } else {
+    // The public tier says it at the choice: faceted, the analytic option off.
+    await expect(page.getByTestId("export-note")).toContainText("faceted");
+    await expect(page.getByTestId("export-option-analytic")).toBeDisabled();
+    await expect(page.getByTestId("export-option-analytic")).not.toBeChecked();
+  }
   await pickOption(page, "export-format", "stl");
   await expect(page.getByTestId("export-option-binary")).toBeChecked();
 

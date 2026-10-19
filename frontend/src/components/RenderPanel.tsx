@@ -26,8 +26,17 @@ import {
 } from "../viewer/display";
 import { sdfRampCss } from "../viewer/sdfRamp";
 import { brepMessage, brepStatus } from "../state";
+import { tierMissing, type TierKind } from "../tier";
 import { MM_PER_UNIT, formatDistance } from "../viewer/graticule";
-import { PanelHeader, Segmented, ToggleSwitch, axisOptions, type SegmentedOption } from "./ui";
+import {
+  PanelHeader,
+  Segmented,
+  TierReason,
+  TierTag,
+  ToggleSwitch,
+  axisOptions,
+  type SegmentedOption,
+} from "./ui";
 import { BoxIcon, StudioIcon, WireIcon, XrayIcon } from "./icons";
 
 /** Each built-in preset's glyph, drawn in the icon set's own pen (I1). */
@@ -126,7 +135,13 @@ const distanceLabel = (units: number): string => {
   return `${value} ${unit}`;
 };
 
-const SWITCHES: { key: keyof DisplaySettings; label: string; hint: string }[] =
+const SWITCHES: {
+  key: keyof DisplaySettings;
+  label: string;
+  hint: string;
+  /** The private-tier kind this switch's exact form needs, tagged beside it. */
+  tier?: TierKind;
+}[] =
   [
     {
       key: "reflections",
@@ -142,6 +157,7 @@ const SWITCHES: { key: keyof DisplaySettings; label: string; hint: string }[] =
       key: "showMeshEdges",
       label: "Feature edges",
       hint: "Sharp creases, corners, and CSG seams",
+      tier: "feature_edges",
     },
     {
       key: "showMeshWireframe",
@@ -163,6 +179,12 @@ export interface RenderPanelProps {
   onPresetReset: (id: RenderPresetId) => void;
   onPathTracingChange: (enabled: boolean) => void;
 }
+
+/**
+ * The inspector cannot run: the server said so up front, or a request found
+ * out (an older server without `/api/capabilities` reports it that way).
+ */
+const brepUnavailable = () => tierMissing("brep") || brepStatus() === "unavailable";
 
 export function RenderPanel(props: RenderPanelProps) {
   const [editing, setEditing] = createSignal(false);
@@ -586,27 +608,34 @@ export function RenderPanel(props: RenderPanelProps) {
                     testId={`toggle-${entry.key}`}
                   >
                     {entry.label}
+                    <Show when={entry.tier}>
+                      {(kind) => <TierTag kind={kind()} />}
+                    </Show>
                     <small>{entry.hint}</small>
                   </ToggleSwitch>
                 )}
               </For>
               {/* The inspector replaces the solid with the derived B-rep, so it
                   sits with the switches that change what the solid is drawn
-                  as. Without the private tier the server's sentence is the
-                  hint, and the switch stays off. */}
+                  as. Without the private tier it is disabled, and the
+                  server's sentence says why in place of the hint. */}
               <ToggleSwitch
-                checked={props.display.showBrep === true}
-                disabled={brepStatus() === "unavailable"}
+                checked={props.display.showBrep === true && !brepUnavailable()}
+                disabled={brepUnavailable()}
                 onChange={(showBrep) => props.onChange({ showBrep })}
                 testId="toggle-showBrep"
-                title={brepStatus() === "unavailable" ? (brepMessage() ?? undefined) : undefined}
               >
                 B-rep inspector
-                <small>
-                  {brepStatus() === "unavailable"
-                    ? "Needs diff-brep (not installed)"
-                    : "Faces, edges and vertices the extraction found"}
-                </small>
+                <TierTag kind="brep" />
+                <Show
+                  when={brepUnavailable()}
+                  fallback={<small>Faces, edges and vertices the extraction found</small>}
+                >
+                  <TierReason kind="brep" />
+                  <Show when={!tierMissing("brep")}>
+                    <small class="tier-reason">{brepMessage()}</small>
+                  </Show>
+                </Show>
               </ToggleSwitch>
             </section>
 

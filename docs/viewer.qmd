@@ -380,6 +380,23 @@ inspector is on. Without diff-brep the switch is greyed out with the reason;
 when the extraction raises, the card prints the exception and the frame it
 came from, and the solid stays on screen.
 
+### Public and private tier
+
+The exact paths are part of the private tier (diff-brep): the derived
+B-rep, its edge curves, analytic STEP, and the node map that lets a Gmsh mesh
+follow the design. Without diff-brep each of these features still runs, on
+dual contouring, and the viewer labels it where you choose it. A small chip
+says what you get and where it comes from: **Feature edges** reads
+`Approximate · lattice` and the STEP entry in **File › Export…** reads
+`STEP · faceted`. **B-rep inspector** is disabled, and a Gmsh mesh in the
+Meshes window reads `Frozen geometry · public tier`. A dashed chip edge marks
+the public form, and one line under the control gives the reason. With
+diff-brep the same chips read `Exact … · private tier`. The viewer reads all
+of this once from `GET /api/capabilities`, and the wording comes from
+`cadjoint.tier`, which the library's own refusals also use. To see the public
+tier on a machine with diff-brep installed, start the playground with
+`CADJOINT_PUBLIC_TIER=1`.
+
 ### Quality and path tracing
 
 Ultra is the default tier; the performance readout shows what it costs.

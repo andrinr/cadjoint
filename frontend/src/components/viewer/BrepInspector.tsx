@@ -242,7 +242,7 @@ export function BrepInspector(props: { show: boolean }) {
               : brepStatus() === "error"
                 ? "Extraction failed"
                 : brepStatus() === "unavailable"
-                  ? "Not installed"
+                  ? "Dual contouring only · public tier"
                   : model()
                     ? "Derived"
                     : "Waiting for a compile"}

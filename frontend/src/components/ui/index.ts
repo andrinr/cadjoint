@@ -57,3 +57,4 @@ export {
   type PanelHeaderProps,
 } from "./Panel";
 export { createDismiss, type DismissOptions } from "./dismiss";
+export { TierReason, TierTag } from "./TierTag";
