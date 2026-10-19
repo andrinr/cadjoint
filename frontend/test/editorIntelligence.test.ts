@@ -122,7 +122,7 @@ describe("ruff fixes", () => {
     const apply = () => undefined;
     const [item] = toDiagnostics(
       doc,
-      { ok: true, diagnostics: [diagnostic({ fix })] },
+      { ok: true, runtime: false, diagnostics: [diagnostic({ fix })] },
       { applyFix: () => apply },
     );
     expect(item.actions).toHaveLength(1);
@@ -133,7 +133,7 @@ describe("ruff fixes", () => {
   it("leaves a display-only fix without a button", () => {
     const [item] = toDiagnostics(
       doc,
-      { ok: true, diagnostics: [diagnostic({ fix: { ...fix, applicability: "display" } })] },
+      { ok: true, runtime: false, diagnostics: [diagnostic({ fix: { ...fix, applicability: "display" } })] },
       { applyFix: () => () => undefined },
     );
     expect(item.actions).toBeUndefined();
@@ -157,7 +157,7 @@ describe("diagnostic ordering", () => {
   });
 
   it("shows the traceback as an error whatever the payload called it", () => {
-    const [first] = toDiagnostics(doc, { ok: true, diagnostics: [runtime] });
+    const [first] = toDiagnostics(doc, { ok: true, runtime: false, diagnostics: [runtime] });
     expect(first.severity).toBe("error");
     expect(first.markClass).toBe("cm-lint-runtime");
   });
@@ -178,7 +178,7 @@ describe("diagnostic ordering", () => {
   });
 
   it("carries the rule code through as the diagnostic's source label", () => {
-    const [item] = toDiagnostics(doc, { ok: true, diagnostics: [diagnostic()] });
+    const [item] = toDiagnostics(doc, { ok: true, runtime: false, diagnostics: [diagnostic()] });
     expect(item.source).toBe("F821");
     expect(item.markClass).toBe("cm-lint-ruff");
   });
@@ -194,7 +194,7 @@ describe("diagnostic ordering", () => {
 
 describe("completions", () => {
   const response = {
-    ok: true,
+    ok: true as const,
     from_line: 3,
     from_column: 8,
     truncated: false,
@@ -207,7 +207,7 @@ describe("completions", () => {
 
   it("replaces from the start of the typed prefix", () => {
     expect(completionFrom(doc, response)).toBe(25);
-    expect(completionFrom(doc, { ok: false })).toBeNull();
+    expect(completionFrom(doc, { ok: false, error: "no jedi" })).toBeNull();
   });
 
   it("keeps the server's keyword arguments in front, in order", () => {
@@ -284,6 +284,6 @@ describe("signature help", () => {
   it("shows the resolved overload, and nothing when there is none", () => {
     expect(activeSignature({ ok: true, signatures: [signature] })).toBe(signature);
     expect(activeSignature({ ok: true, signatures: [] })).toBeNull();
-    expect(activeSignature({ ok: false })).toBeNull();
+    expect(activeSignature({ ok: false, error: "no jedi" })).toBeNull();
   });
 });

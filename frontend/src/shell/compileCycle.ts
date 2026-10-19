@@ -68,7 +68,7 @@ import {
 import { createSuperseding, type RunToken } from "./supersede";
 import type { SourceHistoryStore } from "./sourceHistory";
 import type { DisplaySettings, Renderer } from "../viewer/renderer";
-import type { ShaderProgram } from "../types";
+import type { PatchRequest, ShaderProgram } from "../types";
 
 /** The generated shader pair, for the "Generated WGSL" dialog. */
 export interface WgslPreview {
@@ -152,8 +152,8 @@ function programValues(program: ShaderProgram): Record<string, number[]> {
   return values;
 }
 
-/** What one `/compile` came back with, before anything has been published. */
-type CompileResult = Awaited<ReturnType<typeof api.compile>>;
+/** What one successful `/api/compile` came back with, before anything has been published. */
+type CompileResult = Extract<Awaited<ReturnType<typeof api.compile>>, { ok: true }>;
 
 type Attempt =
   /** A newer request owns the app; this answer is to be forgotten entirely. */
@@ -265,8 +265,8 @@ export function createCompileCycle(options: CompileCycleOptions): CompileCycle {
     try {
       const result = await api.compile(text, { clientId, signal: controller.signal });
       if (!token.current()) return { state: "stale" };
-      if (result.error_kind === "cancelled") return { state: "cancelled" };
       if (!result.ok) {
+        if (result.error_kind === "cancelled") return { state: "cancelled" };
         return { state: "failed", message: result.error ?? "Unknown compile error." };
       }
       return { state: "ok", result };
@@ -428,7 +428,9 @@ export function createCompileCycle(options: CompileCycleOptions): CompileCycle {
   let patchQueue: Promise<void> = Promise.resolve();
   const performPatch = async (body: Record<string, unknown>): Promise<boolean> => {
     try {
-      const result = await api.patch({ source: source(), ...body });
+      // The panes build their edits as plain objects; the server checks each
+      // one against its `PatchRequest` model and refuses what does not fit.
+      const result = await api.patch({ ...body, source: source() } as PatchRequest);
       if (!result.ok || !result.source) {
         setStatus({ kind: "error", text: result.error ?? "Edit failed" });
         return false;

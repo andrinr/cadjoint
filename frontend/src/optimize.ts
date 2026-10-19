@@ -9,7 +9,7 @@
  * DOM or app state, so it is unit-testable as-is.
  */
 
-import type { OptimizationPayload, OptimizeResponse, OptimizeTrajectoryEntry } from "./types";
+import type { JobStamped, OptimizationPayload, OptimizeFrame, OptimizeResponse } from "./types";
 import { byId } from "./identity";
 
 // ── /api/optimize NDJSON stream parsing ──────────────────────────────────
@@ -33,7 +33,7 @@ export interface OptimizeProgress {
 
 export type OptimizeStreamEvent =
   | ({ kind: "progress" } & OptimizeProgress)
-  | { kind: "done"; response: OptimizeResponse };
+  | { kind: "done"; response: OptimizeResponse & JobStamped };
 
 /** Split a stream buffer into complete lines plus the unfinished tail. */
 export function splitStreamBuffer(buffer: string): { lines: string[]; rest: string } {
@@ -80,7 +80,7 @@ export function parseOptimizeStreamLine(line: string): OptimizeStreamEvent | nul
   }
   if (record.event === "done") {
     const { event: _event, ...response } = record;
-    return { kind: "done", response: response as unknown as OptimizeResponse };
+    return { kind: "done", response: response as unknown as OptimizeResponse & JobStamped };
   }
   return null;
 }
@@ -255,7 +255,7 @@ export function sparklineCursorPoint(
 
 /** Objective value of a trajectory frame, for the player readout. */
 export function frameObjective(
-  trajectory: readonly OptimizeTrajectoryEntry[],
+  trajectory: readonly OptimizeFrame[],
   frame: number,
 ): number | null {
   const entry = trajectory[frame];

@@ -1,7 +1,7 @@
 /**
  * Client-side evaluation of serialized Nodes selections for BC previews.
  *
- * Mirrors cadjoint/fem/selection.py over the simulation render payload: the
+ * Mirrors cadjoint/studies/selection.py over the simulation render payload: the
  * payload ships exactly the boundary-surface vertices, so the server's
  * implicit "boundary nodes only" restriction is already satisfied and the
  * complement (`not`) is a plain negation. `side` reproduces the server's
@@ -101,6 +101,27 @@ export function evaluateSelection(
           const dz = positions[index * 3 + 2] - node.point[2];
           mask[index] =
             dx * node.normal[0] + dy * node.normal[1] + dz * node.normal[2] >= 0;
+        }
+        return mask;
+      }
+      case "cylinder": {
+        // selection.py's _Cylinder: radial distance from the axis line
+        // between `inner` and `radius`, and within `half_length` of the
+        // centre along the axis when that is bounded.
+        const length = Math.hypot(node.axis[0], node.axis[1], node.axis[2]);
+        const direction = node.axis.map((component) => component / length);
+        const outerSq = node.radius * node.radius;
+        const innerSq = node.inner * node.inner;
+        for (let index = 0; index < count; index++) {
+          const dx = positions[index * 3] - node.center[0];
+          const dy = positions[index * 3 + 1] - node.center[1];
+          const dz = positions[index * 3 + 2] - node.center[2];
+          const axial = dx * direction[0] + dy * direction[1] + dz * direction[2];
+          const radialSq = dx * dx + dy * dy + dz * dz - axial * axial;
+          mask[index] =
+            radialSq <= outerSq &&
+            radialSq >= innerSq &&
+            (node.half_length === null || Math.abs(axial) <= node.half_length);
         }
         return mask;
       }

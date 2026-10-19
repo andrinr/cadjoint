@@ -25,94 +25,23 @@
 
 import { createSignal } from "solid-js";
 import * as api from "./api";
+import type { JobProgress, JobsSnapshot, JobSummary } from "./types";
+
+export type {
+  JobDetail,
+  JobProgress,
+  JobSample,
+  JobStamped,
+  JobStore,
+  JobSummary,
+  JobsSnapshot,
+  JobTotals,
+} from "./types";
 
 /** The kinds of work the server registers. */
-export type JobKind =
-  | "compile"
-  | "mesh"
-  | "mesh_inspect"
-  | "simulate"
-  | "optimize"
-  | "export"
-  | "lint"
-  | "warmup";
+export type JobKind = JobSummary["kind"];
 
-export type JobStatus = "queued" | "running" | "done" | "failed" | "cancelled";
-
-/** The per-step figures an optimize job mirrors out of its stream. */
-export interface JobProgress {
-  step?: number;
-  steps?: number;
-  objective?: number;
-  grad_norm?: number;
-  elapsed?: number;
-}
-
-/** One resource sample of a running worker, relative to the job's start. */
-export interface JobSample {
-  t: number;
-  cpu_percent: number;
-  rss_bytes: number;
-}
-
-/** A job as `GET /api/jobs` lists it: everything but the result and samples. */
-export interface JobSummary {
-  job_id: string;
-  kind: JobKind;
-  status: JobStatus;
-  fields: Record<string, string | number | boolean>;
-  source_hash: string | null;
-  source_bytes: number;
-  submitted_at: number;
-  started_at: number | null;
-  finished_at: number | null;
-  elapsed_s: number;
-  pid: number | null;
-  ok: boolean | null;
-  error: string | null;
-  progress: JobProgress | null;
-  cpu_percent: number;
-  rss_bytes: number;
-  peak_cpu_percent: number;
-  peak_rss_bytes: number;
-  cpu_seconds: number;
-  sampling: "psutil" | "rusage" | "none";
-  samples: number;
-  result_available: boolean;
-  result_bytes: number;
-}
-
-export interface JobDetail extends JobSummary {
-  sample_series: JobSample[];
-  progress_events: JobProgress[];
-}
-
-export interface JobTotals {
-  running: number;
-  cpu_percent: number;
-  rss_bytes: number;
-  uptime_s: number;
-  server: { cpu_percent: number; rss_bytes: number; pid: number };
-  host: { cpu_count: number | null; mem_total: number | null; mem_available: number | null };
-  sampling: "psutil" | "rusage";
-}
-
-export interface JobStore {
-  jobs: number;
-  max_jobs: number;
-  max_lint_jobs: number;
-  result_bytes: number;
-  max_result_bytes: number;
-  evicted_jobs: number;
-  evicted_results: number;
-}
-
-export interface JobsSnapshot {
-  ok: boolean;
-  jobs: JobSummary[];
-  totals: JobTotals;
-  store: JobStore;
-}
+export type JobStatus = JobSummary["status"];
 
 /**
  * What a panel stores instead of a result.
@@ -127,19 +56,6 @@ export interface JobRef {
   source_hash: string | null;
   kind: JobKind;
   fields: Record<string, string | number | boolean>;
-}
-
-/**
- * What registration adds to an endpoint's response.
- *
- * The server's contract did not change when jobs arrived: every endpoint
- * answers exactly as before, with the id of the job that ran it added, and
- * `error_kind: "cancelled"` when somebody stopped that job (HTTP 409). Both
- * are optional so a response from an older server still types.
- */
-export interface JobStamped {
-  job_id?: string;
-  error_kind?: string;
 }
 
 // ── source hashing ─────────────────────────────────────────────────────────

@@ -30,7 +30,7 @@ import type {
   GizmoMode,
   MeshEdgePayload,
   Selection,
-  SimulationMeshPayload,
+  SurfacePayload,
 } from "../types";
 import { gizmoScale, type AxisIndex } from "./gizmo";
 import {
@@ -388,7 +388,7 @@ export class Renderer {
   // an alternative nodal field, warped (deformed) positions, and a per-
   // vertex highlight tint for BC previews. Any change re-interleaves the
   // vertex buffer — tens of thousands of vertices, cheap enough per edit.
-  private simPayload: SimulationMeshPayload | null = null;
+  private simPayload: SurfacePayload | null = null;
   private simScalarOverride: readonly number[] | null = null;
   private simPositionOverride: readonly number[] | null = null;
   private simOverlay: Float32Array | null = null;
@@ -809,7 +809,7 @@ export class Renderer {
   }
 
   /** Replace the FEM surface mesh (null clears it); resets view overrides. */
-  setSimulationMesh(payload: SimulationMeshPayload | null): void {
+  setSimulationMesh(payload: SurfacePayload | null): void {
     this.simIndexCount = 0;
     this.simHighlight = null;
     this.simOutlineBuffer?.destroy();

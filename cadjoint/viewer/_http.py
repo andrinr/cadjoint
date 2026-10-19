@@ -23,6 +23,7 @@ from typing import Any
 from urllib.parse import urlsplit
 
 from cadjoint.viewer._limits import MAX_SOURCE_BYTES
+from cadjoint.viewer.schema.api import API_VERSION, API_VERSION_HEADER
 
 STATIC_ROOT = Path(__file__).resolve().parent / "static"
 
@@ -102,6 +103,7 @@ class PlaygroundBase(BaseHTTPRequestHandler):
         self.send_header("Content-Length", str(len(body)))
         self.send_header("X-Content-Type-Options", "nosniff")
         self.send_header("Referrer-Policy", "no-referrer")
+        self.send_header(API_VERSION_HEADER, str(API_VERSION))
         for name, value in headers.items():
             self.send_header(name.replace("_", "-"), value)
         self.end_headers()
@@ -159,6 +161,7 @@ class PlaygroundBase(BaseHTTPRequestHandler):
         self.send_header("Cache-Control", "no-store")
         self.send_header("X-Content-Type-Options", "nosniff")
         self.send_header("Referrer-Policy", "no-referrer")
+        self.send_header(API_VERSION_HEADER, str(API_VERSION))
         self.send_header("Transfer-Encoding", "chunked")
         self.end_headers()
         try:

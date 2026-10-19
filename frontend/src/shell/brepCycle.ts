@@ -76,12 +76,12 @@ export function createBrepCycle(options: BrepCycleOptions): void {
       .brep(compiled, { clientId, signal: controller.signal })
       .then((result) => {
         if (options.compiledSource() !== compiled || inFlight !== mine) return;
-        const payload = result.brep ?? null;
         if (!result.ok) {
           setBrepStatus("error");
           setBrepMessage(lastLine(result.error) ?? "The B-rep request failed.");
           return;
         }
+        const payload = result.brep;
         if (payload && !payload.available) {
           setBrepStatus("unavailable");
           setBrepMessage(payload.reason ?? "The private tier (diff-brep) is not installed.");

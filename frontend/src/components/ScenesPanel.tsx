@@ -80,7 +80,7 @@ export function ScenesPanel(props: ScenesPanelProps) {
     try {
       const listing = await api.listScenes();
       if (gone) return;
-      const described = listing.scenes ?? [];
+      const described = listing.ok ? listing.scenes : [];
       setEntries(described);
       drawAll(described);
     } catch (error) {
@@ -95,8 +95,8 @@ export function ScenesPanel(props: ScenesPanelProps) {
     if (!confirmDiscardChanges()) return;
     try {
       const loaded = await api.loadScene(entry.name);
-      if (!loaded.ok || typeof loaded.source !== "string") {
-        setStatus({ kind: "error", text: loaded.error ?? `Could not open ${entry.name}.` });
+      if (!loaded.ok) {
+        setStatus({ kind: "error", text: loaded.error || `Could not open ${entry.name}.` });
         return;
       }
       props.onOpen(entry.name, loaded.source);

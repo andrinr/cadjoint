@@ -38,6 +38,7 @@ from cadjoint.viewer._limits import (
     EXPORT_MAX_RESOLUTION,
     EXPORT_MIN_RESOLUTION,
 )
+from cadjoint.viewer.schema.payloads import StudySelection
 
 Vector2 = Annotated[list[float], Field(min_length=2, max_length=2)]
 Vector3 = Annotated[list[float], Field(min_length=3, max_length=3)]
@@ -309,8 +310,8 @@ class DeleteStudyRequest(StudyTargeted):
 class AddStudyBcRequest(StudyTargeted):
     op: Literal["add_study_bc"]
     bc_type: BoundaryConditionType
-    selection: dict[str, Any] | None = None
-    """A serialized node selection, as ``StudySelection`` describes it.
+    selection: StudySelection | None = None
+    """A serialized node selection.
 
     Absent for the three conditions that place nothing: a flow study's
     inlet, outlet and duct walls are faces of the lattice rather than a

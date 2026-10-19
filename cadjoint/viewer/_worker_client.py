@@ -16,6 +16,12 @@ Request validation here is only what has to happen before a worker is
 started — the kind/name/step shapes.  ``/patch`` never reaches this module:
 it is pure text surgery (see :mod:`cadjoint.viewer._patch_requests`).
 
+Both directions of the pipe are checked against
+:mod:`cadjoint.viewer.schema.worker`: the request this module builds before
+it is written, and every reply before it is returned.  A reply that does not
+match its mode's model comes back as an ``error_kind: "contract"`` failure
+rather than reaching a route.
+
 :func:`warm_start` is the one call that is not somebody's request: the
 server fires it at startup so the *first* real request meets a warm
 compilation cache instead of paying XLA for the whole scene.
@@ -34,6 +40,7 @@ from typing import Any
 
 from cadjoint.viewer._jobs import REGISTRY, attach_process, current_job
 from cadjoint.viewer._limits import OVERSIZED_SOURCE_ERROR, exceeds_source_limit
+from cadjoint.viewer.schema.worker import checked_progress, checked_reply, checked_request
 from cadjoint.viewer.worker.protocol import MODULE, RETIRE_FLAG
 
 # The edit round-trip budget. It used to be 20 s, which the gearbox end-cap's
@@ -93,7 +100,11 @@ def _run_worker(
     if exceeds_source_limit(source):
         return {"ok": False, "error": OVERSIZED_SOURCE_ERROR}
 
-    request = json.dumps({**(extra or {}), "source": source, "mode": mode})
+    message = {**(extra or {}), "source": source, "mode": mode}
+    refused = checked_request(message)
+    if refused is not None:
+        return refused
+    request = json.dumps(message)
     process = subprocess.Popen(
         [sys.executable, "-m", MODULE],
         stdin=subprocess.PIPE,
@@ -126,7 +137,7 @@ def _run_worker(
         return {"ok": False, "error": f"Invalid compiler response:\n{detail[-8_000:]}"}
     if not isinstance(result, dict):
         return {"ok": False, "error": "Invalid compiler response."}
-    return result
+    return checked_reply(mode, result)
 
 
 #: Set to ``0`` to make every compile a disposable process again.
@@ -232,7 +243,7 @@ def _pooled_compile(source: str, timeout: float) -> dict[str, Any] | None:
             # jax config, or it hit its request cap. Its answer is good; the
             # process is not.
             _retire_pooled(kill=False)
-        return result
+        return checked_reply("compile", result)
 
 
 #: Sentinel distinguishing "nothing arrived in time" from "the pipe closed".
@@ -511,6 +522,11 @@ def _stream_optimize_worker(source: str, extra: dict[str, Any], timeout: float):
     """
     import threading
 
+    message = {**extra, "source": source, "mode": "optimize"}
+    refused = checked_request(message)
+    if refused is not None:
+        yield {"event": "done", **refused}
+        return
     process = subprocess.Popen(
         [sys.executable, "-m", MODULE],
         stdin=subprocess.PIPE,
@@ -532,7 +548,7 @@ def _stream_optimize_worker(source: str, extra: dict[str, Any], timeout: float):
     watchdog.start()
     final: dict[str, Any] | None = None
     try:
-        process.stdin.write(json.dumps({**extra, "source": source, "mode": "optimize"}))
+        process.stdin.write(json.dumps(message))
         process.stdin.close()
         for line in process.stdout:
             line = line.strip()
@@ -545,7 +561,11 @@ def _stream_optimize_worker(source: str, extra: dict[str, Any], timeout: float):
             if not isinstance(event, dict):
                 continue
             if event.get("event") == "progress":
-                yield event
+                # A malformed progress line is dropped like stray output: the
+                # run's own result is still checked below.
+                checked = checked_progress(event)
+                if checked is not None:
+                    yield checked
             else:
                 final = event
         process.wait()
@@ -567,7 +587,7 @@ def _stream_optimize_worker(source: str, extra: dict[str, Any], timeout: float):
         )
         yield {"event": "done", "ok": False, "error": detail[-8_000:]}
         return
-    yield {"event": "done", **final}
+    yield {"event": "done", **checked_reply("optimize", final)}
 
 
 def optimize_source_events(request: dict[str, Any], timeout: float = OPTIMIZE_TIMEOUT_SECONDS):

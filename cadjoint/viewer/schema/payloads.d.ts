@@ -5,9 +5,11 @@
  *
  *     python -m cadjoint.viewer.schema.emit
  *
- * The compile worker validates every payload it sends against those same
- * models, so a type here is a guarantee, not a hope. `tests/viewer/
- * test_parity_schema.py` fails when this file and the models disagree.
+ * The server checks every worker reply against those same models before a
+ * route answers (cadjoint/viewer/schema/worker.py), so a type here is a
+ * guarantee, not a hope. `tests/viewer/test_parity_schema.py` fails when
+ * this file and the models disagree, and `tests/viewer/test_api_contract.py`
+ * when the models and the server's routes do.
  */
 
 /**
@@ -43,10 +45,32 @@ export interface CompilePayload {
   output: string;
 }
 
-/** What every worker mode answers with when it raised. */
+/**
+ * What every worker mode — and every endpoint — answers with when it fails.
+ *
+ * ``output`` is what the program printed before it failed, when the mode
+ * captured it; ``error_kind`` is set only for the reasons in
+ * :data:`ErrorKind`.
+ */
 export interface WorkerFailure {
   ok: false;
   error: string;
+  error_kind?: "cancelled" | "fem_unavailable" | "contract" | null;
+  output?: string | null;
+}
+
+/** What every route answers with when it refuses or fails. */
+export interface Failure {
+  ok: false;
+  error: string;
+  error_kind?: "cancelled" | "fem_unavailable" | "contract" | null;
+  output?: string | null;
+  job_id?: string | null;
+}
+
+/** What the job registry adds to a tracked route's response. */
+export interface JobStamped {
+  job_id: string;
 }
 
 /**
@@ -122,7 +146,7 @@ export interface ConstructionElement {
 export interface ConstructionNode {
   id: string;
   stableId: string | null;
-  kind: string;
+  kind: "profile" | "box" | "sphere" | "cylinder";
   name: string | null;
   line: number | null;
   editable: boolean;
@@ -209,7 +233,7 @@ export interface ConstructionVertex {
 
 /** One constraint attached to a sketch's vertex parameters. */
 export interface ConstructionConstraint {
-  kind: string;
+  kind: "fixed" | "distance" | "horizontal" | "vertical" | "coincident" | "equal_length" | "parallel" | "perpendicular";
   vertices: number[];
   value?: number | number[] | null;
   index: number;
@@ -331,20 +355,22 @@ export interface StudyPayload {
 }
 
 /**
- * One boundary condition of a declared study.
+ * One boundary condition as its own ``describe()`` reports it.
  *
  * ``nodes`` is optional because not every condition is placed by selecting
  * nodes: a flow study's inlet, outlet and duct walls are planes of the
  * lattice, and carry an inlet velocity or a wall temperature instead.
  * ``serializable`` still says whether the condition round-trips, but it is
  * now the condition's own answer rather than its selection's.
+ *
+ * This is the shape a solved study echoes (``/api/simulate``'s ``study``);
+ * the compile payload's :class:`StudyBc` adds where the condition is
+ * written.
  */
-export interface StudyBc {
-  type: string;
+export interface StudyBcDescription {
+  type: BoundaryConditionType;
   nodes?: StudySelection | null;
-  stableId: string | null;
   serializable: boolean;
-  span: [number, number] | null;
   value?: number | null;
   flux?: number | null;
   vector?: [number, number, number] | null;
@@ -355,29 +381,82 @@ export interface StudyBc {
   [key: string]: unknown;
 }
 
-/**
- * A serialized node selection, mirroring ``cadjoint.studies.selection``.
- *
- * Composite selections nest: ``and``/``or`` carry ``operands``, ``not``
- * carries ``operand``, and the leaves carry their own geometry. The
- * per-kind fields are optional here because one model has to cover all of
- * them; ``kind`` says which are meaningful.
- */
-export interface StudySelection {
-  kind: string;
-  min_corner?: number[] | null;
-  max_corner?: number[] | null;
-  center?: number[] | null;
-  radius?: number | null;
-  point?: number[] | null;
-  normal?: number[] | null;
-  side?: string | null;
-  tol?: number | null;
-  name?: string | null;
-  operands?: StudySelection[] | null;
-  operand?: StudySelection | null;
+/** One boundary condition of a declared study, with its place in the source. */
+export interface StudyBc {
+  type: BoundaryConditionType;
+  nodes?: StudySelection | null;
+  serializable: boolean;
+  value?: number | null;
+  flux?: number | null;
+  vector?: [number, number, number] | null;
+  velocity?: [number, number, number] | null;
+  temperature?: number | null;
+  power?: number | null;
+  stableId: string | null;
+  span: [number, number] | null;
   /** Fields the object's own describe() may add. */
   [key: string]: unknown;
+}
+
+/** ``Nodes.box``: the nodes inside an axis-aligned box. */
+export interface BoxSelection {
+  kind: "box";
+  min_corner: number[];
+  max_corner: number[];
+}
+
+/** ``Nodes.sphere``: the nodes inside a ball. */
+export interface SphereSelection {
+  kind: "sphere";
+  center: number[];
+  radius: number;
+}
+
+/** ``Nodes.halfspace``: the nodes on the side of a plane its normal points to. */
+export interface HalfspaceSelection {
+  kind: "halfspace";
+  point: number[];
+  normal: number[];
+}
+
+/**
+ * ``Nodes.cylinder``: the nodes inside a cylinder, or a tube when ``inner > 0``.
+ *
+ * ``half_length`` bounds it along ``axis`` either side of ``center``; null
+ * leaves it unbounded.
+ */
+export interface CylinderSelection {
+  kind: "cylinder";
+  center: number[];
+  axis: number[];
+  radius: number;
+  inner: number;
+  half_length: number | null;
+}
+
+/** ``Nodes.side``: the extreme boundary plane of the mesh on one axis side. */
+export interface SideSelection {
+  kind: "side";
+  side: string;
+  tol: number | null;
+}
+
+/** ``Nodes.predicate``: a Python callable, which the viewer can name but not evaluate. */
+export interface PredicateSelection {
+  kind: "predicate";
+  name: string;
+}
+
+/** ``a & b`` and ``a | b``. */
+export interface CombinedSelection {
+  kind: "and" | "or";
+  operands: StudySelection[];
+}
+
+/** ``~a``. */
+export interface ComplementSelection {
+  kind: "not";
+  operand: StudySelection;
 }
 
 /** The domain object a mesh or study discretizes, reported by name. */
@@ -511,6 +590,631 @@ export interface BRepDiagnostics {
   timings: Record<string, number>;
 }
 
+/** ``GET /api/session``: the write token, the starter program, the contract version. */
+export interface SessionResponse {
+  ok: true;
+  token: string;
+  example: string;
+  api_version: number;
+}
+
+/** One private plugin kind's standing in the server process (:mod:`cadjoint.tier`). */
+export interface KindStatus {
+  kind: string;
+  available: boolean;
+  plugin: string | null;
+  version: string | null;
+  contract_version: number | null;
+  compatible: boolean;
+  reason: string | null;
+}
+
+/** ``GET /api/capabilities``: which private plugin kinds this server can reach. */
+export interface CapabilitiesResponse {
+  ok: true;
+  installed: boolean;
+  provider: string;
+  contract_version: number;
+  kinds: Record<string, KindStatus>;
+}
+
+/** A request that carries nothing but the program. */
+export interface SourceRequest {
+  source: string;
+}
+
+/** A command that takes no arguments; the client sends ``{}``. */
+export interface EmptyRequest {
+}
+
+/** ``POST /api/compile`` and ``POST /api/mesh``. */
+export interface CompileRequest {
+  source: string;
+  client_id?: string | null;
+}
+
+/** ``POST /api/mesh``: the dual-contour mesh edges of the program. */
+export interface MeshResult {
+  ok: true;
+  mesh_edges: MeshEdgePayload | null;
+  output: string;
+}
+
+/**
+ * ``POST /api/brep``: the derived B-rep, for the inspector.
+ *
+ * Without the private tier this is still ``ok``: ``brep.available`` is
+ * false and ``brep.reason`` says why.
+ */
+export interface BrepResult {
+  ok: true;
+  brep: BRepInspectionPayload;
+  output: string;
+}
+
+/**
+ * ``POST /api/mesh_refresh``: move the last extracted overlay to new values.
+ *
+ * ``source`` is the program the overlay was extracted from — the base of a
+ * values-only edit, not the edit — and ``values`` maps free-parameter names
+ * to their new components, whole parameters at a time.
+ */
+export interface MeshRefreshRequest {
+  source: string;
+  values: Record<string, number[]>;
+  certify?: boolean;
+}
+
+/** The overlay at the new values, and how much of it could not be certified. */
+export interface MeshRefreshResult {
+  ok: true;
+  mesh_edges: MeshEdgePayload;
+  stale: number;
+}
+
+/** ``{min, mean, max}`` of one per-element (or per-node) quantity. */
+export interface QualitySummary {
+  min: number;
+  mean: number;
+  max: number;
+}
+
+/**
+ * One boundary face group of a simulation mesh — a BC target.
+ *
+ * ``axis``/``side`` are set for a hex mesh's gradient-axis groups (``+x``,
+ * ``-z``) and null for any other group.
+ */
+export interface SurfaceGroup {
+  id: string;
+  axis: "x" | "y" | "z" | null;
+  side: "+" | "-" | null;
+  center: [number, number, number];
+  area: number;
+  faces: number;
+  start: number;
+  count: number;
+}
+
+/**
+ * A mesh's boundary surface, triangulated, with one scalar per vertex.
+ *
+ * Hex and tet meshes leave the worker in this one shape.  A solved study
+ * adds its whole per-vertex field catalog (``fields``, ``ranges``) and, for
+ * an elastic solve, the raw ``displacements`` for a warped view.
+ */
+export interface SurfacePayload {
+  positions: number[];
+  scalars: number[];
+  indices: number[];
+  edges?: number[] | null;
+  groups: SurfaceGroup[];
+  range: [number, number];
+  vertex_count: number;
+  fields?: Record<string, number[]> | null;
+  ranges?: Record<string, [number, number]> | null;
+  displacements?: [number, number, number][] | null;
+}
+
+export interface MeshBounds {
+  min: number[];
+  max: number[];
+}
+
+export interface MeshGrid {
+  origin: number[];
+  spacing: number[];
+  cells: number[];
+}
+
+/**
+ * ``SimMesh.inspect()``: what was built and how good its elements are.
+ *
+ * Open because it is the library's own ``inspect()``; ``quality`` maps each
+ * metric the method has (``scaled_jacobian`` for hexes, ``radius_ratio``
+ * and ``aspect_ratio`` for tets) to its summary.
+ */
+export interface MeshInspectInfo {
+  name: string;
+  method: string;
+  mesher?: string | null;
+  frozen_geometry?: boolean | null;
+  nodes: number;
+  elements: number;
+  bounds: MeshBounds;
+  grid: MeshGrid | null;
+  quality: Record<string, QualitySummary>;
+  /** Fields the object's own describe() may add. */
+  [key: string]: unknown;
+}
+
+/** How far the tet mesher had to re-dice the declared grid. */
+export interface Refinement {
+  declared: number[];
+  used: number[];
+  attempts: number;
+}
+
+/** ``SimulationResult.describe()``: the solved study, summarised. */
+export interface ResultSummary {
+  name: string;
+  kind: "thermal" | "elastic" | "flow";
+  field: string;
+  mesh: string | null;
+  nodes: number;
+  elements: number;
+  range: [number, number];
+  fields: Record<string, QualitySummary>;
+  mass?: number | null;
+  safety_factor?: number | null;
+  refinement?: Refinement | null;
+  /** Fields the object's own describe() may add. */
+  [key: string]: unknown;
+}
+
+/**
+ * A study's own ``describe()``, as a solved study echoes it.
+ *
+ * The compile payload's :class:`~.payloads.StudyPayload` is this plus where
+ * the study is written; a solve reports only what the study says of itself.
+ */
+export interface StudyDescription {
+  name: string;
+  kind: "thermal" | "elastic" | "flow";
+  resolution?: number | number[] | null;
+  bounds?: number[] | null;
+  size?: number[] | null;
+  mesh?: string | null;
+  domain?: DomainEntry | null;
+  material?: Record<string, number | string>;
+  bcs: StudyBcDescription[];
+  /** Fields the object's own describe() may add. */
+  [key: string]: unknown;
+}
+
+/** ``POST /api/simulate``: solve one study the program declares, by name. */
+export interface SimulateRequest {
+  source: string;
+  kind?: "study";
+  name: string;
+  cached?: boolean;
+}
+
+/** A solved study: its declaration, its render surface, and its summaries. */
+export interface SimulateResult {
+  ok: true;
+  kind: "study";
+  study: StudyDescription;
+  field: string;
+  mesh: SurfacePayload;
+  result: ResultSummary;
+  mesh_info: MeshInspectInfo | null;
+  cached: boolean;
+  output: string;
+}
+
+/**
+ * ``POST /api/mesh_inspect``: build a declared mesh (or a study's) without solving.
+ *
+ * With no ``name``, the program's one mesh — or, failing that, its one
+ * study — is used.
+ */
+export interface MeshInspectRequest {
+  source: string;
+  name?: string | null;
+}
+
+/** A built mesh: its report and a quality heatmap of its surface. */
+export interface MeshInspectResult {
+  ok: true;
+  kind: "mesh_inspect";
+  name: string;
+  field: string | null;
+  info: MeshInspectInfo;
+  mesh: SurfacePayload;
+  quality_scalars: number[];
+  output: string;
+}
+
+/** ``POST /api/optimize``: run one declared ``Optimization`` by name. */
+export interface OptimizeRequest {
+  source: string;
+  name: string;
+  steps?: number | null;
+}
+
+/** One recorded optimizer evaluation. */
+export interface OptimizeStep {
+  step: number;
+  objective: number;
+  grad_norm: number;
+}
+
+/** One replayable trajectory frame; step 0 is the initial design. */
+export interface OptimizeFrame {
+  step: number;
+  objective: number;
+  parameters: Record<string, number | number[]>;
+}
+
+/** A study-backed run's final design, solved — the shapes ``/api/simulate`` uses. */
+export interface OptimizeSimulateBlock {
+  field: string;
+  mesh: SurfacePayload;
+  result: ResultSummary;
+  mesh_info: MeshInspectInfo | null;
+}
+
+/** A finished run: the program with the optimized values written back. */
+export interface OptimizeResult {
+  ok: true;
+  kind: "optimize";
+  name: string;
+  method: string;
+  steps: number;
+  source: string;
+  history: OptimizeStep[];
+  trajectory: OptimizeFrame[];
+  parameters: Record<string, number | number[]>;
+  initial: Record<string, number | number[]>;
+  simulate?: OptimizeSimulateBlock | null;
+  output: string;
+}
+
+/** One ``/api/optimize`` stream line per finished optimizer step. */
+export interface OptimizeProgressEvent {
+  event: "progress";
+  step: number;
+  steps: number;
+  objective: number;
+  grad_norm: number;
+  elapsed: number;
+  job_id?: string | null;
+}
+
+/** The stream's last line when the run succeeded. */
+export interface OptimizeDone {
+  ok: true;
+  kind: "optimize";
+  name: string;
+  method: string;
+  steps: number;
+  source: string;
+  history: OptimizeStep[];
+  trajectory: OptimizeFrame[];
+  parameters: Record<string, number | number[]>;
+  initial: Record<string, number | number[]>;
+  simulate?: OptimizeSimulateBlock | null;
+  output: string;
+  event: "done";
+  job_id?: string | null;
+}
+
+/** The stream's last line when the run (or its request) failed. */
+export interface OptimizeFailed {
+  ok: false;
+  error: string;
+  error_kind?: "cancelled" | "fem_unavailable" | "contract" | null;
+  output?: string | null;
+  job_id?: string | null;
+  event: "done";
+}
+
+/**
+ * ``X-Cadjoint-Export``: what the server says about the file beside its bytes.
+ *
+ * ``report`` is the writer's own: ``resolution``/``bounds``/``size`` of the
+ * lattice for a geometry format, ``study``/``cached`` for ``vtk``.
+ */
+export interface ExportSummary {
+  format: ExportFormat;
+  name: string;
+  size: number;
+  report: Record<string, unknown>;
+}
+
+export interface LintFixEdit {
+  from_line: number;
+  from_col: number;
+  to_line: number;
+  to_col: number;
+  content: string;
+}
+
+/** A ruff autofix: a label and the edits that apply it in one go. */
+export interface LintFix {
+  message: string;
+  applicability: "safe" | "unsafe" | "display";
+  edits: LintFixEdit[];
+}
+
+/** One diagnostic: ruff's, or the last failed compile's traceback line. */
+export interface LintDiagnostic {
+  from_line: number;
+  from_col: number;
+  to_line: number;
+  to_col: number;
+  severity: "error" | "warning" | "info";
+  message: string;
+  code: string;
+  source: "ruff" | "runtime";
+  url: string | null;
+  fix: LintFix | null;
+}
+
+/** ``POST /api/lint``. */
+export interface LintResult {
+  ok: true;
+  diagnostics: LintDiagnostic[];
+  runtime: boolean;
+}
+
+/** ``POST /api/complete`` and ``POST /api/signature``: a caret in the program. */
+export interface CursorRequest {
+  source: string;
+  line: number;
+  column: number;
+}
+
+/** One jedi completion, shaped like CodeMirror's ``Completion``. */
+export interface CompletionItem {
+  label: string;
+  type: string;
+  detail: string;
+  info: string | null;
+  apply: string;
+}
+
+/** ``POST /api/complete``. */
+export interface CompleteResult {
+  ok: true;
+  from_line: number;
+  from_column: number;
+  completions: CompletionItem[];
+  truncated: boolean;
+}
+
+export interface SignatureParameter {
+  name: string;
+  label: string;
+}
+
+export interface SignatureInfo {
+  name: string;
+  label: string;
+  active_parameter: number | null;
+  parameters: SignatureParameter[];
+  documentation: string | null;
+}
+
+/** ``POST /api/signature``. */
+export interface SignatureResult {
+  ok: true;
+  signatures: SignatureInfo[];
+}
+
+/** A scene's declarations, counted statically; ``parameters`` only the named ones. */
+export interface SceneCounts {
+  parameters: number;
+  free: number;
+  studies: number;
+  meshes: number;
+  optimizations: number;
+  materials: number;
+}
+
+/** One scene file, described with ``ast`` and never by running it. */
+export interface SceneEntry {
+  name: string;
+  path: string;
+  bytes: number;
+  modified: string | null;
+  source_hash: string | null;
+  summary: string;
+  counts: SceneCounts;
+  materials: string[];
+  error: string | null;
+}
+
+/** ``GET /api/scenes``. */
+export interface SceneList {
+  ok: true;
+  files: string[];
+  scenes: SceneEntry[];
+}
+
+export interface SceneLoadRequest {
+  name: string;
+}
+
+export interface SceneLoadResult {
+  ok: true;
+  name: string;
+  source: string;
+}
+
+export interface SceneSaveRequest {
+  name: string;
+  source: string;
+}
+
+export interface SceneSaveResult {
+  ok: true;
+  name: string;
+}
+
+/** The per-step figures an optimize job mirrors out of its stream. */
+export interface JobProgress {
+  step?: number | null;
+  steps?: number | null;
+  objective?: number | null;
+  grad_norm?: number | null;
+  elapsed?: number | null;
+}
+
+/** One resource sample of a running worker, relative to the job's start. */
+export interface JobSample {
+  t: number;
+  cpu_percent: number;
+  rss_bytes: number;
+}
+
+/** A job as ``GET /api/jobs`` lists it: everything but the result and samples. */
+export interface JobSummary {
+  job_id: string;
+  kind: "compile" | "mesh" | "brep" | "mesh_inspect" | "simulate" | "optimize" | "export" | "lint" | "warmup";
+  status: "queued" | "running" | "done" | "failed" | "cancelled";
+  fields: Record<string, string | number | boolean>;
+  source_hash: string | null;
+  source_bytes: number;
+  submitted_at: number;
+  started_at: number | null;
+  finished_at: number | null;
+  elapsed_s: number;
+  pid: number | null;
+  ok: boolean | null;
+  error: string | null;
+  progress: JobProgress | null;
+  cpu_percent: number;
+  rss_bytes: number;
+  peak_cpu_percent: number;
+  peak_rss_bytes: number;
+  cpu_seconds: number;
+  sampling: "psutil" | "rusage" | "none";
+  samples: number;
+  result_available: boolean;
+  result_bytes: number;
+}
+
+export interface JobDetail {
+  job_id: string;
+  kind: "compile" | "mesh" | "brep" | "mesh_inspect" | "simulate" | "optimize" | "export" | "lint" | "warmup";
+  status: "queued" | "running" | "done" | "failed" | "cancelled";
+  fields: Record<string, string | number | boolean>;
+  source_hash: string | null;
+  source_bytes: number;
+  submitted_at: number;
+  started_at: number | null;
+  finished_at: number | null;
+  elapsed_s: number;
+  pid: number | null;
+  ok: boolean | null;
+  error: string | null;
+  progress: JobProgress | null;
+  cpu_percent: number;
+  rss_bytes: number;
+  peak_cpu_percent: number;
+  peak_rss_bytes: number;
+  cpu_seconds: number;
+  sampling: "psutil" | "rusage" | "none";
+  samples: number;
+  result_available: boolean;
+  result_bytes: number;
+  sample_series: JobSample[];
+  progress_events: JobProgress[];
+}
+
+export interface ServerLoad {
+  cpu_percent: number;
+  rss_bytes: number;
+  pid: number;
+}
+
+export interface HostCapacity {
+  cpu_count: number | null;
+  mem_total: number | null;
+  mem_available: number | null;
+}
+
+export interface JobTotals {
+  running: number;
+  cpu_percent: number;
+  rss_bytes: number;
+  uptime_s: number;
+  server: ServerLoad;
+  host: HostCapacity;
+  sampling: "psutil" | "rusage";
+}
+
+export interface JobStore {
+  jobs: number;
+  max_jobs: number;
+  max_lint_jobs: number;
+  result_bytes: number;
+  max_result_bytes: number;
+  evicted_jobs: number;
+  evicted_results: number;
+}
+
+/** ``GET /api/jobs``: every registered job, newest first, and the live totals. */
+export interface JobsSnapshot {
+  ok: true;
+  jobs: JobSummary[];
+  totals: JobTotals;
+  store: JobStore;
+}
+
+/** ``GET /api/jobs/{job_id}``. */
+export interface JobDetailResult {
+  ok: true;
+  job: JobDetail;
+}
+
+/** A job route's refusal: unknown id (404), still running (409), evicted (410). */
+export interface JobFailure {
+  ok: false;
+  error: string;
+  error_kind?: "cancelled" | "fem_unavailable" | "contract" | null;
+  output?: string | null;
+  job_id: string;
+  status?: "queued" | "running" | "done" | "failed" | "cancelled" | null;
+}
+
+/** ``POST /api/jobs/{job_id}/cancel``. */
+export interface JobCancelled {
+  ok: true;
+  job_id: string;
+  status: "cancelled";
+}
+
+/** ``POST /api/jobs/clear``: finished jobs dropped; running ones are kept. */
+export interface JobsCleared {
+  ok: true;
+  cleared: number;
+  remaining: number;
+}
+
+/** ``POST /api/jobs/cancel_client``. */
+export interface CancelClientRequest {
+  client_id: string;
+}
+
+export interface ClientCancelled {
+  ok: true;
+  client_id: string;
+  cancelled: string[];
+}
+
 /** What ``/patch`` answers with: the patched program, or why not. */
 export interface PatchResponse {
   ok: boolean;
@@ -629,7 +1333,7 @@ export interface SetSketchPlaneRequest {
   id?: string | null;
   line?: number | null;
   op: "set_sketch_plane";
-  reference: WorldPlaneReference | CapPlaneReference | SidePlaneReference | FacePlaneReference | TangentPlaneReference;
+  reference: SketchPlaneReference;
   x_axis?: [number, number, number] | null;
   flip?: boolean;
   offset?: number | null;
@@ -725,7 +1429,7 @@ export interface AddStudyBcRequest {
   study?: string | number | null;
   op: "add_study_bc";
   bc_type: BoundaryConditionType;
-  selection?: Record<string, unknown> | null;
+  selection?: StudySelection | null;
   value?: number | number[] | null;
 }
 
@@ -966,5 +1670,112 @@ export type SketchPlaneReference =
   | FacePlaneReference
   | TangentPlaneReference;
 
-/** What `mode: "compile"` answers with. */
-export type CompileResponse = CompilePayload | WorkerFailure;
+/** A serialized node selection, discriminated on `kind`. */
+export type StudySelection =
+  | BoxSelection
+  | SphereSelection
+  | HalfspaceSelection
+  | CylinderSelection
+  | SideSelection
+  | PredicateSelection
+  | CombinedSelection
+  | ComplementSelection;
+
+/**
+ * The contract version this file was generated for (`API_VERSION`).
+ * `/api/session` reports the server's; a client compares the two.
+ */
+export type ApiVersion = 2;
+
+/** Why a request failed, when the client acts on the reason. */
+export type ErrorKind = "cancelled" | "fem_unavailable" | "contract";
+
+/** Every constraint kind a compiled sketch can report (wider than `ConstraintKind`). */
+export type ReportedConstraintKind = ConstructionConstraint["kind"];
+
+/** Every node-selection kind a study's boundary condition can carry. */
+export type SelectionKind = StudySelection["kind"];
+
+/** What `POST /api/compile` answers with. */
+export type CompileResponse = CompilePayload | Failure;
+
+/** What `POST /api/mesh` answers with. */
+export type MeshResponse = MeshResult | Failure;
+
+/** What `POST /api/brep` answers with. */
+export type BrepResponse = BrepResult | Failure;
+
+/** What `POST /api/mesh_refresh` answers with. */
+export type MeshRefreshResponse = MeshRefreshResult | Failure;
+
+/** What `POST /api/simulate` answers with. */
+export type SimulateResponse = SimulateResult | Failure;
+
+/** What `POST /api/mesh_inspect` answers with. */
+export type MeshInspectResponse = MeshInspectResult | Failure;
+
+/** What `POST /api/optimize` answers with. */
+export type OptimizeStreamLine = OptimizeProgressEvent | OptimizeDone | OptimizeFailed;
+
+/** What `POST /api/lint` answers with. */
+export type LintResponse = LintResult | Failure;
+
+/** What `POST /api/complete` answers with. */
+export type CompleteResponse = CompleteResult | Failure;
+
+/** What `POST /api/signature` answers with. */
+export type SignatureResponse = SignatureResult | Failure;
+
+/** What `GET /api/scenes` answers with. */
+export type SceneListResponse = SceneList | Failure;
+
+/** What `POST /api/scenes/load` answers with. */
+export type SceneLoadResponse = SceneLoadResult | Failure;
+
+/** What `POST /api/scenes/save` answers with. */
+export type SceneSaveResponse = SceneSaveResult | Failure;
+
+/** What `GET /api/jobs/{job_id}` answers with. */
+export type JobDetailResponse = JobDetailResult | JobFailure;
+
+/** What `POST /api/jobs/{job_id}/cancel` answers with. */
+export type JobCancelResponse = JobCancelled | JobFailure;
+
+/** What `POST /api/jobs/cancel_client` answers with. */
+export type CancelClientResponse = ClientCancelled | Failure;
+
+/** A buffered optimize run's answer: the stream's `done` line without `event`. */
+export type OptimizeResponse = OptimizeResult | Failure;
+
+/**
+ * Every route the server answers, by path (`{job_id}` is one path segment).
+ *
+ * `tracked` routes carry `job_id` on every response (`JobStamped`); a
+ * `stream` route answers NDJSON, one `response` per line; a `file` route
+ * answers a success as an attachment and only a failure as JSON.
+ */
+export interface ApiRoutes {
+  "/api/session": { method: "GET"; request: null; response: SessionResponse; tracked: false; stream: false; file: false };
+  "/api/capabilities": { method: "GET"; request: null; response: CapabilitiesResponse; tracked: false; stream: false; file: false };
+  "/api/compile": { method: "POST"; request: CompileRequest; response: CompileResponse; tracked: true; stream: false; file: false };
+  "/api/patch": { method: "POST"; request: PatchRequest; response: PatchResponse; tracked: false; stream: false; file: false };
+  "/api/mesh": { method: "POST"; request: CompileRequest; response: MeshResponse; tracked: true; stream: false; file: false };
+  "/api/brep": { method: "POST"; request: CompileRequest; response: BrepResponse; tracked: true; stream: false; file: false };
+  "/api/mesh_refresh": { method: "POST"; request: MeshRefreshRequest; response: MeshRefreshResponse; tracked: false; stream: false; file: false };
+  "/api/simulate": { method: "POST"; request: SimulateRequest; response: SimulateResponse; tracked: true; stream: false; file: false };
+  "/api/mesh_inspect": { method: "POST"; request: MeshInspectRequest; response: MeshInspectResponse; tracked: true; stream: false; file: false };
+  "/api/optimize": { method: "POST"; request: OptimizeRequest; response: OptimizeStreamLine; tracked: true; stream: true; file: false };
+  "/api/export": { method: "POST"; request: ExportRequest; response: Failure; tracked: true; stream: false; file: true };
+  "/api/lint": { method: "POST"; request: SourceRequest; response: LintResponse; tracked: true; stream: false; file: false };
+  "/api/complete": { method: "POST"; request: CursorRequest; response: CompleteResponse; tracked: false; stream: false; file: false };
+  "/api/signature": { method: "POST"; request: CursorRequest; response: SignatureResponse; tracked: false; stream: false; file: false };
+  "/api/scenes": { method: "GET"; request: null; response: SceneListResponse; tracked: false; stream: false; file: false };
+  "/api/scenes/load": { method: "POST"; request: SceneLoadRequest; response: SceneLoadResponse; tracked: false; stream: false; file: false };
+  "/api/scenes/save": { method: "POST"; request: SceneSaveRequest; response: SceneSaveResponse; tracked: false; stream: false; file: false };
+  "/api/jobs": { method: "GET"; request: null; response: JobsSnapshot; tracked: false; stream: false; file: false };
+  "/api/jobs/{job_id}": { method: "GET"; request: null; response: JobDetailResponse; tracked: false; stream: false; file: false };
+  "/api/jobs/{job_id}/result": { method: "GET"; request: null; response: JobFailure; tracked: false; stream: false; file: false };
+  "/api/jobs/{job_id}/cancel": { method: "POST"; request: EmptyRequest; response: JobCancelResponse; tracked: false; stream: false; file: false };
+  "/api/jobs/clear": { method: "POST"; request: EmptyRequest; response: JobsCleared; tracked: false; stream: false; file: false };
+  "/api/jobs/cancel_client": { method: "POST"; request: CancelClientRequest; response: CancelClientResponse; tracked: false; stream: false; file: false };
+}

@@ -35,7 +35,7 @@ import * as api from "../api";
 import { busy, materials, nodes, source } from "../state";
 import { NumberInput } from "./ui";
 import { hasPhysicalBlock, physicalRows, type PhysicalRow } from "../materialProperties";
-import type { MaterialDefinition } from "../types";
+import type { MaterialDefinition, SetMaterialPropertyRequest } from "../types";
 import { materialPreviewUrl } from "./materialPreview";
 
 export const MATERIAL_DRAG_TYPE = "application/x-cadjoint-material";
@@ -164,7 +164,8 @@ export function MaterialPanel(props: MaterialPanelProps) {
         // itself invalidates.
         ...(material.stableId ? { id: material.stableId } : {}),
         line: material.line,
-        property: key,
+        // One of PHYSICAL_PROPERTIES' keys, each a member of the request's union.
+        property: key as SetMaterialPropertyRequest["property"],
         value,
         ...(expand ? { expand: true } : {}),
       });

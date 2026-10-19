@@ -22,6 +22,7 @@ import type {
   LintFixEdit,
   LintResponse,
   SignatureInfo,
+  SignatureResponse,
 } from "../types";
 
 /**
@@ -245,9 +246,7 @@ export function signatureSegments(signature: SignatureInfo): SignatureSegment[] 
  * call to, and a tooltip that stacks them all is a wall of text over the code
  * the user is trying to read.
  */
-export function activeSignature(response: { ok: boolean; signatures?: SignatureInfo[] }):
-  | SignatureInfo
-  | null {
-  if (!response.ok || !response.signatures || response.signatures.length === 0) return null;
+export function activeSignature(response: SignatureResponse): SignatureInfo | null {
+  if (!response.ok || response.signatures.length === 0) return null;
   return response.signatures[0];
 }

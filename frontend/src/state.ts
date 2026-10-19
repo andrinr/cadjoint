@@ -20,13 +20,13 @@ import type {
   MeshEdgePayload,
   MeshInspectInfo,
   OptimizationPayload,
-  OptimizeHistoryEntry,
-  OptimizeTrajectoryEntry,
+  OptimizeStep,
+  OptimizeFrame,
   Selection,
   SelectionMode,
   SimMeshPayload,
-  SimulationMeshPayload,
-  SimulationResultSummary,
+  SurfacePayload,
+  ResultSummary,
   StudyPayload,
   ToolMode,
 } from "./types";
@@ -105,7 +105,7 @@ export const [planePreview, setPlanePreview] = createSignal<{
  */
 export interface SimViewState {
   /** Render payload with the base (undeformed) vertex positions. */
-  payload: SimulationMeshPayload;
+  payload: SurfacePayload;
   info: MeshInspectInfo | null;
   /** Scalars currently mapped through the ramp (field, or mesh quality). */
   scalars: readonly number[];
@@ -129,8 +129,8 @@ export interface OptimizeSimulateResult {
   /** The optimization's name, for the results header. */
   name: string;
   field: string;
-  mesh: SimulationMeshPayload;
-  result: SimulationResultSummary | null;
+  mesh: SurfacePayload;
+  result: ResultSummary | null;
   meshInfo: MeshInspectInfo | null;
 }
 
@@ -146,8 +146,8 @@ export interface OptimizeRunState {
   name: string;
   /** The adopted program with the final literals written back. */
   source: string;
-  history: OptimizeHistoryEntry[];
-  trajectory: OptimizeTrajectoryEntry[];
+  history: OptimizeStep[];
+  trajectory: OptimizeFrame[];
   parameters: Record<string, number | number[]>;
   initial: Record<string, number | number[]>;
   /** The backing study's name for study-backed runs, else null. */

@@ -1,11 +1,19 @@
 """Local server for the CADJOINT browser playground.
 
-Serves the built frontend (``cadjoint/viewer/static``) and a small JSON API:
+Serves the built frontend (``cadjoint/viewer/static``) and a small JSON API.
+Every request and response below is modelled in :mod:`cadjoint.viewer.schema`
+(:data:`cadjoint.viewer.schema.api.ROUTES` is the table, pinned against this
+module's routing by ``tests/viewer/test_api_contract.py``), and the frontend's
+types are generated from those models. The contract is versioned:
+``/api/session`` reports :data:`~cadjoint.viewer.schema.api.API_VERSION` and
+every response carries it in ``X-Cadjoint-Api``.
 
-- ``GET  /api/session``  session token and the starter program
-- ``POST /compile``      run the user's Python in a disposable child process
+- ``GET  /api/session``  session token, the starter program, and ``api_version``
+- ``POST /api/compile``  run the user's Python in a disposable child process
                          and return WGSL shaders plus the construction tree
-- ``POST /patch``        rewrite sketch vertex literals in the user's source
+                         (``/compile`` still answers, for older clients)
+- ``POST /api/patch``    rewrite sketch vertex literals in the user's source
+                         (``/patch`` still answers, for older clients)
 - ``POST /api/mesh``     run the source again and return only the dual-contour
                          mesh edges (requested lazily by the viewer)
 - ``POST /api/mesh_refresh`` re-solve the last extracted mesh edges at new
@@ -67,9 +75,9 @@ for them, a process monitor can see what is burning the machine, and a run
 can be cancelled for real.  Registration adds ``job_id`` to every response
 (and to every streamed optimize event) and changes nothing else.
 
-Everything is loopback-only and token-gated. ``/compile`` and ``/api/mesh``
+Everything is loopback-only and token-gated. ``/api/compile`` and ``/api/mesh``
 execute the editor's Python on this machine — only run code you trust.
-``/patch`` is pure text surgery and never executes anything, and neither do
+``/api/patch`` is pure text surgery and never executes anything, and neither do
 ``/api/lint``, ``/api/complete`` and ``/api/signature`` — ruff and jedi read
 the program without importing it. Scene files are confined to the ``scenes``
 directory under the server's working directory.
@@ -138,9 +146,11 @@ from cadjoint.viewer._worker_client import (
     simulate_source,
     warm_start,
 )
+from cadjoint.viewer.schema.api import API_VERSION, MAX_CLIENT_ID, ROUTES
 from cadjoint.viewer.worker.export import EXPORT_TIMEOUT_SECONDS, export_source
 
 __all__ = [
+    "API_VERSION",
     "COMPILE_TIMEOUT_SECONDS",
     "DEFAULT_PORT",
     "EXAMPLE_SOURCE",
@@ -188,11 +198,11 @@ def _post_routes() -> dict[str, Callable[[dict[str, Any]], dict[str, Any]]]:
     this module at call time, so replacing one here (as the FEM-unavailable
     test does) is honoured by a running server.
     """
-    return {
+    routes = {
         # `record_compile` is a tap, not a filter: it returns the worker's
         # result unchanged and only remembers a traceback that named a line
         # of this program, so `/api/lint` can show the failure in the gutter.
-        "/compile": _tracked(
+        "/api/compile": _tracked(
             "compile",
             lambda payload: record_compile(
                 payload.get("source"), compile_source(payload.get("source"))
@@ -215,13 +225,19 @@ def _post_routes() -> dict[str, Callable[[dict[str, Any]], dict[str, Any]]]:
         "/api/mesh_refresh": OVERLAYS.refresh,
         "/api/simulate": _tracked("simulate", simulate_source),
         "/api/mesh_inspect": _tracked("mesh_inspect", mesh_inspect_source),
-        "/patch": patch_source,
+        "/api/patch": patch_source,
         "/api/lint": _tracked("lint", lint_source),
         "/api/complete": complete_source,
         "/api/signature": signature_source,
         "/api/scenes/load": load_scene,
         "/api/scenes/save": save_scene,
     }
+    # The paths these two had before the contract moved everything under
+    # /api/: a page built against an older server still compiles and edits.
+    for route in ROUTES:
+        for alias in route.aliases:
+            routes[alias] = routes[route.path]
+    return routes
 
 
 #: Request fields worth remembering on a job: which study, which optimization,
@@ -237,12 +253,6 @@ def _job_fields(payload: dict[str, Any]) -> dict[str, Any]:
         for key in JOB_FIELD_KEYS
         if isinstance(payload.get(key), (str, int, float, bool))
     }
-
-
-#: Longest client request label accepted.  It is an opaque token the client
-#: matches against itself, never anything this server parses, so the only
-#: thing worth bounding is how much of one a request can make us remember.
-MAX_CLIENT_ID = 64
 
 
 def _client_id(payload: dict[str, Any]) -> str | None:
@@ -377,7 +387,13 @@ def make_handler(token: str):
                 # Same-origin read only: a cross-origin page cannot see this
                 # response, so the token still gates POSTs against CSRF.
                 self._send_json(
-                    HTTPStatus.OK, {"ok": True, "token": token, "example": EXAMPLE_SOURCE}
+                    HTTPStatus.OK,
+                    {
+                        "ok": True,
+                        "token": token,
+                        "example": EXAMPLE_SOURCE,
+                        "api_version": API_VERSION,
+                    },
                 )
                 return
 
