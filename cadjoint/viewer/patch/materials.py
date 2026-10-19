@@ -34,16 +34,16 @@ import ast
 import json
 from dataclasses import dataclass
 
-# ``_BOUNDS`` is the one table of what a material property may hold: the
+# ``BOUNDS`` is the one table of what a material property may hold: the
 # brackets ``Material`` itself enforces when ``free=True``.  Restating them
 # here would let the viewer accept a value the optimizer would then refuse,
-# so the private name is imported rather than copied.
+# so the table is imported rather than copied.
 from cadjoint.render.material import (
-    _BOUNDS,
+    BOUNDS,
     OPTICAL_PROPERTIES,
     PHYSICAL_PROPERTIES,
     UNITS,
-    _display,
+    display_value,
 )
 from cadjoint.viewer.patch.edits import (
     _ensure_import,
@@ -194,7 +194,7 @@ EDITABLE_PROPERTIES: tuple[str, ...] = (
 #: ``property -> (low, high)``: the same brackets ``Material`` enforces when
 #: ``free=True``, so a value the viewer accepts is one the optimizer accepts.
 PROPERTY_BOUNDS: dict[str, tuple[float, float]] = {
-    key: (float(_BOUNDS[key][0]), float(_BOUNDS[key][1])) for key in EDITABLE_PROPERTIES
+    key: (float(BOUNDS[key][0]), float(BOUNDS[key][1])) for key in EDITABLE_PROPERTIES
 }
 
 #: ``property -> SI unit``, named in every rejection so a refused number says
@@ -465,10 +465,13 @@ def _expanded_material(source: str, located: _Definition) -> str:
     # a different number, so the optical values are rounded the same way.
     arguments = [("name", json.dumps(material.name or located.variable))]
     arguments.append(
-        ("color", "[" + ", ".join(_exact_number(_display(c)) for c in described["color"]) + "]")
+        (
+            "color",
+            "[" + ", ".join(_exact_number(display_value(c)) for c in described["color"]) + "]",
+        )
     )
     arguments.extend(
-        (key, _exact_number(_display(described[key])))
+        (key, _exact_number(display_value(described[key])))
         for key in OPTICAL_PROPERTIES
         if key != "color"
     )

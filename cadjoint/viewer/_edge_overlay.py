@@ -43,7 +43,6 @@ import numpy as np
 from cadjoint.enums import PluginKind
 from cadjoint.meshing import DEFAULT_BOUNDS, DEFAULT_SIZE
 from cadjoint.meshing.patch_fields import world_frame_leaves
-from cadjoint.zeroset.project import _MIN_GRADIENT_SQUARED
 
 #: The overlay's name for the leaf split it shares with the mesher and the
 #: graph: the design-subtree rule below is defined over exactly these
@@ -197,125 +196,29 @@ def _project_seam_groups(
 
     :func:`_project_to_seam` is exact but pays a fixed cost per call —
     building the ``vmap(value_and_grad)`` evaluators and dispatching four
-    Newton iterations op-by-op — that is independent of how many points it
+    Newton iterations — that is independent of how many points it
     projects; measured, one point costs as much as three hundred.  A scene
     with context geometry produces a seam group per operand *set*, so the
     per-call cost was what the whole mesh overlay used to be made of
     (measured on the starter: 15 groups, 108 points, 5.6 s).
 
-    So evaluate every world-frame leaf at every seam point instead, in one
-    program, and let each point pick its own operands out of the result by
-    gather.  Groups shorter than the widest are padded with a repeat of
-    their first operand and masked to zero, which is exact rather than
-    approximate: a zero Jacobian row makes the padded Gram row and column
-    zero, the regularizer puts ``eps`` on its diagonal, and the solve
-    returns a zero multiplier there, so the Newton step is the one the
-    unpadded system would have taken.  The two places the padding *is*
-    visible are handled explicitly — the rank test's smallest eigenvalue
-    (a padded row contributes a spurious zero, so those rows are lifted
-    above the block's spectrum first) and the ``1e-2 * trace / count``
-    threshold, which uses each point's own operand count.
+    So every group goes through :func:`cadjoint.zeroset.project.project_groups`,
+    the padded multi-group form of the one projection kernel: one program,
+    each point gathering its own operands.  The seam points are solved in
+    float32, as the residual test's thresholds assume.
 
     Returns one ``(projected, residual)`` pair per group, in the order the
     groups were given.
     """
-    import jax
-    import jax.numpy as jnp
+    from cadjoint.zeroset.project import project_groups
 
-    # Only the operands some group actually meets: a scene's other leaves
-    # would be evaluated at every seam point for nothing.
-    used = sorted({index for _rows, operands in groups for index in operands})
-    slot = {index: position for position, index in enumerate(used)}
-    evaluators = [
-        jax.vmap(jax.value_and_grad(lambda p, f=leaves[index]: jnp.asarray(f(p)))) for index in used
+    results = project_groups(
+        leaves, groups, np.asarray(vertices, dtype=np.float32), steps=4, max_step=max_step
+    )
+    return [
+        (np.asarray(projected, dtype=np.float64), np.asarray(residual, dtype=np.float64))
+        for projected, residual in results
     ]
-    width = max(len(operands) for _rows, operands in groups)
-    member_blocks, valid_blocks, point_blocks = [], [], []
-    for rows, operands in groups:
-        slots = [slot[index] for index in operands]
-        padded = slots + [slots[0]] * (width - len(slots))
-        member_blocks.append(np.tile(np.asarray(padded, dtype=np.int32), (rows.size, 1)))
-        mask = np.zeros(width, dtype=np.float32)
-        mask[: len(operands)] = 1.0
-        valid_blocks.append(np.tile(mask, (rows.size, 1)))
-        point_blocks.append(vertices[rows])
-    members = jnp.asarray(np.concatenate(member_blocks))
-    valid = jnp.asarray(np.concatenate(valid_blocks))
-    counts = jnp.sum(valid, axis=1)
-    start = jnp.asarray(np.concatenate(point_blocks), dtype=jnp.float32)
-    picker = jnp.arange(start.shape[0])[:, None]
-
-    # Compiled, not dispatched op by op: five reads of every used leaf's
-    # value and gradient, plus four Newton sweeps of stacks, solves and
-    # einsums.  Eagerly that is one XLA program per primitive per leaf —
-    # hundreds for one call; under one `jit` it is a single program.
-    @jax.jit
-    def solve(start: Any) -> tuple[Any, Any]:
-        def system(x):
-            values, gradients = zip(*(evaluate(x) for evaluate in evaluators))
-            jacobian = jnp.stack(gradients, axis=1)[picker, members] * valid[..., None]
-            gram = jnp.einsum("sij,skj->sik", jacobian, jacobian)
-            return jnp.stack(values, axis=-1)[picker, members] * valid, jacobian, gram
-
-        identity = jnp.eye(width, dtype=start.dtype)
-        _, _, gram0 = system(start)
-        trace = jnp.trace(gram0, axis1=-2, axis2=-1)
-        # A padded row is exactly zero, so it would contribute the smallest
-        # eigenvalue and fail every point with a short operand set.  Lift the
-        # padded diagonal above the real block's spectrum (bounded by its
-        # trace) so the minimum is the real block's own.
-        lifted = gram0 + ((trace[:, None] + 1.0) * (1.0 - valid))[..., None] * identity
-        transversal = jnp.linalg.eigvalsh(lifted)[..., 0] > 1e-2 * trace / counts
-
-        # Rolled, so the leaves are traced and lowered once instead of four
-        # times over; `fori_loop` with a static trip count is `scan` and
-        # differentiates like the unrolled form (see
-        # `cadjoint.zeroset.project`, which had the same unrolling).
-        def sweep(_iteration, x):
-            residual, jacobian, gram = system(x)
-            # Regularize at a float32-meaningful scale; smaller epsilons
-            # underflow against unit-gradient Gram entries.
-            trace = jnp.trace(gram, axis1=-2, axis2=-1)
-            gram = gram + (1e-4 * trace + 1e-12)[..., None, None] * identity
-            multipliers = jnp.linalg.solve(gram, residual[..., None])[..., 0]
-            step = jnp.einsum("sij,si->sj", jacobian, multipliers)
-            # The rest is `cadjoint.zeroset.project._iterate`'s, which this
-            # must equal (the reference test compares them segment for
-            # segment): no step where the fields are flat or the step is not
-            # finite, and `max_step` bounds the *total* displacement from
-            # the start, not each step -- clamping per step let four steps
-            # walk four times as far as the reference allows.
-            usable = trace > _MIN_GRADIENT_SQUARED
-            step = jnp.where(usable[:, None] & jnp.isfinite(step), step, 0.0)
-            displacement = x - step - start
-            length = jnp.sqrt(
-                jnp.maximum(jnp.sum(displacement * displacement, axis=-1, keepdims=True), 1e-24)
-            )
-            moved = start + displacement * jnp.minimum(1.0, max_step / length)
-            # Under x64 the leaves evaluate in float64, so the step does too;
-            # the loop carry must keep its float32 type or fori_loop refuses
-            # it, and the overlay -- which swallows errors -- draws nothing.
-            return moved.astype(x.dtype)
-
-        x = jax.lax.fori_loop(0, 4, sweep, start)
-        x = jnp.where(transversal[:, None], x, start)
-
-        values, _gradients = zip(*(evaluate(x) for evaluate in evaluators))
-        # Padded slots are masked to zero and |f| >= 0, so they never win the max.
-        residual = jnp.max(jnp.abs(jnp.stack(values, axis=-1)[picker, members]) * valid, axis=1)
-        return x, residual
-
-    x, residual = solve(start)
-    projected = np.asarray(x, dtype=np.float64)
-    residuals = np.asarray(residual, dtype=np.float64)
-
-    results: list[tuple[np.ndarray, np.ndarray]] = []
-    offset = 0
-    for rows, _operands in groups:
-        stop = offset + rows.size
-        results.append((projected[offset:stop], residuals[offset:stop]))
-        offset = stop
-    return results
 
 
 #: Leaves whose ``|f|`` at a dual vertex is within this fraction of a cell

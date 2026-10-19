@@ -761,3 +761,20 @@ class TestFrozenObjectiveIsCompiled:
         # per-step drop on this bar is 1.8e-5 relative, 300x larger, so the
         # compiled and eager runs describe the same descent.
         assert compiled == pytest.approx(eager, rel=1e-6)
+
+
+class TestStudyTarget:
+    """``study_target``: where a study-backed run reads and writes its parameters."""
+
+    def test_the_studys_domain_wins_over_the_scene(self):
+        domain = _bar_scene()
+        study = _bar_study()
+        study.domain = domain
+        optimization = Optimization("on-domain", study=study, metric="mean")
+        assert optimization.study_target(scene=_ball()) is domain
+
+    def test_without_a_domain_it_is_the_scene_the_caller_supplies(self):
+        scene = _bar_scene()
+        optimization = Optimization("on-scene", study=_bar_study(), metric="mean")
+        assert optimization.study_target(scene) is scene
+        assert optimization.study_target() is None

@@ -26,7 +26,14 @@ from typing import Any
 
 import numpy as np
 
-__all__ = ["classify", "group_by_incidence", "project", "project_table", "theta_array"]
+__all__ = [
+    "classify",
+    "group_by_incidence",
+    "project",
+    "project_groups",
+    "project_table",
+    "theta_array",
+]
 
 #: Below this squared gradient a field says nothing about where its zero
 #: set is; the point stays put and contributes no derivative there.
@@ -83,6 +90,118 @@ def project(
     return call_jit(run, jnp.asarray(points))
 
 
+def project_groups(
+    fields: Sequence[Callable[[Any], Any]],
+    groups: Sequence[tuple[Any, Sequence[int]]],
+    points: Any,
+    *,
+    steps: int = 8,
+    max_step: float | None = None,
+    transversality: float = 1e-2,
+) -> list[tuple[np.ndarray, np.ndarray]]:
+    """:func:`project` for many point groups at once, each onto its own fields.
+
+    Every group is a set of point rows and the ``fields`` they are
+    projected onto; ``project_groups(fields, [(rows, ids)], points)`` is
+    ``project([fields[i] for i in ids], points[rows])``, and a list of
+    groups is that call per group — in **one** program rather than one per
+    group.  The per-call cost of :func:`project` (building the evaluators,
+    lowering, dispatch) does not depend on how many points it moves, so a
+    caller with many small groups pays it once here instead of once each.
+
+    Every field some group names is evaluated at every point, and each
+    point gathers its own.  Groups narrower than the widest are padded with
+    a repeat of their first field and masked to zero, which is exact rather
+    than approximate: a zero Jacobian row makes the padded Gram row and
+    column zero, the regulariser puts ``eps`` on its diagonal and the solve
+    returns a zero multiplier there, so the Newton step is the one the
+    unpadded system takes.  The two places padding would show are handled
+    in the kernel (:func:`_iterate`): the transversality test lifts the
+    padded rows above the real block's spectrum, and its threshold uses each
+    point's own field count.  Then the arithmetic *is* :func:`project`'s.
+
+    Args:
+        fields: Scalar fields, each callable on a ``(3,)`` point.
+        groups: ``(rows, field ids)`` per group — ``rows`` indexes
+            ``points``, ``field ids`` names one or more of ``fields``.
+            Unlike :func:`project` a group may name more than three: a
+            lattice seam can sit where four operands meet, and the
+            minimum-norm step is defined for any count (the transversality
+            test then refuses what is not a point).
+        points: ``(N, 3)`` starting points; the groups' rows are gathered
+            from it in their dtype, which is the dtype of the solve.
+        steps: Newton iterations.
+        max_step: Total displacement clamp per point, or None for none.
+        transversality: As for :func:`project`.
+
+    Returns:
+        Per group, in the order given, ``(projected, residual)`` as numpy
+        arrays: the projected points ``(len(rows), 3)`` (a refused point
+        where it started) and the largest ``|f|`` over the group's fields
+        at each of them — how far it still is from their common zero set.
+    """
+    import jax
+    import jax.numpy as jnp
+
+    if not groups:
+        return []
+    for _rows, ids in groups:
+        if not ids:
+            raise ValueError("every group names at least one field")
+    points = np.asarray(points)
+    # Only the fields some group names: the others would be evaluated at
+    # every point for nothing.
+    used = sorted({index for _rows, ids in groups for index in ids})
+    slot = {index: position for position, index in enumerate(used)}
+    evaluators = [
+        jax.vmap(jax.value_and_grad(lambda p, f=fields[index]: jnp.asarray(f(p)))) for index in used
+    ]
+    width = max(len(ids) for _rows, ids in groups)
+    member_blocks, valid_blocks, point_blocks = [], [], []
+    for rows, ids in groups:
+        rows = np.asarray(rows)
+        slots = [slot[index] for index in ids]
+        padded = slots + [slots[0]] * (width - len(slots))
+        member_blocks.append(np.tile(np.asarray(padded, dtype=np.int32), (rows.size, 1)))
+        mask = np.zeros(width, dtype=np.float32)
+        mask[: len(ids)] = 1.0
+        valid_blocks.append(np.tile(mask, (rows.size, 1)))
+        point_blocks.append(points[rows])
+    members = jnp.asarray(np.concatenate(member_blocks))
+    valid = jnp.asarray(np.concatenate(valid_blocks))
+    start = jnp.asarray(np.concatenate(point_blocks))
+    picker = jnp.arange(start.shape[0])[:, None]
+
+    def evaluate(x):
+        values, gradients = zip(*(evaluator(x) for evaluator in evaluators))
+        return jnp.stack(values, axis=-1)[picker, members] * valid, gradients
+
+    def system(x):
+        values, gradients = evaluate(x)
+        jacobian = jnp.stack(gradients, axis=1)[picker, members] * valid[..., None]
+        gram = jnp.einsum("sij,skj->sik", jacobian, jacobian)
+        return values, jacobian, gram
+
+    # One compiled program for every group; fresh per call for the reason
+    # `project` gives (the fields are opaque closures).
+    @jax.jit
+    def solve(start: Any) -> tuple[Any, Any]:
+        x = _iterate(system, start, width, steps, max_step, transversality, valid=valid)
+        values, _gradients = evaluate(x)
+        # Padded slots are masked to zero and |f| >= 0, so they never win the max.
+        return x, jnp.max(jnp.abs(values), axis=1)
+
+    x, residual = solve(start)
+    projected, residuals = np.asarray(x), np.asarray(residual)
+    results: list[tuple[np.ndarray, np.ndarray]] = []
+    offset = 0
+    for rows, _ids in groups:
+        stop = offset + np.asarray(rows).size
+        results.append((projected[offset:stop], residuals[offset:stop]))
+        offset = stop
+    return results
+
+
 def _system(fields: Sequence[Callable[[Any], Any]]) -> Callable[[Any], Any]:
     """``x -> (values, jacobian, gram)`` for the fields at every point.
 
@@ -119,12 +238,15 @@ def _iterate(
     steps: int,
     max_step: float | None,
     transversality: float,
+    valid: Any = None,
 ) -> Any:
     """The Newton iteration itself — the one kernel, traced once.
 
-    Split out of :func:`project` so the closure form and the node-table
-    form (:func:`project_table`) run the *same* arithmetic rather than two
-    copies that could drift apart.  The sweep is a
+    Split out of :func:`project` so the closure form, the node-table form
+    (:func:`project_table`) and the padded multi-group form
+    (:func:`project_groups`) run the *same* arithmetic rather than copies
+    that could drift apart (one did: the edge overlay's own copy once
+    clamped each step instead of the total displacement).  The sweep is a
     :func:`jax.lax.fori_loop` with a static trip count, so the traced
     program holds one body instead of ``steps`` copies of it; a static
     count lowers to a ``scan``, which differentiates in both modes.
@@ -145,6 +267,12 @@ def _iterate(
         steps: Newton iterations.
         max_step: Total displacement clamp per point, or None for none.
         transversality: Refusal threshold on the smallest Gram eigenvalue.
+        valid: ``(N, count)`` 1/0 mask of each point's real fields when the
+            system is padded to ``count`` (:func:`project_groups`), else
+            None.  The padded rows are zero; the transversality test lifts
+            them above the real block's spectrum (bounded by its trace) so
+            its smallest eigenvalue is the real block's own, and compares it
+            against each point's own field count.
 
     Returns:
         The projected points, ``(N, 3)``; a refused point is returned
@@ -156,6 +284,11 @@ def _iterate(
     eye = jnp.eye(count, dtype=start.dtype)
 
     def is_transversal(gram, trace):
+        if valid is not None:
+            lifted = gram + ((trace[:, None] + 1.0) * (1.0 - valid))[..., None] * eye
+            return jnp.linalg.eigvalsh(jax.lax.stop_gradient(lifted))[..., 0] > (
+                transversality * trace / jnp.sum(valid, axis=1)
+            )
         if count == 1:
             return gram[:, 0, 0] > _MIN_GRADIENT_SQUARED
         return jnp.linalg.eigvalsh(jax.lax.stop_gradient(gram))[..., 0] > (
@@ -189,7 +322,10 @@ def _iterate(
                 jnp.maximum(jnp.sum(displacement * displacement, axis=-1, keepdims=True), 1e-24)
             )
             x = start + displacement * jnp.minimum(1.0, max_step / length)
-        return x, transversal
+        # Fields that evaluate wider than the points (float64 leaves under
+        # x64 at float32 points) widen the step; the loop carry keeps the
+        # points' dtype or fori_loop refuses it.
+        return x.astype(start.dtype), transversal
 
     x, transversal = jax.lax.fori_loop(
         0, steps, sweep, (start, jnp.zeros(start.shape[:1], dtype=bool))

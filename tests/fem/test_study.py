@@ -20,6 +20,7 @@ from cadjoint.fem import (
     capture_sim_meshes,
     capture_studies,
     sdf_to_hex_mesh,
+    study_mesh,
 )
 from cadjoint.geometry.parameters import Vector
 from cadjoint.sdf.primitives import Box
@@ -529,3 +530,25 @@ class TestSimulationResult:
         result.to_vtk(str(path))
         exported = meshio.read(str(path))
         assert "temperature" in exported.point_data
+
+
+class TestStudyMesh:
+    def test_an_implicit_study_names_one_anonymous_mesh_and_keeps_it(self):
+        study = _thermal_study(domain=_bar())
+        mesh = study_mesh(study)
+        assert isinstance(mesh, SimMesh)
+        assert mesh.name == "bar-conduction::mesh"
+        assert mesh.resolution == study.resolution
+        assert mesh.domain is study.domain
+        # One mesh per study, so its build cache is shared with every solve.
+        assert study_mesh(study) is mesh
+
+    def test_a_declared_mesh_is_returned_as_is(self):
+        declared = SimMesh(name="declared", resolution=8, bounds=_BOUNDS, size=_SIZE)
+        study = _thermal_study(mesh=declared, resolution=None, bounds=None, size=None)
+        assert study_mesh(study) is declared
+
+    def test_nothing_is_built(self):
+        mesh = study_mesh(_elastic_study())
+        assert mesh.name == "cantilever::mesh"
+        assert mesh._cache is None

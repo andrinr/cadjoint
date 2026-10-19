@@ -130,7 +130,7 @@ def _run_optimization(
         # inspection triggers) describes the final design consistently —
         # matching the patched source the client is about to adopt.
         scene = namespace["scene"]
-        apply_parameters(optimization._study_target(scene), run.parameters)
+        apply_parameters(optimization.study_target(scene), run.parameters)
         sdf = lambda p: jnp.asarray(scene(p))  # noqa: E731
         packaged = _study_payload(optimization.study, run.result, sdf)
         payload["simulate"] = {

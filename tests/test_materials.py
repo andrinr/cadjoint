@@ -19,10 +19,12 @@ import pytest
 from cadjoint.geometry.parameters import Scalar
 from cadjoint.materials import CATALOGUE, aluminium_6061, aluminum_6061, catalogue, copper_c11000
 from cadjoint.render.material import (
+    BOUNDS,
     OPTICAL_PROPERTIES,
     PHYSICAL_PROPERTIES,
     UNITS,
     Material,
+    display_value,
 )
 from cadjoint.sdf import Box, material_mass, volume
 
@@ -220,3 +222,23 @@ class TestMaterialMass:
     def test_missing_density_names_the_material(self):
         with pytest.raises(ValueError, match="plain"):
             material_mass(Box([0.5, 0.5, 0.5], material=Material("plain")))
+
+
+class TestDisplayAndBounds:
+    def test_display_value_rounds_storage_noise_to_six_figures(self):
+        assert display_value(68900003840.0) == 68.9e9
+        assert display_value(0.33000001) == 0.33
+        for passthrough in (None, 0.0, float("inf")):
+            assert display_value(passthrough) == passthrough
+        assert np.isnan(display_value(float("nan")))
+
+    def test_describe_reports_what_display_value_reads(self):
+        material = Material(youngs_modulus=68.9e9)
+        stored = float(material.get("youngs_modulus"))
+        assert material.describe()["physical"]["youngs_modulus"] == display_value(stored)
+
+    def test_every_property_has_a_bracket_and_free_values_get_it(self):
+        assert set(BOUNDS) == set(OPTICAL_PROPERTIES) | set(PHYSICAL_PROPERTIES)
+        material = Material(name="tuned", roughness=0.4, density=2700.0, free=True)
+        assert material.params["roughness"].bounds == BOUNDS["roughness"]
+        assert material.params["density"].bounds == BOUNDS["density"]
