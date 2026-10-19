@@ -87,13 +87,9 @@ export async function compileModule(
  * an opaque solid wants: an edge behind the part is hidden by the part. `seen`
  * compares `always`, so the same geometry reads through the surface.
  *
- * The pair exists because the see-through used to come from the *other* end.
- * The raymarch pass withheld its depth while the solid was x-rayed, which
- * bought construction geometry its visibility and, in the same stroke, let the
- * floor grid through the part — the grid draws behind whatever depth the scene
- * wrote, and an x-rayed solid had written none. The solid states its depth
- * honestly now (see `trace_scene` in `cadjoint/viewer/_webgpu.py`) and the
- * overlays choose their own rule, which is the one the gizmos always used.
+ * The raymarch pass writes the solid's depth (`fs_main_depth` in
+ * `cadjoint/viewer/_webgpu.py`); whether an overlay reads through the solid
+ * is the overlay's own choice of pipeline.
  */
 export interface DepthPair {
   tested: GPURenderPipeline;

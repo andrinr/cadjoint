@@ -12,7 +12,7 @@ Types:
 Helpers:
 - as_parameter: Auto-convert raw values to Parameter objects
 
-For constraint systems (distances, angles, parallel, etc.), see constraints.py (future).
+For constraint systems (distances, angles, parallel, etc.), see :mod:`cadjoint.constraints`.
 """
 
 from dataclasses import dataclass, field

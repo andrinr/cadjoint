@@ -168,7 +168,7 @@ class EnergyConfig:
             stored fields, which is the reason not to simply set it very
             high on a large lattice.  :func:`energy_imbalance` is the
             check that catches a stall, and
-            :meth:`~cadjoint.flow.FlowStudy.warnings` runs it.
+            :attr:`~cadjoint.flow.study.FlowStudyResult.warnings` runs it.
 
     Raises:
         ValueError: On a non-positive diffusivity or conductivity ratio, or

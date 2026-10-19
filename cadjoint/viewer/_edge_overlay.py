@@ -98,9 +98,9 @@ def _design_leaves(leaves: list[Any]) -> np.ndarray | None:
     nothing would delete its sharp layer entirely.
 
     **Exactly one thing is restricted**, and it is the sharp layer's: which
-    of the graph's edges are drawn (:func:`_design_patches` lifts the rule
-    from leaves to patches, and an edge is drawn when *both* its patches
-    pass — a curve half on scenery is not a crease the user is authoring).
+    of the graph's edges are drawn (the ``feature_edges`` component lifts
+    the rule from leaves to patches, and an edge is drawn when *both* its
+    patches pass — a curve half on scenery is not a crease the user is authoring).
     Everything else stays whole-scene.  In particular the graph is derived
     over every leaf, so the wire layer keeps its full mesh wireframe with
     every vertex re-solved, and a vertex on scenery is classified as scenery
