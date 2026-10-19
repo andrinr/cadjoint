@@ -1,0 +1,1 @@
+{"format": "cadjoint-scene", "version": 1, "root": {"type": "translate", "params": {"offset": [0.0, 0.0, 0.0]}, "children": [{"type": "box", "params": {"size": [0.20000000298023224, 0.15000000596046448, 0.20000000298023224]}, "children": []}]}}

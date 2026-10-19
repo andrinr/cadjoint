@@ -226,6 +226,22 @@ def _direct_shader(scene) -> tuple[str, dict | None] | None:
     return source, contract.as_dict()
 
 
+def _scene_graph(scene: Any) -> dict | None:
+    """The scene as a version 2 ``cadjoint-scene`` graph, or None if it cannot be one.
+
+    The frontend can build ``scene_wgsl`` from it itself (``frontend/src/scene``).
+    A node the graph has no type for, or a plain callable as a child, leaves
+    the client with the WGSL sent alongside.
+    """
+    from cadjoint.backends.jaxjs import UnsupportedNode, scene_graph
+
+    try:
+        return scene_graph(scene, version=2)
+    except UnsupportedNode as reason:
+        print(f"note: no scene graph for this scene ({reason}); the browser uses the sent WGSL.")
+        return None
+
+
 def _table_hash(scene: Any) -> str | None:
     """The scene's node table with θ left out, hashed — or None if it has no table.
 
@@ -306,6 +322,7 @@ def _compile_source(source: str) -> dict[str, Any]:
             "present_shader": WGSL_PRESENT_TEMPLATE,
             "program": program,
             "shader_hash": shader_hash,
+            "scene_graph": _scene_graph(namespace["scene"]),
             "table_hash": table_hash,
             "construction": construction,
             # Every stable id the text declares, so the viewer can name anything

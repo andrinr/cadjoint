@@ -85,13 +85,14 @@ export async function dismissBanner(page: Page) {
  * compile.
  *
  * @param options.dismiss Also close a banner left over the canvas.
+ * @param options.query A query string for the page, such as `?shaders=browser`.
  * @returns Null, with the browser closed, when no adapter is available.
  *   `errors` collects page errors and console errors from before the load.
  */
 export async function openViewer(
-  options: { width?: number; height?: number; timeout?: number; dismiss?: boolean } = {},
+  options: { width?: number; height?: number; timeout?: number; dismiss?: boolean; query?: string } = {},
 ): Promise<{ browser: Browser; page: Page; errors: string[] } | null> {
-  const { width = 1400, height = 900, timeout, dismiss = false } = options;
+  const { width = 1400, height = 900, timeout, dismiss = false, query = "" } = options;
   const browser = await chromium.launch({ args: WEBGPU_ARGS });
   const page = await browser.newPage({ viewport: { width, height } });
   const errors: string[] = [];
@@ -99,7 +100,7 @@ export async function openViewer(
   page.on("console", (message) => {
     if (message.type() === "error") errors.push(message.text());
   });
-  await page.goto(`http://127.0.0.1:${PORT}/`);
+  await page.goto(`http://127.0.0.1:${PORT}/${query}`);
   const adapter = await page.evaluate(async () => {
     if (!navigator.gpu) return null;
     return (await navigator.gpu.requestAdapter()) ? "available" : null;

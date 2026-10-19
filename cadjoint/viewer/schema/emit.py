@@ -411,8 +411,12 @@ def constants_source() -> str:
 
     Which boundary conditions each study kind takes, which of them place no
     region, and the export lattice's bounds: the frontend offers exactly
-    what the server accepts.
+    what the server accepts.  The scene shader's parameter-buffer layout and
+    the scene graph format, so that WGSL built in the browser
+    (``frontend/src/scene``) lays out the buffer the worker's WGSL does.
     """
+    from cadjoint.backends import jaxjs
+    from cadjoint.backends.wgsl import codegen
     from cadjoint.enums import STUDY_KIND_BOUNDARY_CONDITIONS, UNPLACED_BOUNDARY_CONDITIONS
     from cadjoint.viewer import _limits
 
@@ -443,6 +447,20 @@ def constants_source() -> str:
         f"  min: {_limits.EXPORT_MIN_RESOLUTION},\n"
         f"  max: {_limits.EXPORT_MAX_RESOLUTION},\n"
         f"  default: {_limits.EXPORT_DEFAULT_RESOLUTION},\n"
+        "} as const;\n\n"
+        "/** The scene shader's parameter buffer: one `vec4<f32>` slot per parameter, then the reserved ones. */\n"
+        "export const SHADER_PARAMETERS = {\n"
+        f"  group: {codegen.DEFAULT_PARAMETER_GROUP},\n"
+        f"  binding: {codegen.DEFAULT_PARAMETER_BINDING},\n"
+        f'  addressSpace: "{codegen.PARAMETER_ADDRESS_SPACE}",\n'
+        f"  slotBytes: {codegen.PARAMETER_SLOT_BYTES},\n"
+        f"  reservedSlots: {codegen.RESERVED_PARAMETER_SLOTS},\n"
+        f"  cullMargin: {codegen.CULL_MARGIN!r},\n"
+        "} as const;\n\n"
+        "/** The `cadjoint-scene` graph format and the versions the server writes. */\n"
+        "export const SCENE_GRAPH = {\n"
+        f'  format: "{jaxjs.SCENE_FORMAT}",\n'
+        f"  versions: {list(jaxjs.SCENE_VERSIONS)},\n"
         "} as const;\n"
     )
 

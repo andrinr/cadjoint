@@ -27,6 +27,8 @@
  * module's cache either, because it never asks for a module at all.
  */
 
+import { SHADER_PARAMETERS } from "../../../cadjoint/viewer/schema/constants";
+
 /** One design parameter's slot, mirroring `ShaderParameter` in the schema. */
 export interface ShaderParameterSlot {
   name: string;
@@ -94,10 +96,9 @@ export interface ShaderProgramPayload {
  * The cull margin that leaves culling on.
  *
  * World-unit slack on every skip test, so float rounding in the box distance
- * can never flip a test the exact arithmetic would not. Mirrors `CULL_MARGIN`
- * in `cadjoint/backends/wgsl/_culling.py`.
+ * can never flip a test the exact arithmetic would not.
  */
-export const CULL_MARGIN_ON = 1e-4;
+export const CULL_MARGIN_ON = SHADER_PARAMETERS.cullMargin;
 
 /**
  * The cull margin that switches culling off.
@@ -108,8 +109,8 @@ export const CULL_MARGIN_ON = 1e-4;
  */
 export const CULL_MARGIN_OFF = Number.POSITIVE_INFINITY;
 
-/** Bytes per parameter: one `vec4<f32>`. Mirrors `PARAMETER_SLOT_BYTES`. */
-export const PARAMETER_SLOT_BYTES = 16;
+/** Bytes per parameter: one `vec4<f32>`. */
+export const PARAMETER_SLOT_BYTES = SHADER_PARAMETERS.slotBytes;
 
 /**
  * The parameter values, packed for upload.

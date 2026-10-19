@@ -53,7 +53,7 @@ from cadjoint.viewer.schema.requests import (
     PatchResponse,
 )
 
-API_VERSION = 2
+API_VERSION = 3
 """The version of this contract.
 
 A server whose ``/api/session`` carries no ``api_version`` is version 1.

@@ -501,6 +501,16 @@ misreading the server.
 parses, is deterministic and shows exactly the requested change, and that
 every `set_*` is idempotent.
 
+**Scene graph.** The compile payload carries the scene as a version 2
+`cadjoint-scene` graph (`scene_graph`, specified in
+`cadjoint/backends/jaxjs/SCENE_FORMAT.md`) next to the WGSL built from it.
+`frontend/src/scene` builds the same shaders from the graph in the browser,
+byte for byte. The server's shaders are drawn by default. With
+`?shaders=browser` in the URL, or `localStorage["cadjoint.shaders"] =
+"browser"`, the page draws its own, and falls back to the server's with a
+console warning when their `shader_hash` differs. `frontend/static.html`
+uses only the graph: it draws and exports the bundled scenes with no server.
+
 **Jobs.** Every request that takes real time is registered as a job with a
 `job_id` and the sha256 of the source it ran on. `GET /api/jobs` lists jobs and
 live CPU/RSS totals (sampled twice a second with `psutil`, or

@@ -778,6 +778,44 @@ class ShaderProgram(Strict):
 # ── The response itself ─────────────────────────────────────────────────────
 
 
+class SceneGraphMaterial(Strict):
+    """A primitive's material in the scene graph: the shader's two material rows.
+
+    A non-finite value is ``null``, as everywhere JSON carries a float.
+    """
+
+    color: list[float | None]
+    roughness: float | None
+    metallic: float | None
+    opacity: float | None
+    ior: float | None
+    reflectivity: float | None
+
+
+class SceneGraphNode(Strict):
+    """One node of a ``cadjoint-scene`` graph.
+
+    The format is specified in ``cadjoint/backends/jaxjs/SCENE_FORMAT.md``;
+    ``id``, ``free``, ``implicit`` and ``material`` are the version 2 fields.
+    """
+
+    type: str
+    params: dict[str, float | list[float] | list[list[float]]]
+    children: list[SceneGraphNode]
+    id: str | None = None
+    free: dict[str, str | list[str | None]] | None = None
+    implicit: list[str] | None = None
+    material: SceneGraphMaterial | None = None
+
+
+class SceneGraph(Strict):
+    """The scene as a ``cadjoint-scene`` graph, from which a client can build its own WGSL."""
+
+    format: Literal["cadjoint-scene"]
+    version: Literal[1, 2]
+    root: SceneGraphNode
+
+
 class CompilePayload(Strict):
     """What ``mode="compile"`` answers with when the program ran.
 
@@ -800,6 +838,11 @@ class CompilePayload(Strict):
     # sha256 of the two scene shaders, so the browser can key its module
     # cache without hashing megabytes of source itself.
     shader_hash: str = ""
+    # The scene as a version 2 ``cadjoint-scene`` graph.  A client that builds
+    # its own WGSL from it (``frontend/src/scene``) writes the same module as
+    # ``scene_wgsl``.  ``None`` when the scene has a node the graph cannot
+    # carry, such as a plain callable.
+    scene_graph: SceneGraph | None = None
     # Of the scene's node table (:mod:`cadjoint.zeroset`) with its design
     # values left out: unchanged by a free-parameter edit, changed by any
     # other, which is what tells a refresh of the mesh-edge overlay from an

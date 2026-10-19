@@ -48,7 +48,7 @@ import type {
  * version fails `tsc` until this line is changed with it — the number cannot
  * silently fall behind the types it vouches for.
  */
-export const CLIENT_API_VERSION: ApiVersion = 2;
+export const CLIENT_API_VERSION: ApiVersion = 3;
 
 /** Thrown by {@link startSession} when the server speaks another contract version. */
 export class ApiVersionMismatch extends Error {
