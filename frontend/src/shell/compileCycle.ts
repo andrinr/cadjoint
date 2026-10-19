@@ -38,7 +38,7 @@
  * `ghostCompile` and stay ignorant of ordering.
  */
 
-import { createEffect, createSignal, type Accessor } from "solid-js";
+import { batch, createEffect, createSignal, type Accessor } from "solid-js";
 import * as api from "../api";
 import { cancelClientJob, nextRequestId, watchJobs } from "../jobs";
 import {
@@ -60,6 +60,8 @@ import {
   setStatus,
   setStudies,
   setViewerError,
+  reportViewerError,
+  viewerError,
   meshEdges,
   source,
 } from "../state";
@@ -103,6 +105,9 @@ export const COMPILE_DEBOUNCE_MS = 150;
  * the meantime, because a mostly-right picture now beats none for a second.
  */
 export const OVERLAY_STALE_LIMIT = 0.005;
+
+/** How the viewer's error banner names a mesh-edge failure. */
+export const MESH_ERROR_PREFIX = "Feature edges unavailable: ";
 
 export interface CompileCycleOptions {
   renderer: Renderer;
@@ -162,7 +167,18 @@ export function createCompileCycle(options: CompileCycleOptions): CompileCycle {
   // The mesh-edge overlay is fetched lazily: /compile no longer computes it,
   // and this cache requests it only while a mesh display mode is on.
   const [compiledSource, setCompiledSource] = createSignal<string | null>(null);
-  let meshRequestFor: string | null = null;
+  // The cache is keyed by *epoch*, not by source text. Every published compile
+  // clears the overlay and opens a new epoch, and so does a fetch that ended
+  // without an answer for the program still on screen. Keyed by text, a second
+  // compile of the same source (Run again, an undo back) cleared the overlay
+  // and then found its text already "requested", and the switch stayed on over
+  // nothing; so did a fetch a compile had aborted, or one that failed.
+  const [meshEpoch, setMeshEpoch] = createSignal(0);
+  let meshRequestFor: number | null = null;
+  const rearmMesh = (): void => {
+    meshRequestFor = null;
+    setMeshEpoch((epoch) => epoch + 1);
+  };
   let meshInFlight: { clientId: string; controller: AbortController } | null = null;
   // An extraction's topology outlives a values-only edit: the same surfaces
   // meet in the same places, only somewhere else. `overlayBase` is the
@@ -199,13 +215,20 @@ export function createCompileCycle(options: CompileCycleOptions): CompileCycle {
     setConsoleText("");
   };
 
-  /** Stop a mesh-edge fetch whose compile has just been replaced. */
-  const dropMeshFetch = (): void => {
+  /**
+   * Stop a mesh-edge fetch whose compile is being replaced.
+   *
+   * @returns Whether one was in flight — the caller re-arms the overlay if the
+   *   compile then does not publish, since the program on screen still wants
+   *   its edges.
+   */
+  const dropMeshFetch = (): boolean => {
     const stale = meshInFlight;
     meshInFlight = null;
-    if (!stale) return;
+    if (!stale) return false;
     stale.controller.abort();
     void cancelClientJob(stale.clientId);
+    return true;
   };
 
   /**
@@ -269,9 +292,6 @@ export function createCompileCycle(options: CompileCycleOptions): CompileCycle {
     setStudies(result.studies ?? []);
     setSimMeshes(result.sim_meshes ?? []);
     setOptimizations(result.optimizations ?? []);
-    // Mesh edges are no longer part of the compile payload; clear the stale
-    // overlay and let the lazy /api/mesh effect refill it when wanted.
-    setMeshEdges(null);
     const previous = lastCompile;
     lastCompile = { source: text, table: result.table_hash ?? null, program: result.program ?? null };
     // The table hash leaves the design values out, so equal hashes mean the
@@ -282,7 +302,15 @@ export function createCompileCycle(options: CompileCycleOptions): CompileCycle {
       previous.table !== null &&
       previous.table === lastCompile.table &&
       (previous.source === overlayBase || overlayRefreshable);
-    setCompiledSource(text);
+    // Mesh edges are no longer part of the compile payload: clear the stale
+    // overlay and let the lazy /api/mesh effect refill it when wanted. One
+    // reactive step, so the effect sees the cleared overlay, the new program
+    // and its new epoch together and asks once, for this program.
+    batch(() => {
+      setMeshEdges(null);
+      setCompiledSource(text);
+      rearmMesh();
+    });
     // Drop a selection that no longer exists in the rebuilt sketch.
     const active = selection();
     if (active) {
@@ -310,10 +338,12 @@ export function createCompileCycle(options: CompileCycleOptions): CompileCycle {
     text: string,
     commit: boolean,
   ): Promise<boolean> => {
+    let droppedMesh = false;
+    let published = false;
     try {
       if (commit) options.history.commit(text);
       // Mesh edges describe the program that is being replaced.
-      dropMeshFetch();
+      droppedMesh = dropMeshFetch();
       const attempt = await fetchCompile(token, text);
       if (attempt.state === "stale") return false;
       if (attempt.state === "cancelled") {
@@ -325,7 +355,10 @@ export function createCompileCycle(options: CompileCycleOptions): CompileCycle {
         setConsoleText(attempt.message);
         return false;
       }
-      if (commit) publish(text, attempt.result);
+      if (commit) {
+        publish(text, attempt.result);
+        published = true;
+      }
       // The renderer replaces this as soon as it draws a frame; setting it here
       // means the status still settles on a machine without WebGPU.
       setStatus({ kind: "ready", text: "Scene compiled" });
@@ -354,6 +387,9 @@ export function createCompileCycle(options: CompileCycleOptions): CompileCycle {
       // here is ending into an app that is still compiling the edit that
       // replaced it.
       if (token.current()) setBusy(false);
+      // The fetch dropped above was for the program still on screen: this run
+      // failed, was stopped, or was a ghost frame that only swapped shaders.
+      if (droppedMesh && !published) rearmMesh();
     }
   };
 
@@ -469,7 +505,7 @@ export function createCompileCycle(options: CompileCycleOptions): CompileCycle {
    * The guard here is the compiled source rather than a revision counter —
    * same rule, expressed in the thing this cache is keyed by.
    */
-  const extractMeshEdges = (compiled: string): void => {
+  const extractMeshEdges = (compiled: string, epoch: number): void => {
     const clientId = nextRequestId();
     const controller = new AbortController();
     const inFlight = { clientId, controller };
@@ -487,26 +523,50 @@ export function createCompileCycle(options: CompileCycleOptions): CompileCycle {
       .then((result) => {
         settle();
         // A newer compile owns the cache now; drop the stale answer.
-        if (compiledSource() !== compiled) return;
-        if (result.ok) setMeshEdges(result.mesh_edges ?? null);
-        if (result.ok && result.mesh_edges) {
+        if (meshEpoch() !== epoch) return;
+        if (!result.ok) {
+          meshFailed(result.error ?? "the server returned no mesh");
+          return;
+        }
+        setMeshEdges(result.mesh_edges ?? null);
+        clearMeshError();
+        if (result.mesh_edges) {
           overlayBase = compiled;
           overlayRefreshable = true;
         }
       })
-      .catch(() => {
-        // Missing mesh edges only dim an optional overlay; stay quiet.
+      .catch((error) => {
         settle();
+        // Aborted by a compile, which re-arms the overlay itself.
+        if (controller.signal.aborted || meshEpoch() !== epoch) return;
+        meshFailed(error instanceof Error ? error.message : String(error));
       });
+  };
+
+  /**
+   * Say the overlay could not be built, and let the switch try again.
+   *
+   * The edges are optional, but a switch that is on over nothing is a fault
+   * the user has no way to see the cause of, so the reason goes to the
+   * viewer's error banner. Forgetting the request means turning the overlay
+   * off and on again asks once more.
+   */
+  const meshFailed = (reason: string): void => {
+    meshRequestFor = null;
+    reportViewerError(`${MESH_ERROR_PREFIX}${reason}`);
+  };
+  const clearMeshError = (): void => {
+    if (viewerError().startsWith(MESH_ERROR_PREFIX)) setViewerError("");
   };
 
   createEffect(() => {
     const display = options.display();
     const wanted = display.showMeshEdges || display.showMeshWireframe;
     const compiled = compiledSource();
+    const epoch = meshEpoch();
     if (!wanted || compiled === null || meshEdges() !== null) return;
-    if (meshRequestFor === compiled) return;
-    meshRequestFor = compiled;
+    if (meshRequestFor === epoch) return;
+    meshRequestFor = epoch;
     const program = lastCompile?.program ?? null;
     const base = overlayBase;
     if (overlayRefreshable && base !== null && program !== null) {
@@ -517,18 +577,18 @@ export function createCompileCycle(options: CompileCycleOptions): CompileCycle {
       void api
         .meshRefresh(base, programValues(program), true)
         .then((result) => {
-          if (compiledSource() !== compiled) return;
+          if (meshEpoch() !== epoch) return;
           if (result.ok && result.mesh_edges) setMeshEdges(result.mesh_edges);
           if (!result.ok || (result.stale ?? 0) > OVERLAY_STALE_LIMIT) {
-            extractMeshEdges(compiled);
+            extractMeshEdges(compiled, epoch);
           }
         })
         .catch(() => {
-          if (compiledSource() === compiled) extractMeshEdges(compiled);
+          if (meshEpoch() === epoch) extractMeshEdges(compiled, epoch);
         });
       return;
     }
-    extractMeshEdges(compiled);
+    extractMeshEdges(compiled, epoch);
   });
 
   // A drag's live values, one request out at a time and the newest waiting.
