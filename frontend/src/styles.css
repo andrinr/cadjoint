@@ -4180,6 +4180,10 @@ button.icon {
   color: var(--danger-ink);
 }
 
+.brep-step-detail {
+  font-variant-numeric: tabular-nums;
+}
+
 /* ── tier tags ─────────────────────────────────────────────────────────────
    What a feature is in this install: a value chip (K4) beside the feature.
    The public form's edge is dashed — approximate, said without a hue — and

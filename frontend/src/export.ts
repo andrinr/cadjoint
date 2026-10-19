@@ -9,7 +9,7 @@
  * neither computes anything this module does not.
  */
 
-import type { ExportFormat, ExportRequest } from "./types";
+import type { ExportFormat, ExportRequest, StepContents } from "./types";
 
 import { EXPORT_RESOLUTION } from "../../cadjoint/viewer/schema/constants";
 
@@ -61,7 +61,7 @@ export const EXPORT_FORMATS: readonly ExportFormatInfo[] = [
     label: "STEP",
     extension: "step",
     takes: "object",
-    note: "AP214 from the derived B-rep: exact planes and cylinders with their real edge curves; blends faceted.",
+    note: "AP214 from the derived B-rep: every face one surface — exact where it has a closed form, a certified B-spline where it is a smooth blend — faceted only where no surface carries it.",
     option: { key: "analytic", label: "Analytic surfaces" },
   },
   {
@@ -73,6 +73,31 @@ export const EXPORT_FORMATS: readonly ExportFormatInfo[] = [
     option: null,
   },
 ];
+
+/** The exact surface kinds, which the contents line counts as one. */
+const ANALYTIC_SURFACES = ["plane", "cylinder", "sphere", "cone"] as const;
+
+/** A length in model units, as the contents line prints a tolerance. */
+const metres = (value: number): string => value.toExponential(1).replace("e-", "e−");
+
+/**
+ * What an analytic STEP file holds, in one line:
+ * `48 faces: 44 analytic · 1 spline (≤ 9.2e−5) · 3 faceted`.
+ *
+ * Analytic is every face on its exact plane, cylinder, sphere or cone;
+ * spline every face on one fitted B-spline, with the bar each was
+ * certified to (model units, metres); faceted every face written as its own
+ * triangles. All three are always named, so a zero says something too.
+ */
+export function stepContentsLine(contents: StepContents): string {
+  const count = (kind: string) => contents.surfaces[kind] ?? 0;
+  const analytic = ANALYTIC_SURFACES.reduce((sum, kind) => sum + count(kind), 0);
+  const spline = count("bspline");
+  const bar = contents.fit_tolerance != null && spline > 0 ? ` (≤ ${metres(contents.fit_tolerance)})` : "";
+  const parts = [`${analytic} analytic`, `${spline} spline${bar}`, `${count("faceted")} faceted`];
+  if (count("dropped")) parts.push(`${count("dropped")} dropped`);
+  return `${contents.faces} faces: ${parts.join(" · ")}`;
+}
 
 /** The picker entry for a format. */
 export function formatInfo(format: ExportFormat): ExportFormatInfo {

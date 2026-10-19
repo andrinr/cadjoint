@@ -496,7 +496,7 @@ def make_handler(token: str):
                 Content_Disposition=f'attachment; filename="{result["filename"]}"',
                 X_Cadjoint_Job=str(result.get("job_id", "")),
                 X_Cadjoint_Export=json.dumps(
-                    {key: result.get(key) for key in ("format", "name", "size", "report")}
+                    {key: result.get(key) for key in ("format", "name", "size", "report", "step")}
                 ),
             )
 

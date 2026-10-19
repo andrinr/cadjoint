@@ -5,6 +5,8 @@ import {
   edgeLegend,
   edgeRgba,
   edgeTone,
+  exportDetail,
+  exportLabel,
   packBrepEdges,
   packBrepFaces,
   packBrepTriangleOutlines,
@@ -249,5 +251,29 @@ describe("picking", () => {
   it("skips an edge whose kind is hidden", () => {
     const [ex, ey] = pixel([0, 0, 0]);
     expect(pickBrep(model(), ex + 2, ey, VIEW, new Set(["traced"]))?.kind).toBe("face");
+  });
+});
+
+describe("the STEP export readout", () => {
+  it("names a fitted face and prints its certificate", () => {
+    const fitted = { surface: "bspline", fit_error: 2.3e-5, field_error: 4.1e-5, control_points: 3080, reason: "" } as const;
+    expect(exportLabel(fitted)).toBe("B-spline fit");
+    expect(exportDetail(fitted)).toBe("fit 2.3e−5 · |f| 4.1e−5 · 3,080 control points");
+  });
+
+  it("keeps an exact face's own name and says nothing more", () => {
+    const exact = { surface: "cylinder" } as const;
+    expect(exportLabel(exact)).toBe("cylinder");
+    expect(exportDetail(exact)).toBe("");
+  });
+
+  it("calls a plane a flat blend was found to lie in a found plane", () => {
+    expect(exportLabel({ surface: "plane", fit_error: 1e-6, field_error: 2e-6 })).toBe("plane (found)");
+  });
+
+  it("gives a faceted face's reason", () => {
+    const faceted = { surface: "faceted", reason: "a crease inside the face" } as const;
+    expect(exportLabel(faceted)).toBe("faceted");
+    expect(exportDetail(faceted)).toBe("a crease inside the face");
   });
 });

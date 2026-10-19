@@ -298,3 +298,81 @@ def test_the_worker_serves_an_exact_brep_of_hard_csg():
     assert diagnostics["off_surface_edges"] == 0
     assert len(payload["triangle_face"]) * 3 == len(payload["triangles"])
     assert set(payload["triangle_face"]) == {face["id"] for face in payload["faces"]}
+
+
+def test_each_face_says_how_the_step_export_writes_it(monkeypatch):
+    """With the ``step_export`` kind, every face carries its export surface and the card the file's count.
+
+    The plan is the B-rep's own (``brep.step_plan(scene)``): an exact surface
+    as it is, a blend on one certified B-spline with its errors, a face no
+    surface carries as facets with the reason.
+    """
+    brep = _fake_brep()
+    brep.step_plan = lambda scene: {
+        "length_unit": "metre",
+        "fit_tolerance": 1e-4,
+        "surfaces": {"plane": 1, "bspline": 1, "faceted": 1, "cylinder": 0},
+        "faces": [
+            {
+                "face": 0,
+                "surface": "plane",
+                "fit_error": None,
+                "field_error": None,
+                "control_points": 0,
+                "reason": "",
+            },
+            {
+                "face": 1,
+                "surface": "faceted",
+                "fit_error": 3e-3,
+                "field_error": 2e-2,
+                "control_points": 900,
+                "reason": "a crease inside the face",
+            },
+            {
+                "face": 2,
+                "surface": "bspline",
+                "fit_error": 2e-5,
+                "field_error": 4e-5,
+                "control_points": 1200,
+                "reason": "",
+            },
+        ],
+    }
+    components = {
+        "brep": SimpleNamespace(extract=lambda *a, **k: brep),
+        "step_export": SimpleNamespace(),
+    }
+    monkeypatch.setattr(tier, "component", lambda kind: components.get(str(kind)))
+
+    payload = brep_inspection(_box())
+    BRepInspectionPayload.model_validate(payload)
+
+    exports = {face["id"]: face["export"] for face in payload["faces"]}
+    assert exports[0]["surface"] == "plane" and exports[0]["fit_error"] is None
+    assert exports[1]["reason"] == "a crease inside the face"
+    assert exports[2] == {
+        "surface": "bspline",
+        "fit_error": 2e-5,
+        "field_error": 4e-5,
+        "control_points": 1200,
+        "reason": "",
+    }
+    step = payload["diagnostics"]["step"]
+    assert step == {
+        "faces": 3,
+        "surfaces": {"plane": 1, "bspline": 1, "faceted": 1},
+        "fit_tolerance": 1e-4,
+        "fit_error_max": 3e-3,
+        "length_unit": "metre",
+    }
+    assert payload["diagnostics"]["step_note"] is None
+
+
+def test_without_the_step_export_kind_there_is_no_plan_and_the_card_says_why(fake_tier):
+    payload = brep_inspection(_box())
+    BRepInspectionPayload.model_validate(payload)
+
+    assert all("export" not in face for face in payload["faces"])
+    assert payload["diagnostics"]["step"] is None
+    assert "diff-brep" in payload["diagnostics"]["step_note"]
