@@ -20,10 +20,12 @@ import {
   brepHover,
   brepMessage,
   brepOffSurfaceOnly,
+  brepShowTriangles,
   brepPayload,
   brepStatus,
   setBrepHiddenKinds,
   setBrepOffSurfaceOnly,
+  setBrepShowTriangles,
 } from "../../state";
 import { cssColor } from "../../simColors";
 import { BREP_OFF_SURFACE, CHROME } from "../../tokens";
@@ -122,6 +124,20 @@ function Legend(props: { model: BrepModel }) {
         <span>Highlight off-surface</span>
         <small data-testid="brep-off-surface-count">{d().off_surface_edges}</small>
       </label>
+      <label
+        class="brep-legend-row"
+        title="Outline every triangle of the extraction's tessellation, to judge how a face was triangulated."
+      >
+        <input
+          type="checkbox"
+          checked={brepShowTriangles()}
+          onChange={(event) => setBrepShowTriangles(event.currentTarget.checked)}
+          data-testid="brep-triangles"
+        />
+        <span class="brep-swatch" style={{ background: CHROME.ink, opacity: 0.3 }} />
+        <span>Triangles</span>
+        <small data-testid="brep-triangle-count">{props.model.triangleFace.length}</small>
+      </label>
     </div>
   );
 }
@@ -141,17 +157,20 @@ function Readout(props: { model: BrepModel }) {
     const vertex = props.model.vertices.find((item) => item.id === hover.id);
     return vertex ? ({ kind: "vertex", vertex } as const) : null;
   });
+  // Keyed: the child reads the target once, so it must be rebuilt for every
+  // new one. Unkeyed, `<Show>` runs its child once while the condition stays
+  // truthy, and the readout froze on the first thing hovered.
   return (
     <Show
       when={target()}
+      keyed
       fallback={
         <Row label="Pointer">
           <small>Hover a face, edge or vertex</small>
         </Row>
       }
     >
-      {(item) => {
-        const value = item();
+      {(value) => {
         if (value.kind === "face") {
           const face = value.face;
           return (

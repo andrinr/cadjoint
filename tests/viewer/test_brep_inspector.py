@@ -169,6 +169,53 @@ def test_the_lattice_quads_are_split_into_a_tessellation_with_face_ids(fake_tier
     assert len(payload["positions"]) == 6 * 3
 
 
+def test_the_b_reps_own_corner_normals_are_shipped_for_smooth_shading(monkeypatch):
+    """A B-rep that knows its surfaces' normals sends them; split lattice quads send none.
+
+    The viewer shades each face with the normal at every triangle corner, so
+    a smooth blend shades smooth instead of showing its facets.  The normals
+    are the private tier's (``brep.corner_normals(scene)``), one per corner
+    in triangle order, and only for its own triangles: the quads this module
+    splits itself have none, and are shaded flat as before.
+    """
+    triangles = np.array([[0, 1, 2], [0, 2, 3]])
+    normals = np.tile(np.array([1.0, 0.0, 0.0]), (2, 3, 1))
+    asked = []
+
+    def corner_normals(scene):
+        asked.append(scene)
+        return normals
+
+    brep = _fake_brep()
+    brep.triangles = triangles
+    brep.triangle_face = np.array([0, 0])
+    brep.corner_normals = corner_normals
+
+    class Extractor:
+        def extract(self, scene, grid, **options):
+            return brep
+
+    monkeypatch.setattr(
+        tier, "component", lambda kind: Extractor() if str(kind) == "brep" else None
+    )
+    scene = _box()
+    payload = brep_inspection(scene)
+    BRepInspectionPayload.model_validate(payload)
+    assert asked == [scene]
+    assert payload["corner_normals"] == [1.0, 0.0, 0.0] * 6
+
+    lattice = _fake_brep()
+    lattice.corner_normals = corner_normals
+    monkeypatch.setattr(
+        tier,
+        "component",
+        lambda kind: SimpleNamespace(extract=lambda *a, **k: lattice)
+        if str(kind) == "brep"
+        else None,
+    )
+    assert "corner_normals" not in brep_inspection(_box())
+
+
 def test_edges_are_kinded_by_how_they_reached_the_screen(fake_tier):
     payload = brep_inspection(_box())
 

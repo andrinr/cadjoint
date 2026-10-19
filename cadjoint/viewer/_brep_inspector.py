@@ -141,6 +141,31 @@ def _tessellation(brep: Any) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     return points, split, np.concatenate([quad_face, quad_face])
 
 
+def _corner_normals(scene: Any, brep: Any, triangles: np.ndarray) -> np.ndarray | None:
+    """The private tier's exact normal at every triangle corner, or ``None``.
+
+    Asked of the B-rep itself (``brep.corner_normals(scene)``), which knows
+    each face's surface: shading with the surface's own normal shows a smooth
+    blend smooth, where the facets' normals show every facet.  Only the
+    B-rep's own triangles have them — not the lattice quads split here — and
+    a B-rep without the method, or one that fails, is shaded flat as before.
+    """
+    method = getattr(brep, "corner_normals", None)
+    if method is None or triangles.shape[0] == 0:
+        return None
+    own = np.asarray(getattr(brep, "triangles", np.zeros((0, 3))), dtype=np.int64).reshape(-1, 3)
+    if own.shape != triangles.shape or not np.array_equal(own, triangles):
+        return None
+    try:
+        normals = np.asarray(method(scene), dtype=np.float64)
+    except Exception as error:  # noqa: BLE001 - shading is a nicety, the inspector still answers
+        print(f"corner normals unavailable: {type(error).__name__}: {error}")
+        return None
+    if normals.shape != (*triangles.shape, 3):
+        return None
+    return normals
+
+
 def _scene_residual(scene: Any, polylines: Sequence[np.ndarray]) -> list[float]:
     """Per polyline, the largest ``|f|`` of the scene over its points.
 
@@ -407,6 +432,7 @@ def brep_inspection(scene: Any) -> dict[str, Any]:
             timings["feature_edges"] = time.perf_counter() - started
     started = time.perf_counter()
     points, triangles, owners = _tessellation(brep)
+    normals = _corner_normals(scene, brep, triangles)
     faces = _faces(brep)
     vertices = _vertices(brep)
     edges = _edges(scene, brep, curves, cell)
@@ -416,6 +442,7 @@ def brep_inspection(scene: Any) -> dict[str, Any]:
         "positions": _round(points),
         "triangles": [int(i) for i in triangles.ravel()],
         "triangle_face": [int(i) for i in owners],
+        **({"corner_normals": _round(normals.reshape(-1, 3))} if normals is not None else {}),
         "faces": faces,
         "edges": edges,
         "vertices": vertices,
