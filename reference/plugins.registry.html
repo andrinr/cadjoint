@@ -3098,6 +3098,7 @@ kind = "thermal_solver"
 transport = "remote"
 url = "http://thermal.cadjoint.svc.cluster.local:8000"
 schema_hash = "sha256:2a1f..."</code></pre>
+<p><strong>Seeing the public tier.</strong> <code>CADJOINT_PUBLIC_TIER=1</code> leaves the private tier’s kinds (:data:<code>cadjoint.tier.KINDS</code>) out of the process-wide registry wherever they come from — what a public install sees, on a machine that has <code>diff-brep</code> installed. Child processes inherit it, so a playground started with it answers every request as the public tier does.</p>
 <p>Callers ask by name (:func:<code>get_plugin</code>) for one specific component, or by kind (:func:<code>plugin_for_kind</code>) for whatever currently fills a slot — which is what :mod:<code>cadjoint.fem.tesseracts.chain</code> and :mod:<code>cadjoint.fem.backends</code> do, so neither imports a <code>tesseract_api</code> module. Instances are cached, so a <code>local</code> plugin imports its API module once and a <code>remote</code> one holds a single warm session.</p>
 <section id="classes" class="level2">
 <h2 class="anchored" data-anchor-id="classes">Classes</h2>
@@ -3416,14 +3417,18 @@ schema_hash = "sha256:2a1f..."</code></pre>
 <td>The plugin currently filling <code>kind</code> in the process-wide registry.</td>
 </tr>
 <tr class="even">
+<td><a href="#cadjoint.plugins.registry.public_tier_forced">public_tier_forced</a></td>
+<td>Whether <code>$CADJOINT_PUBLIC_TIER</code> asks for the public tier only.</td>
+</tr>
+<tr class="odd">
 <td><a href="#cadjoint.plugins.registry.register_plugin">register_plugin</a></td>
 <td>Register <code>spec</code> in the process-wide registry.</td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td><a href="#cadjoint.plugins.registry.registry">registry</a></td>
 <td>The process-wide registry, assembled on first use.</td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td><a href="#cadjoint.plugins.registry.set_registry">set_registry</a></td>
 <td>Install <code>new</code> as the process-wide registry, returning the old one.</td>
 </tr>
@@ -3731,6 +3736,11 @@ schema_hash = "sha256:2a1f..."</code></pre>
 <h3 class="anchored" data-anchor-id="cadjoint.plugins.registry.plugin_for_kind">plugin_for_kind</h3>
 <pre class="python"><code>plugins.registry.plugin_for_kind(kind)</code></pre>
 <p>The plugin currently filling <code>kind</code> in the process-wide registry.</p>
+</section>
+<section id="cadjoint.plugins.registry.public_tier_forced" class="level3">
+<h3 class="anchored" data-anchor-id="cadjoint.plugins.registry.public_tier_forced">public_tier_forced</h3>
+<pre class="python"><code>plugins.registry.public_tier_forced()</code></pre>
+<p>Whether <code>$CADJOINT_PUBLIC_TIER</code> asks for the public tier only.</p>
 </section>
 <section id="cadjoint.plugins.registry.register_plugin" class="level3">
 <h3 class="anchored" data-anchor-id="cadjoint.plugins.registry.register_plugin">register_plugin</h3>
