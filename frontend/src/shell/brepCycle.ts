@@ -14,6 +14,7 @@
  */
 
 import { createEffect, type Accessor } from "solid-js";
+import { tierKind, tierMissing } from "../tier";
 import * as api from "../api";
 import { cancelClientJob, nextRequestId, watchJobs } from "../jobs";
 import {
@@ -55,6 +56,15 @@ export function createBrepCycle(options: BrepCycleOptions): void {
         requestedFor = null;
       }
       setBrepHover(null);
+      return;
+    }
+    if (tierMissing("brep")) {
+      // The server said up front that the exact B-rep is not here: say it
+      // the same way a refused request would, without asking.
+      setBrepStatus("unavailable");
+      setBrepMessage(tierKind("brep")?.message ?? null);
+      setBrepPayload(null);
+      options.disable();
       return;
     }
     if (compiled === null || requestedFor === compiled || brepStatus() === "unavailable") return;

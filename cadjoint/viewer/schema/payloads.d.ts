@@ -640,6 +640,8 @@ export interface KindStatus {
   contract_version: number | null;
   compatible: boolean;
   reason: string | null;
+  label: string;
+  message?: string | null;
 }
 
 /** ``GET /api/capabilities``: which private plugin kinds this server can reach. */

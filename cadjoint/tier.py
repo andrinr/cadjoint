@@ -68,30 +68,50 @@ EDGES_LATTICE_NOTE = "EDGES LATTICE · DIFF-BREP NOT INSTALLED"
 #: What the Meshes window shows for a Gmsh mesh without the tier.
 GEOMETRY_FROZEN_NOTE = "GEOMETRY FROZEN · DIFF-BREP NOT INSTALLED"
 
-#: The one sentence per kind, written for a public user.
+#: The one sentence per kind, written for a public user: what the public
+#: tier does instead, and that the exact path is the private tier's.  The
+#: viewer prints these verbatim beside the feature they limit.
 _MESSAGES: dict[str, str] = {
     PluginKind.NODE_MAP: (
-        "node positions of a Gmsh mesh do not follow the design without diff-brep: "
-        "the mesh is frozen geometry. Use mesher='tetgen' for a differentiable mesh, "
-        "or install diff-brep."
+        "A Gmsh mesh is frozen geometry in the public tier: its nodes do not follow "
+        "the design, because the node map is part of the private tier (diff-brep). "
+        "Use mesher='tetgen' for a mesh that follows the design, or install diff-brep."
     ),
     PluginKind.FEATURE_EDGES: (
-        "feature edges are read off the lattice without diff-brep; the exact edge "
-        "curves of the derived B-rep are the private tier's."
+        "Feature edges are read off the dual-contouring lattice in the public tier, "
+        "so they are approximate; exact edge curves are part of the private tier "
+        "(diff-brep)."
     ),
     PluginKind.BREP: (
-        "the derived B-rep is the private tier's; without diff-brep there is no B-rep "
-        "object, only the dual-contour mesh."
+        "Exact B-rep extraction is part of the private tier (diff-brep); the public "
+        "tier has the dual-contour mesh only."
     ),
     PluginKind.STEP_EXPORT: (
-        "STEP export is faceted without diff-brep; analytic planes and cylinders from "
-        "the derived B-rep are the private tier's."
+        "STEP export is faceted in the public tier: triangles from dual contouring. "
+        "Exact planes, cylinders and edge curves are part of the private tier "
+        "(diff-brep)."
     ),
     PluginKind.DRAG: (
-        "dragging a B-rep handle solves the design through the derived B-rep, which "
-        "is the private tier's; install diff-brep."
+        "Dragging a B-rep handle solves the design through the exact B-rep, which is "
+        "part of the private tier (diff-brep)."
     ),
 }
+
+#: Per kind, the tag the viewer shows beside the feature: ``(with the private
+#: tier, without it)``.  What you get, then where it comes from.
+_LABELS: dict[str, tuple[str, str]] = {
+    PluginKind.NODE_MAP: ("Follows design · private tier", "Frozen geometry · public tier"),
+    PluginKind.FEATURE_EDGES: ("Exact curves · private tier", "Approximate · lattice"),
+    PluginKind.BREP: ("Exact · private tier", "Dual contouring · public tier"),
+    PluginKind.STEP_EXPORT: ("Exact surfaces · private tier", "Faceted · public tier"),
+    PluginKind.DRAG: ("Exact · private tier", "Unavailable · public tier"),
+}
+
+
+def label(kind: str, available: bool) -> str:
+    """The short tag for ``kind``: what the feature is in this tier."""
+    exact, public = _LABELS.get(str(kind), ("Private tier", "Unavailable · public tier"))
+    return exact if available else public
 
 
 class TierUnavailable(RuntimeError):
@@ -155,7 +175,14 @@ class TierStatus:
             "installed": self.installed,
             "provider": PROVIDER,
             "contract_version": CONTRACT_VERSION,
-            "kinds": {kind: asdict(entry) for kind, entry in self.kinds.items()},
+            "kinds": {
+                kind: {
+                    **asdict(entry),
+                    "label": label(kind, entry.available),
+                    "message": None if entry.available else message(kind, entry.reason),
+                }
+                for kind, entry in self.kinds.items()
+            },
         }
 
     def flags(self) -> dict[str, bool]:

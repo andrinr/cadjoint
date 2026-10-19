@@ -22,6 +22,8 @@ import { simMeshes, studies } from "../../state";
 import {
   Card,
   CardHeader,
+  TierReason,
+  TierTag,
   CardList,
   NumberField,
   SectionHead,
@@ -208,6 +210,17 @@ export function MeshesTab(props: MeshesTabProps) {
                   <p class="sim-note sim-method-hint">
                     Hex: fast, lattice-aligned · Tet10: accurate boundary, slower
                   </p>
+                  {/* A Gmsh mesh follows the design only through the private
+                      tier's node map; without it the mesh is frozen geometry,
+                      and an optimization over it refuses. Said here, where
+                      the mesh is chosen, not first at the refusal. */}
+                  <Show when={mesh.mesher === "gmsh" && mesh.method !== "hex"}>
+                    <p class="sim-note" data-testid={`mesh-tier-${mesh.name}`}>
+                      Gmsh
+                      <TierTag kind="node_map" testId={`mesh-tier-tag-${mesh.name}`} />
+                      <TierReason kind="node_map" />
+                    </p>
+                  </Show>
                 </Show>
 
                 <button

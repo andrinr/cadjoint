@@ -32,6 +32,12 @@ The file has two tables::
     url = "http://thermal.cadjoint.svc.cluster.local:8000"
     schema_hash = "sha256:2a1f..."
 
+**Seeing the public tier.**  ``CADJOINT_PUBLIC_TIER=1`` leaves the private
+tier's kinds (:data:`cadjoint.tier.KINDS`) out of the process-wide registry
+wherever they come from — what a public install sees, on a machine that has
+``diff-brep`` installed.  Child processes inherit it, so a playground started
+with it answers every request as the public tier does.
+
 Callers ask by name (:func:`get_plugin`) for one specific component, or by
 kind (:func:`plugin_for_kind`) for whatever currently fills a slot — which
 is what :mod:`cadjoint.fem.tesseracts.chain` and
@@ -57,6 +63,8 @@ from cadjoint.plugins.spec import PluginConfigError, PluginSpec
 ENTRY_POINT_GROUP = "cadjoint.plugins"
 #: Environment variable naming a config file (or a directory holding one).
 CONFIG_ENV = "CADJOINT_PLUGINS"
+#: Environment variable that hides the private tier's kinds (``1`` / ``true``).
+PUBLIC_TIER_ENV = "CADJOINT_PUBLIC_TIER"
 #: The file name looked for in a config directory.
 CONFIG_NAME = "plugins.toml"
 
@@ -464,7 +472,16 @@ def registry() -> PluginRegistry:
     with _REGISTRY_LOCK:
         if _REGISTRY is None:
             _REGISTRY = build_registry()
+            if public_tier_forced():
+                from cadjoint.plugins.contracts import KIND_CONTRACTS
+
+                _REGISTRY = _REGISTRY.without(KIND_CONTRACTS)
         return _REGISTRY
+
+
+def public_tier_forced() -> bool:
+    """Whether ``$CADJOINT_PUBLIC_TIER`` asks for the public tier only."""
+    return os.environ.get(PUBLIC_TIER_ENV, "").strip().lower() in ("1", "true", "yes", "on")
 
 
 def set_registry(new: PluginRegistry | None) -> PluginRegistry | None:

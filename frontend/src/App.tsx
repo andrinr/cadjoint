@@ -36,6 +36,7 @@ import "./shell/layoutGrid.css";
 import { RenderSettingsButton } from "./components/viewer/RenderSettingsButton";
 import { ViewerPane } from "./components/ViewerPane";
 import { createBrepCycle } from "./shell/brepCycle";
+import { loadCapabilities } from "./tier";
 import { createCompileCycle } from "./shell/compileCycle";
 import { createPatchOperations } from "./shell/patchOperations";
 import { createRenderState } from "./shell/renderState";
@@ -278,6 +279,7 @@ export function App() {
   onMount(async () => {
     try {
       const session = await api.startSession();
+      void loadCapabilities();
       setExample(session.example);
       setSource(session.example);
       await compile.run();

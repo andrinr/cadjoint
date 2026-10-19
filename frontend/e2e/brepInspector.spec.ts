@@ -60,18 +60,21 @@ test("the inspector draws the derived B-rep and reads it out", async () => {
   if (!opened) return;
   const { browser, page } = opened;
   try {
+    const brep = (await page.evaluate(async () => (await fetch("/api/capabilities")).json())).kinds
+      .brep as { available: boolean; message: string | null };
+    if (!brep.available) {
+      // Public tier: the switch is disabled up front, with the server's
+      // sentence under it, and the inspector never asks for a B-rep.
+      await page.getByTestId("display-options").click();
+      await page.getByTestId("render-customize").click();
+      await expect(page.getByTestId("toggle-showBrep")).toBeDisabled();
+      await expect(page.getByTestId("toggle-showBrep")).not.toBeChecked();
+      await expect(page.getByTestId("tier-reason-brep")).toHaveText(brep.message!);
+      return;
+    }
     await flip(page, "toggle-showBrep");
     await expect(page.getByTestId("brep-inspector")).toBeVisible();
     const status = await settled(page);
-    if (/Not installed/.test(status)) {
-      // Public tier only: the mode says so and stays off.
-      await expect(page.getByTestId("brep-message")).toContainText(/diff-brep/i);
-      await page.getByTestId("display-options").click();
-      await page.getByTestId("render-customize").click();
-      await expect(page.getByTestId("toggle-showBrep")).not.toBeChecked();
-      await expect(page.getByTestId("toggle-showBrep")).toBeDisabled();
-      return;
-    }
     expect(status).toBe("Derived");
 
     // The card's counts.
@@ -86,7 +89,7 @@ test("the inspector draws the derived B-rep and reads it out", async () => {
     // Every legend row is a kind the server named, with a count; the counts
     // add up to the edge total.
     const counts = await page
-      .locator(".brep-legend-row:not(.brep-off-surface) small")
+      .locator(".brep-legend-row:has([data-testid^=brep-kind-]) small")
       .allTextContents();
     expect(counts.reduce((sum, text) => sum + Number(text), 0)).toBe(edges);
     await expect(page.getByTestId("brep-kind-traced")).toBeChecked();
