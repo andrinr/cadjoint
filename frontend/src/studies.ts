@@ -15,6 +15,10 @@ import type {
   StudyPayloadKind,
   StudySelection,
 } from "./types";
+import {
+  STUDY_BOUNDARY_CONDITIONS,
+  UNPLACED_BOUNDARY_CONDITIONS,
+} from "../../cadjoint/viewer/schema/constants";
 import { byId } from "./identity";
 
 /** Compact numeric formatting for selection summaries: drop trailing zeros. */
@@ -77,11 +81,8 @@ export const BC_LABELS: Record<BoundaryConditionType, string> = {
  * lattice, so they place no region and the form must not ask for one. See
  * `bcPlacesRegion`.
  */
-export function bcTypesFor(kind: StudyPayloadKind): BoundaryConditionType[] {
-  if (kind === "thermal") return ["dirichlet", "heat_flux"];
-  if (kind === "elastic") return ["fixed", "traction"];
-  if (kind === "flow") return ["inlet", "outlet", "walls", "heat_source", "held_temperature"];
-  return [];
+export function bcTypesFor(kind: StudyPayloadKind): readonly BoundaryConditionType[] {
+  return STUDY_BOUNDARY_CONDITIONS[kind];
 }
 
 /** Whether the GUI can add and edit this kind of study's conditions. */
@@ -91,7 +92,7 @@ export function isEditableStudyKind(kind: StudyPayloadKind): kind is StudyKind {
 
 /** Whether this condition picks a region, or is a face of the lattice. */
 export function bcPlacesRegion(type: BoundaryConditionType): boolean {
-  return BC_PLACEMENT[type] === undefined;
+  return !UNPLACED_BOUNDARY_CONDITIONS.includes(type);
 }
 
 /**

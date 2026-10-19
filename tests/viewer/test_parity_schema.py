@@ -174,6 +174,14 @@ class TestTheGeneratedTypeScript:
             "`python -m cadjoint.viewer.schema.emit`."
         )
 
+    def test_the_checked_in_constants_are_what_the_emitter_produces(self):
+        from cadjoint.viewer.schema.emit import CONSTANTS_PATH, constants_source
+
+        assert CONSTANTS_PATH.read_text() == constants_source(), (
+            "cadjoint/viewer/schema/constants.ts is stale; regenerate it with "
+            "`python -m cadjoint.viewer.schema.emit`."
+        )
+
     def test_it_declares_every_model_the_payload_carries(self):
         text = TYPESCRIPT_PATH.read_text()
         for name in (

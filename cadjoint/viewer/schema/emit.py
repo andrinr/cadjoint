@@ -22,10 +22,14 @@ from typing import Any
 from pydantic import BaseModel
 from pydantic.json_schema import models_json_schema
 
+from cadjoint.enums import BoundaryConditionType
 from cadjoint.viewer.schema import api, payloads, requests
 
 TYPESCRIPT_PATH = Path(__file__).with_name("payloads.d.ts")
 """The generated file the frontend imports."""
+
+CONSTANTS_PATH = Path(__file__).with_name("constants.ts")
+"""The generated values the frontend would otherwise copy by hand."""
 
 _HEADER = """\
 /**
@@ -402,10 +406,53 @@ def _route_chunks() -> list[str]:
     return chunks
 
 
+def constants_source() -> str:
+    """The tables the server enforces, as TypeScript values.
+
+    Which boundary conditions each study kind takes, which of them place no
+    region, and the export lattice's bounds: the frontend offers exactly
+    what the server accepts.
+    """
+    from cadjoint.enums import STUDY_KIND_BOUNDARY_CONDITIONS, UNPLACED_BOUNDARY_CONDITIONS
+    from cadjoint.viewer import _limits
+
+    def strings(values: Any) -> str:
+        return "[" + ", ".join(f'"{value}"' for value in values) + "]"
+
+    kinds = "".join(
+        f"  {kind}: {strings(types)},\n" for kind, types in STUDY_KIND_BOUNDARY_CONDITIONS.items()
+    )
+    unplaced = strings(sorted(UNPLACED_BOUNDARY_CONDITIONS, key=list(BoundaryConditionType).index))
+    return (
+        "/**\n"
+        " * Generated from cadjoint (enums, viewer/_limits) — do not edit.\n"
+        " *\n"
+        " * Regenerate with:\n"
+        " *\n"
+        " *     python -m cadjoint.viewer.schema.emit\n"
+        " */\n\n"
+        'import type { BoundaryConditionType, StudyKind } from "./payloads";\n\n'
+        "/** The boundary conditions each study kind accepts, in the order they are offered. */\n"
+        "export const STUDY_BOUNDARY_CONDITIONS: Readonly<\n"
+        "  Record<StudyKind, readonly BoundaryConditionType[]>\n"
+        "> = {\n" + kinds + "};\n\n"
+        "/** Conditions that are faces of the flow lattice and place no region. */\n"
+        f"export const UNPLACED_BOUNDARY_CONDITIONS: readonly BoundaryConditionType[] = {unplaced};\n\n"
+        "/** The export lattice's resolution bounds and default. */\n"
+        "export const EXPORT_RESOLUTION = {\n"
+        f"  min: {_limits.EXPORT_MIN_RESOLUTION},\n"
+        f"  max: {_limits.EXPORT_MAX_RESOLUTION},\n"
+        f"  default: {_limits.EXPORT_DEFAULT_RESOLUTION},\n"
+        "} as const;\n"
+    )
+
+
 def write_typescript(path: Path | None = None) -> Path:
-    """Write :func:`typescript_source` to disk and return where it went."""
+    """Write :func:`typescript_source` (and :func:`constants_source`) and return where."""
     destination = path or TYPESCRIPT_PATH
     destination.write_text(typescript_source())
+    if path is None:
+        CONSTANTS_PATH.write_text(constants_source())
     return destination
 
 
