@@ -28,7 +28,7 @@
  * a bug, not a nuance.
  */
 
-import type { StudyBcType } from "./types";
+import type { BoundaryConditionType } from "./types";
 
 // ── colour math ───────────────────────────────────────────────────────────
 // Kept here, with no runtime imports, so `tools/emit-tokens.ts` can load this
@@ -587,7 +587,7 @@ export const VIEWPORT_BACKGROUND: Rgb = [0.902, 0.902, 0.914];
  * paper, clear of both ramps' high ends, the proposal teal and every chrome
  * tone — held to those numbers by test/simColors.test.ts.
  */
-export const BC_TYPE_COLORS: Record<StudyBcType, Rgb> = {
+export const BC_TYPE_COLORS: Record<BoundaryConditionType, Rgb> = {
   dirichlet: [0.122, 0.482, 0.961],
   heat_flux: [0.753, 0.408, 0.114],
   fixed: [0.667, 0.322, 0.965],

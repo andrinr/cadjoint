@@ -276,7 +276,13 @@ export function App() {
       setSource(session.example);
       await compile.run();
     } catch (error) {
-      setStatus({ kind: "error", text: "Could not reach the playground server." });
+      setStatus({
+        kind: "error",
+        text:
+          error instanceof api.ApiVersionMismatch
+            ? "This page and the playground server are from different versions — see the console."
+            : "Could not reach the playground server.",
+      });
       setConsoleText(error instanceof Error ? error.message : String(error));
     }
   });

@@ -46,6 +46,47 @@ describe("selectionEvaluable", () => {
 });
 
 describe("primitive selections", () => {
+  // The server describes `Nodes.cylinder` too (cadjoint/studies/selection.py);
+  // it used to fall through every case here and evaluate to undefined.
+  it("cylinder selects by distance from its axis, which need not be unit length", () => {
+    const mask = evaluate({
+      kind: "cylinder",
+      center: [1, 1, 0],
+      axis: [0, 0, 2],
+      radius: 0.5,
+      inner: 0,
+      half_length: null,
+    })!;
+    expect(mask).toEqual([false, false, true, false, false, false, true, false]);
+  });
+
+  it("cylinder is bounded along its axis by half_length", () => {
+    const mask = evaluate({
+      kind: "cylinder",
+      center: [1, 1, 1],
+      axis: [0, 0, 1],
+      radius: 0.5,
+      inner: 0,
+      half_length: 0.5,
+    })!;
+    expect(mask).toEqual([false, false, false, false, false, false, true, false]);
+  });
+
+  it("a tube (inner > 0) leaves out what is inside its bore", () => {
+    const tube = (inner: number) =>
+      evaluate({
+        kind: "cylinder",
+        center: [0, 0, 0],
+        axis: [0, 0, 1],
+        radius: 3,
+        inner,
+        half_length: null,
+      })!;
+    // Every corner is √2 from the z axis.
+    expect(tube(1)).toEqual(new Array(8).fill(true));
+    expect(tube(1.5)).toEqual(new Array(8).fill(false));
+  });
+
   it("box is inclusive on its faces", () => {
     const mask = evaluate({
       kind: "box",

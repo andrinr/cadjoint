@@ -24,13 +24,13 @@ import {
   setSelectionMode,
   solverRuns,
 } from "../state";
-import type { ConstraintSolverMethod } from "../types";
+import type { ConstraintSolveMethod } from "../types";
 import { constraintLabel } from "../constraints";
 import { fixBlocked } from "../shell/toolActions";
 
 export interface SketchPanelProps {
   onFix: () => void;
-  onSolve: (method: ConstraintSolverMethod, iterations: number) => void;
+  onSolve: (method: ConstraintSolveMethod, iterations: number) => void;
   onExtrude: () => void;
   onRevolve: () => void;
   /** Remove the profile's index-th serialized constraint. */
@@ -42,7 +42,7 @@ export interface SketchPanelProps {
 export function SketchPanel(props: SketchPanelProps) {
   const [solverOpen, setSolverOpen] = createSignal(false);
   const [solverMethod, setSolverMethod] =
-    createSignal<ConstraintSolverMethod>("newton");
+    createSignal<ConstraintSolveMethod>("newton");
   const [solverIterations, setSolverIterations] = createSignal(8);
   const profile = createMemo(() => {
     const active = selection();
@@ -295,7 +295,7 @@ export function SketchPanel(props: SketchPanelProps) {
                       { value: "adam", label: "Adam" },
                       { value: "sgd", label: "SGD" },
                     ]}
-                    onChange={(value) => setSolverMethod(value as ConstraintSolverMethod)}
+                    onChange={(value) => setSolverMethod(value as ConstraintSolveMethod)}
                     testId="solver-method"
                   />
                 </label>

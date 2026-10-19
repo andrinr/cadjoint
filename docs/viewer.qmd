@@ -451,15 +451,25 @@ The server warms the cache for the scene it opens. See
 [program size](meshing.qmd#program-size) and the
 [performance notes](https://github.com/andrinr/cadjoint/blob/main/research/performance.md).
 
-**Source patches.** Every edit is a `/patch` request that rewrites a span of
+**Source patches.** Every edit is a `/api/patch` request that rewrites a span of
 the source; there are 28 operations. Each addressable thing carries a **stable
 id** derived from its AST path and the name the program gave it —
 `assign:comb_profile`, `call:extrude@comb_profile`, `box:block`,
 `bc:sink-conduction[1]`, `face:sink:cap+` — so an edit elsewhere in the file
 cannot redirect a patch; only an object with neither a variable nor a `name=`
-falls back to an ordinal `#<n>`. The payload is defined as pydantic models in
-`cadjoint/viewer/schema/`, which validate every response and generate
-`payloads.d.ts` (`python -m cadjoint.viewer.schema.emit`).
+falls back to an ordinal `#<n>`.
+
+**The contract.** Every request and response of every route, and every
+message between the server and its worker process, is a pydantic model in
+`cadjoint/viewer/schema/`; `api.ROUTES` lists the routes. The server checks
+each worker reply against its model before a route answers (a mismatch comes
+back as `error_kind: "contract"` rather than reaching the browser), and the
+frontend's types are generated from the same models into `payloads.d.ts`
+(`python -m cadjoint.viewer.schema.emit`). The contract is versioned:
+`GET /api/session` reports `api_version`, every response carries it in
+`X-Cadjoint-Api`, and a page built for another version says so instead of
+misreading the server. `/compile` and `/patch` moved to `/api/compile` and
+`/api/patch`; the old paths still answer.
 `tests/viewer/test_parity_roundtrip.py` checks that every operation's result
 parses, is deterministic and shows exactly the requested change, and that
 every `set_*` is idempotent.

@@ -245,7 +245,7 @@ describe("optimize NDJSON stream parsing", () => {
     );
     expect(event?.kind).toBe("done");
     if (event?.kind !== "done") throw new Error("expected done");
-    expect(event.response.ok).toBe(true);
+    if (!event.response.ok) throw new Error("expected a successful run");
     expect(event.response.source).toBe("x = 1");
     expect("event" in event.response).toBe(false);
   });

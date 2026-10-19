@@ -16,7 +16,12 @@ Two rules run through the file:
   keys as the FEM layer grows (``regularizer``, ``source``); those models
   say ``extra="allow"`` and the generated TypeScript carries an index
   signature, so the schema documents the guaranteed core without freezing
-  what the solver may add.
+  what the solver may add.  This is deliberate and limited to shapes that
+  come out of a library object's own ``describe()``/``inspect()``: the
+  studies, meshes, optimizations and their conditions and domains here,
+  and the solved-result and mesh-inspection summaries in
+  :mod:`cadjoint.viewer.schema.api`.  Everything the viewer package builds
+  itself is :class:`Strict`.
 """
 
 from __future__ import annotations
@@ -24,6 +29,8 @@ from __future__ import annotations
 from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
+
+from cadjoint.enums import BoundaryConditionType
 
 Span = Annotated[list[int], Field(min_length=2, max_length=2)]
 """``[start, end]`` character offsets into the program text."""
@@ -167,10 +174,29 @@ class ConstructionVertex(Strict):
     binding: ParameterBinding | None = None
 
 
+ReportedConstraintKind = Literal[
+    "fixed",
+    "distance",
+    "horizontal",
+    "vertical",
+    "coincident",
+    "equal_length",
+    "parallel",
+    "perpendicular",
+]
+"""Every constraint kind a compiled sketch can *report*.
+
+One wider than :class:`cadjoint.enums.ConstraintKind`, which names the kinds
+the viewer can *add*: ``equal_length`` is read back from a program that
+declares an ``EqualLengthConstraint`` but has no authoring tool.  Pinned
+against ``source_map.constraints.CONSTRAINT_CLASS_KINDS`` by a test.
+"""
+
+
 class ConstructionConstraint(Strict):
     """One constraint attached to a sketch's vertex parameters."""
 
-    kind: str
+    kind: ReportedConstraintKind
     vertices: list[int]
     value: Value = None
     index: int
@@ -210,12 +236,16 @@ class ConstructionTransform(Strict):
     bindings: dict[str, list[ParameterBinding]] = Field(default_factory=dict)
 
 
+ConstructionKind = Literal["profile", "box", "sphere", "cylinder"]
+"""A sketch profile, or one of the primitive kinds of ``cadjoint.construction.solid.DIMENSIONS``."""
+
+
 class ConstructionNode(Strict):
     """One construction object from the executed program."""
 
     id: str
     stableId: str | None
-    kind: str
+    kind: ConstructionKind
     name: str | None
     line: int | None
     editable: bool
@@ -347,50 +377,139 @@ class MaterialDefinition(Open):
 # ── Declarations ────────────────────────────────────────────────────────────
 
 
-class StudySelection(Open):
-    """A serialized node selection, mirroring ``cadjoint.studies.selection``.
+class BoxSelection(Strict):
+    """``Nodes.box``: the nodes inside an axis-aligned box."""
 
-    Composite selections nest: ``and``/``or`` carry ``operands``, ``not``
-    carries ``operand``, and the leaves carry their own geometry. The
-    per-kind fields are optional here because one model has to cover all of
-    them; ``kind`` says which are meaningful.
+    kind: Literal["box"]
+    min_corner: list[float]
+    max_corner: list[float]
+
+
+class SphereSelection(Strict):
+    """``Nodes.sphere``: the nodes inside a ball."""
+
+    kind: Literal["sphere"]
+    center: list[float]
+    radius: float
+
+
+class HalfspaceSelection(Strict):
+    """``Nodes.halfspace``: the nodes on the side of a plane its normal points to."""
+
+    kind: Literal["halfspace"]
+    point: list[float]
+    normal: list[float]
+
+
+class CylinderSelection(Strict):
+    """``Nodes.cylinder``: the nodes inside a cylinder, or a tube when ``inner > 0``.
+
+    ``half_length`` bounds it along ``axis`` either side of ``center``; null
+    leaves it unbounded.
     """
 
-    kind: str
-    min_corner: list[float] | None = None
-    max_corner: list[float] | None = None
-    center: list[float] | None = None
-    radius: float | None = None
-    point: list[float] | None = None
-    normal: list[float] | None = None
-    side: str | None = None
-    tol: float | None = None
-    name: str | None = None
-    operands: list[StudySelection] | None = None
-    operand: StudySelection | None = None
+    kind: Literal["cylinder"]
+    center: list[float]
+    axis: list[float]
+    radius: float
+    inner: float
+    half_length: float | None
 
 
-class StudyBc(Open):
-    """One boundary condition of a declared study.
+class SideSelection(Strict):
+    """``Nodes.side``: the extreme boundary plane of the mesh on one axis side."""
+
+    kind: Literal["side"]
+    side: str
+    tol: float | None
+
+
+class PredicateSelection(Strict):
+    """``Nodes.predicate``: a Python callable, which the viewer can name but not evaluate."""
+
+    kind: Literal["predicate"]
+    name: str
+
+
+class CombinedSelection(Strict):
+    """``a & b`` and ``a | b``."""
+
+    kind: Literal["and", "or"]
+    operands: list[StudySelection]
+
+
+class ComplementSelection(Strict):
+    """``~a``."""
+
+    kind: Literal["not"]
+    operand: StudySelection
+
+
+StudySelection = Annotated[
+    BoxSelection
+    | SphereSelection
+    | HalfspaceSelection
+    | CylinderSelection
+    | SideSelection
+    | PredicateSelection
+    | CombinedSelection
+    | ComplementSelection,
+    Field(discriminator="kind"),
+]
+"""A serialized node selection, mirroring ``cadjoint.studies.selection``.
+
+One model per selection class, discriminated on ``kind``, so the frontend
+evaluates exactly these shapes with an exhaustive switch.  Closed, although
+it is a ``describe()``: a test describes one selection of every class, so a
+class added there without a model here fails rather than reaching a
+frontend that cannot evaluate it (as ``cylinder`` once did).
+"""
+
+SELECTION_MODELS: tuple[type[BaseModel], ...] = (
+    BoxSelection,
+    SphereSelection,
+    HalfspaceSelection,
+    CylinderSelection,
+    SideSelection,
+    PredicateSelection,
+    CombinedSelection,
+    ComplementSelection,
+)
+
+CombinedSelection.model_rebuild()
+ComplementSelection.model_rebuild()
+
+
+class StudyBcDescription(Open):
+    """One boundary condition as its own ``describe()`` reports it.
 
     ``nodes`` is optional because not every condition is placed by selecting
     nodes: a flow study's inlet, outlet and duct walls are planes of the
     lattice, and carry an inlet velocity or a wall temperature instead.
     ``serializable`` still says whether the condition round-trips, but it is
     now the condition's own answer rather than its selection's.
+
+    This is the shape a solved study echoes (``/api/simulate``'s ``study``);
+    the compile payload's :class:`StudyBc` adds where the condition is
+    written.
     """
 
-    type: str
+    type: BoundaryConditionType
     nodes: StudySelection | None = None
-    stableId: str | None
     serializable: bool
-    span: Span | None
     value: float | None = None
     flux: float | None = None
     vector: Vector3 | None = None
     velocity: Vector3 | None = None
     temperature: float | None = None
     power: float | None = None
+
+
+class StudyBc(StudyBcDescription):
+    """One boundary condition of a declared study, with its place in the source."""
+
+    stableId: str | None
+    span: Span | None
 
 
 class DomainEntry(Open):
@@ -600,11 +719,28 @@ class CompilePayload(Strict):
     output: str
 
 
+ErrorKind = Literal["cancelled", "fem_unavailable", "contract"]
+"""Why a request failed, when the reason is one the client acts on.
+
+``cancelled``: somebody stopped the job (HTTP 409).  ``fem_unavailable``: the
+optional solver extra is missing (HTTP 501, shown as an install hint).
+``contract``: a worker answered with a shape its model does not allow — a
+bug, reported rather than forwarded (see :mod:`cadjoint.viewer.schema.worker`).
+"""
+
+
 class WorkerFailure(Strict):
-    """What every worker mode answers with when it raised."""
+    """What every worker mode — and every endpoint — answers with when it fails.
+
+    ``output`` is what the program printed before it failed, when the mode
+    captured it; ``error_kind`` is set only for the reasons in
+    :data:`ErrorKind`.
+    """
 
     ok: Literal[False]
     error: str
+    error_kind: ErrorKind | None = None
+    output: str | None = None
 
 
 def validate_compile_payload(payload: dict[str, Any]) -> dict[str, Any]:

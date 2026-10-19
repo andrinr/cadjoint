@@ -154,3 +154,55 @@ jobs:
           CXX: "false"
           FC: "false"
         run: uv lock --check
+
+  # The browser half of the viewer. Until this job nothing on CI ran a line of
+  # TypeScript, so the frontend could stop compiling, fail its own unit tests,
+  # or drift from the bundle the Python package ships, and every check here
+  # stayed green. The contract between the two halves is generated from the
+  # pydantic models (cadjoint/viewer/schema/payloads.d.ts, kept fresh by
+  # tests/viewer/test_parity_schema.py in the `test` job), so `tsc` here is
+  # what turns a server-side shape change into a red build.
+  #
+  # Playwright stays out: the e2e specs need a WebGPU browser and a running
+  # playground with a warm JAX cache, which is minutes per spec, not seconds.
+  frontend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Type-check
+        run: npm run typecheck
+
+      - name: Unit tests
+        run: npm test
+
+      - name: Build
+        run: npm run build
+
+      # `pip install cadjoint` ships cadjoint/viewer/static as committed, and
+      # the playground, the e2e specs and the design linter all serve it, so a
+      # source change committed without its rebuilt bundle is a release that
+      # runs yesterday's frontend. The build is deterministic (content-hashed
+      # file names, no timestamps), so a clean tree after building is the check.
+      - name: The committed bundle is the build of this source
+        run: |
+          changes=$(git status --porcelain -- ../cadjoint/viewer/static)
+          if [ -n "$changes" ]; then
+            echo "::error::cadjoint/viewer/static is not the build of frontend/src."
+            echo "Run 'npm run build' in frontend/ and commit cadjoint/viewer/static."
+            echo "$changes"
+            exit 1
+          fi
