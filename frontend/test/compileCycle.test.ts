@@ -11,7 +11,7 @@
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { createRoot } from "solid-js";
+import { createRoot, createSignal } from "solid-js";
 
 const compile = vi.fn();
 const mesh = vi.fn();
@@ -57,7 +57,8 @@ const watchers = {
 let requestIds = 0;
 
 const { createCompileCycle } = await import("../src/shell/compileCycle");
-const { busy, nodes, source, setSource, status } = await import("../src/state");
+const { busy, meshEdges, nodes, source, setSource, setViewerError, status, viewerError } =
+  await import("../src/state");
 
 /** A compile response naming the program it came from. */
 function answer(name: string) {
@@ -100,7 +101,10 @@ const settle = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
 const DEBOUNCE = 20;
 
 /** The cycle, with the two things it talks to stubbed out. */
-function cycle() {
+function cycle(display: () => { showMeshEdges: boolean; showMeshWireframe: boolean } = () => ({
+  showMeshEdges: false,
+  showMeshWireframe: false,
+})) {
   return createRoot(() =>
     createCompileCycle({
       renderer: { setShaders: async () => {} } as never,
@@ -112,7 +116,7 @@ function cycle() {
         stepBack: () => null,
         stepForward: () => null,
       },
-      display: () => ({ showMeshEdges: false, showMeshWireframe: false }) as never,
+      display: display as never,
       debounceMs: DEBOUNCE,
     }),
   );
@@ -126,6 +130,7 @@ beforeEach(() => {
   watchers.held = 0;
   watchers.peak = 0;
   setSource("");
+  setViewerError("");
 });
 
 describe("chained edits", () => {
@@ -307,5 +312,96 @@ describe("chained edits", () => {
     slow.resolve(answer("p+"));
     await settle(DEBOUNCE + 20);
     expect(nodes().map((node) => node.id)).toEqual(["p++"]);
+  });
+});
+
+describe("the feature-edge overlay", () => {
+  const EDGES = { sharp: [[0, 0, 0, 1, 0, 0]], wire: [], resolution: 32, edges: "graph" };
+
+  /** A cycle with the overlay switch under the test's control, switched on. */
+  function withOverlay() {
+    const [display, setDisplay] = createSignal({ showMeshEdges: true, showMeshWireframe: false });
+    return { app: cycle(display), setDisplay };
+  }
+
+  it("asks again when the same program compiles a second time", async () => {
+    compile.mockImplementation(async (text: string) => answer(text));
+    mesh.mockImplementation(async () => ({ ok: true, mesh_edges: EDGES }));
+    const { app } = withOverlay();
+    setSource("same");
+    await app.run();
+    await settle();
+    expect(mesh).toHaveBeenCalledTimes(1);
+    expect(meshEdges()).not.toBeNull();
+
+    // Run again with no edit: the compile clears the overlay, so it has to
+    // be asked for again rather than found already "requested".
+    await app.run();
+    await settle();
+    expect(mesh).toHaveBeenCalledTimes(2);
+    expect(meshEdges()).not.toBeNull();
+  });
+
+  it("reports a failed extraction, and the switch tries again", async () => {
+    compile.mockImplementation(async (text: string) => answer(text));
+    mesh.mockImplementationOnce(async () => {
+      throw new Error("Server returned a non-JSON response (504).");
+    });
+    mesh.mockImplementationOnce(async () => ({ ok: true, mesh_edges: EDGES }));
+    const { app, setDisplay } = withOverlay();
+    setSource("part");
+    await app.run();
+    await settle();
+    expect(viewerError()).toContain("Feature edges unavailable");
+    expect(viewerError()).toContain("504");
+    expect(meshEdges()).toBeNull();
+
+    setDisplay({ showMeshEdges: false, showMeshWireframe: false });
+    setDisplay({ showMeshEdges: true, showMeshWireframe: false });
+    await settle();
+    expect(mesh).toHaveBeenCalledTimes(2);
+    expect(meshEdges()).not.toBeNull();
+    expect(viewerError()).toBe("");
+  });
+
+  it("reports a refusal from the server, not only a network failure", async () => {
+    compile.mockImplementation(async (text: string) => answer(text));
+    mesh.mockImplementation(async () => ({ ok: false, error: "mesh extraction timed out" }));
+    const { app } = withOverlay();
+    setSource("part");
+    await app.run();
+    await settle();
+    expect(viewerError()).toBe("Feature edges unavailable: mesh extraction timed out");
+  });
+
+  it("asks again when a failed compile aborted the extraction in flight", async () => {
+    compile.mockImplementationOnce(async (text: string) => answer(text));
+    compile.mockImplementationOnce(async () => ({ ok: false, error: "SyntaxError" }));
+    const first = deferred<unknown>();
+    mesh.mockImplementationOnce(
+      (_source: string, options: { signal: AbortSignal }) =>
+        new Promise((resolve, reject) => {
+          options.signal.addEventListener("abort", () =>
+            reject(new DOMException("aborted", "AbortError")),
+          );
+          void first.promise.then(resolve);
+        }),
+    );
+    mesh.mockImplementationOnce(async () => ({ ok: true, mesh_edges: EDGES }));
+    const { app } = withOverlay();
+    setSource("good");
+    await app.run();
+    await settle();
+    expect(mesh).toHaveBeenCalledTimes(1);
+
+    // A broken edit compiles, fails, and never publishes: the program on
+    // screen is still "good", and it still wants its edges.
+    setSource("bad");
+    await app.run();
+    await settle();
+    expect(mesh).toHaveBeenCalledTimes(2);
+    expect(mesh.mock.calls[1][0]).toBe("good");
+    expect(meshEdges()).not.toBeNull();
+    expect(viewerError()).toBe("");
   });
 });
