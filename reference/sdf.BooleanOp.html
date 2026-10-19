@@ -3080,7 +3080,7 @@ ul.task-list li input[type="checkbox"] {
 <pre class="python"><code>sdf.BooleanOp()</code></pre>
 <p>Base class for boolean operation SDFs.</p>
 <p>Boolean operations combine one or more SDFs - union, intersection, difference, etc.</p>
-<p>Subclasses must implement: - <span class="citation" data-cites="staticmethod">@staticmethod</span> def sdf(child_sdfs: tuple, p: Array, **params) -&gt; Array - <strong>call</strong>(self, p: Array) -&gt; Array - to_functional(self) -&gt; Callable</p>
+<p>Subclasses must implement: - <span class="citation" data-cites="staticmethod">@staticmethod</span> def sdf(child_sdfs: tuple, p: Array, **params) -&gt; Array - <strong>call</strong>(self, p: Array) -&gt; Array</p>
 <p>Subclasses should store: - self.sdfs: Tuple of child SDFs - self.params: Dictionary of Parameter objects</p>
 
 

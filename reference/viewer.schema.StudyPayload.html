@@ -3079,8 +3079,7 @@ ul.task-list li input[type="checkbox"] {
 <h1>viewer.schema.StudyPayload</h1>
 <pre class="python"><code>viewer.schema.StudyPayload()</code></pre>
 <p>One study declared in the scene program.</p>
-<p><code>kind</code> names what a program may <em>contain</em>; :class:<code>~cadjoint.enums.StudyKind</code> names what the viewer can <em>create and edit</em> through the patch endpoints. The two are equal today — a :class:<code>cadjoint.flow.FlowStudy</code> is displayed and written like the other two, though it discretises a fixed lattice rather than a mesh, so it carries a <code>resolution</code> and no <code>mesh</code>.</p>
-<p>They are kept as separate vocabularies because they have differed and may again: <code>flow</code> was in this one and not the enum for as long as the patch layer could not write a <code>FlowStudy</code>, and widening the enum ahead of that would have made <code>add_study</code> advertise a kind it could not produce. A kind here and not in the enum reports <code>editable: false</code>.</p>
+<p><code>kind</code> names what a program may contain; :class:<code>~cadjoint.enums.StudyKind</code> names what the patch endpoints can write. A kind here and not in the enum reports <code>editable: false</code>.</p>
 
 
 </section>

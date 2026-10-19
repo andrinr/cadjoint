@@ -3190,8 +3190,8 @@ ul.task-list li input[type="checkbox"] {
 <table class="caption-top table">
 <colgroup>
 <col style="width: 8%">
-<col style="width: 19%">
-<col style="width: 71%">
+<col style="width: 20%">
+<col style="width: 70%">
 </colgroup>
 <thead>
 <tr class="header">
@@ -3203,62 +3203,62 @@ ul.task-list li input[type="checkbox"] {
 <tbody>
 <tr class="odd">
 <td></td>
-<td>dict[str, Any]</td>
-<td><code>{"name", "kind", "field", "mesh", "nodes", "elements",        | |        | dict\[str, Any\] | "range", "fields", "mass", "safety_factor", "refinement"}</code></td>
+<td>ResultDescription</td>
+<td><code>{"name", "kind", "field", "mesh", "nodes", "elements",        | |        | ResultDescription | "range", "fields", "mass", "safety_factor", "refinement"}</code></td>
 </tr>
 <tr class="even">
 <td></td>
-<td>dict[str, Any]</td>
+<td>ResultDescription</td>
 <td>where <code>mesh</code> is</td>
 </tr>
 <tr class="odd">
 <td></td>
-<td>dict[str, Any]</td>
+<td>ResultDescription</td>
 <td>the SimMesh name (or None), <code>range</code> is the <code>[min, max]</code> of</td>
 </tr>
 <tr class="even">
 <td></td>
-<td>dict[str, Any]</td>
+<td>ResultDescription</td>
 <td>the display field of :meth:<code>nodal_scalar</code>, <code>fields</code> maps each</td>
 </tr>
 <tr class="odd">
 <td></td>
-<td>dict[str, Any]</td>
+<td>ResultDescription</td>
 <td>solved field to a <code>{"min", "mean", "max"}</code> summary</td>
 </tr>
 <tr class="even">
 <td></td>
-<td>dict[str, Any]</td>
+<td>ResultDescription</td>
 <td>(displacement summarized by magnitude, von Mises per cell), and</td>
 </tr>
 <tr class="odd">
 <td></td>
-<td>dict[str, Any]</td>
+<td>ResultDescription</td>
 <td><code>mass</code> (kg) / <code>safety_factor</code> are None when the scene’s</td>
 </tr>
 <tr class="even">
 <td></td>
-<td>dict[str, Any]</td>
+<td>ResultDescription</td>
 <td>materials do not make them computable. <code>refinement</code> is None</td>
 </tr>
 <tr class="odd">
 <td></td>
-<td>dict[str, Any]</td>
+<td>ResultDescription</td>
 <td>unless the tet mesher had to re-dice the declared grid, in</td>
 </tr>
 <tr class="even">
 <td></td>
-<td>dict[str, Any]</td>
+<td>ResultDescription</td>
 <td>which case it is <code>{"declared", "used", "attempts"}</code> — the</td>
 </tr>
 <tr class="odd">
 <td></td>
-<td>dict[str, Any]</td>
+<td>ResultDescription</td>
 <td>declared and actually-used cell counts and how many</td>
 </tr>
 <tr class="even">
 <td></td>
-<td>dict[str, Any]</td>
+<td>ResultDescription</td>
 <td>extractions it took (:attr:<code>refinement</code> holds the full record).</td>
 </tr>
 </tbody>

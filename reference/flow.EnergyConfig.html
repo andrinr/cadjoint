@@ -3152,7 +3152,7 @@ ul.task-list li input[type="checkbox"] {
 <tr class="odd">
 <td>restart</td>
 <td>int</td>
-<td>Krylov subspace size before GMRES restarts, and the one setting here that can silently return a wrong answer. Restarted GMRES <em>stagnates</em> when the subspace is too small for the operator’s spectrum, and the conductivity ratio is what sets that spectrum: on a 14x26x14 duct, <code>restart = 30</code> converges to 2.9e-12 at a ratio of 50 and stalls at a relative residual of <strong>0.23</strong> at a ratio of 200 – reporting a peak temperature of 0.014 where the answer is 0.602, with no error and no warning. 60 converges at both. It costs <code>restart</code> stored fields, which is the reason not to simply set it very high on a large lattice. :func:<code>energy_imbalance</code> is the check that catches a stall, and :meth:<code>~cadjoint.flow.FlowStudy.warnings</code> runs it.</td>
+<td>Krylov subspace size before GMRES restarts, and the one setting here that can silently return a wrong answer. Restarted GMRES <em>stagnates</em> when the subspace is too small for the operator’s spectrum, and the conductivity ratio is what sets that spectrum: on a 14x26x14 duct, <code>restart = 30</code> converges to 2.9e-12 at a ratio of 50 and stalls at a relative residual of <strong>0.23</strong> at a ratio of 200 – reporting a peak temperature of 0.014 where the answer is 0.602, with no error and no warning. 60 converges at both. It costs <code>restart</code> stored fields, which is the reason not to simply set it very high on a large lattice. :func:<code>energy_imbalance</code> is the check that catches a stall, and :attr:<code>~cadjoint.flow.study.FlowStudyResult.warnings</code> runs it.</td>
 </tr>
 </tbody>
 </table>

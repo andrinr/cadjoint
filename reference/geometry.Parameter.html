@@ -3174,18 +3174,14 @@ ul.task-list li input[type="checkbox"] {
 <td>Register a constraint that references this parameter.</td>
 </tr>
 <tr class="even">
-<td><a href="#cadjoint.geometry.Parameter.extract_value">extract_value</a></td>
-<td>Extract raw numeric value for computation.</td>
-</tr>
-<tr class="odd">
 <td><a href="#cadjoint.geometry.Parameter.get_constraints">get_constraints</a></td>
 <td>Get all constraints that reference this parameter.</td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td><a href="#cadjoint.geometry.Parameter.tree_flatten">tree_flatten</a></td>
 <td>Flatten for JAX pytree.</td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td><a href="#cadjoint.geometry.Parameter.tree_unflatten">tree_unflatten</a></td>
 <td>Unflatten from JAX pytree.</td>
 </tr>
@@ -3217,37 +3213,12 @@ ul.task-list li input[type="checkbox"] {
 </table>
 </section>
 </section>
-<section id="cadjoint.geometry.Parameter.extract_value" class="level3">
-<h3 class="anchored" data-anchor-id="cadjoint.geometry.Parameter.extract_value">extract_value</h3>
-<pre class="python"><code>geometry.Parameter.extract_value()</code></pre>
-<p>Extract raw numeric value for computation.</p>
-<p>Base implementation returns .value. Subclasses like Vector override to return .xyz.</p>
-<section id="returns" class="level4 doc-section doc-section-returns">
-<h4 class="doc-section doc-section-returns anchored" data-anchor-id="returns">Returns</h4>
-<table class="caption-top table">
-<thead>
-<tr class="header">
-<th>Name</th>
-<th>Type</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr class="odd">
-<td></td>
-<td>Union[float, Array]</td>
-<td>Raw numeric value (float or Array)</td>
-</tr>
-</tbody>
-</table>
-</section>
-</section>
 <section id="cadjoint.geometry.Parameter.get_constraints" class="level3">
 <h3 class="anchored" data-anchor-id="cadjoint.geometry.Parameter.get_constraints">get_constraints</h3>
 <pre class="python"><code>geometry.Parameter.get_constraints()</code></pre>
 <p>Get all constraints that reference this parameter.</p>
-<section id="returns-1" class="level4 doc-section doc-section-returns">
-<h4 class="doc-section doc-section-returns anchored" data-anchor-id="returns-1">Returns</h4>
+<section id="returns" class="level4 doc-section doc-section-returns">
+<h4 class="doc-section doc-section-returns anchored" data-anchor-id="returns">Returns</h4>
 <table class="caption-top table">
 <thead>
 <tr class="header">

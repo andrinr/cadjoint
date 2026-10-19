@@ -3104,7 +3104,7 @@ ul.task-list li input[type="checkbox"] {
 <colgroup>
 <col style="width: 1%">
 <col style="width: 3%">
-<col style="width: 95%">
+<col style="width: 94%">
 </colgroup>
 <thead>
 <tr class="header">
@@ -3157,7 +3157,7 @@ ul.task-list li input[type="checkbox"] {
 <tr class="odd">
 <td>gradient_path</td>
 <td>GradientPathLike</td>
-<td>Study form: how the design-&gt;points derivative is carried per step (keyword-only) — a :class:<code>~cadjoint.enums.GradientPath</code> or its plain string spelling, normalised (aliases resolved) on construction. <code>"direct"</code> (default) is the validated frozen-topology path — node positions Newton re-projected onto the true SDF, solved in-process. <code>"tesseract"</code> runs the packaged two-tesseract chain instead (lattice samples -&gt; mesher tesseract with its surface-interpolation VJP -&gt; solver tesseract adjoint); it meshes the <em>trilinear interpolant</em> of the samples, so it can need a finer lattice than the direct path and its gradient carries only normal boundary motion (measured in <code>research/tet-vs-hex.md</code>). <code>"tesseract-dc"</code> is the narrow cut: dual contouring stays in JAX on the true SDF and only TetGen is wrapped (tetfill tesseract, exact pass-through VJP on the vertices <code>-Y</code> preserves), so it meshes the same geometry the direct path does — tet <code>SimMesh</code> only. Both chain paths resolve each stage through :mod:<code>cadjoint.plugins</code>, so where the mesher and the solver actually run is configuration (<code>plugins.toml</code>), and both spellings accept the aliases <code>"plugins"</code> / <code>"plugins-dc"</code>. Both require the <code>tesseract</code> extra. The final reported result is always evaluated on the direct path.</td>
+<td>Study form: how the design-&gt;points derivative is carried per step (keyword-only) — a :class:<code>~cadjoint.enums.GradientPath</code> or its plain string spelling, normalised on construction. <code>"direct"</code> (default) is the validated frozen-topology path — node positions Newton re-projected onto the true SDF, solved in-process. <code>"tesseract"</code> runs the packaged two-tesseract chain instead (lattice samples -&gt; mesher tesseract with its surface-interpolation VJP -&gt; solver tesseract adjoint); it meshes the <em>trilinear interpolant</em> of the samples, so it can need a finer lattice than the direct path and its gradient carries only normal boundary motion (measured in <code>research/tet-vs-hex.md</code>). <code>"tesseract-dc"</code> is the narrow cut: dual contouring stays in JAX on the true SDF and only TetGen is wrapped (tetfill tesseract, exact pass-through VJP on the vertices <code>-Y</code> preserves), so it meshes the same geometry the direct path does — tet <code>SimMesh</code> only. Both chain paths resolve each stage through :mod:<code>cadjoint.plugins</code>, so where the mesher and the solver actually run is configuration (<code>plugins.toml</code>). Both require the <code>tesseract</code> extra. The final reported result is always evaluated on the direct path.</td>
 </tr>
 <tr class="even">
 <td>steps</td>

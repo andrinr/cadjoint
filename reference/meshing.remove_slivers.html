@@ -3083,7 +3083,7 @@ ul.task-list li input[type="checkbox"] {
 <h1>meshing.remove_slivers</h1>
 <pre class="python"><code>meshing.remove_slivers(mesh)</code></pre>
 <p>Weld coincident vertices and drop the triangles that collapse.</p>
-<p>At a sharp concave crease dual contouring can emit triangles whose corners are distinct vertex rows at one position (about 1e-15 apart). The index graph is manifold, but a file without indices is not: an STL reader merges coincident points, those triangles then have no area, and their edges are used a third and fourth time — the file is not watertight (issue #52). This does that merge first, keeps the faces on the lowest row of each coincident group, and drops every triangle that no longer has three distinct corners. <code>save_stl</code> and <code>save_obj</code> apply it; <code>save_step</code> has its own edge weld.</p>
+<p>At a sharp concave crease dual contouring can emit triangles whose corners are distinct vertex rows at one position (about 1e-15 apart). The index graph is manifold, but a file without indices is not: an STL reader merges coincident points, those triangles then have no area, and their edges are used a third and fourth time — the file is not watertight. This does that merge first, keeps the faces on the lowest row of each coincident group, and drops every triangle that no longer has three distinct corners. <code>save_stl</code> and <code>save_obj</code> apply it; <code>save_step</code> has its own edge weld.</p>
 <section id="parameters" class="level2 doc-section doc-section-parameters">
 <h2 class="doc-section doc-section-parameters anchored" data-anchor-id="parameters">Parameters</h2>
 <table class="caption-top table">

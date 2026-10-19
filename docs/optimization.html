@@ -3422,7 +3422,6 @@ penalty                  loss 0.0450  |r| 8.4e-03</code></pre>
 </tr>
 </tbody>
 </table>
-<p>The aliases <code>"plugins"</code> and <code>"plugins-dc"</code> name the same two chain paths and resolve to the canonical member on construction.</p>
 <p><code>"tesseract-dc"</code> keeps dual contouring in JAX against the true field, which preserves fin creases; the starter scene declares it. Both Tesseract paths need the <code>tesseract</code> extra. Whichever path runs the descent, the final result is evaluated on the direct path.</p>
 <p>The stages behind both paths are <a href="../docs/plugins.html">plugins</a> resolved by kind (<code>mesher</code>, <code>tetfill</code>, <code>thermal_solver</code>, <code>elastic_solver</code>), so where each runs is configuration. The plugins page gives the cost of each boundary.</p>
 </section>

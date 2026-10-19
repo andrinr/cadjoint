@@ -3563,10 +3563,6 @@ probe = get_plugin("thermal_jaxfem").probe()
 <h2 class="anchored" data-anchor-id="gradient-paths-and-backends">Gradient paths and backends</h2>
 <p><code>gradient_path</code> on an <a href="../docs/optimization.html"><code>Optimization</code></a> selects which frozen chain runs:</p>
 <table class="caption-top table">
-<colgroup>
-<col style="width: 50%">
-<col style="width: 50%">
-</colgroup>
 <thead>
 <tr class="header">
 <th><code>gradient_path</code></th>
@@ -3579,11 +3575,11 @@ probe = get_plugin("thermal_jaxfem").probe()
 <td>none: in-process JAX and jax-fem</td>
 </tr>
 <tr class="even">
-<td><code>"tesseract"</code> (alias <code>"plugins"</code>)</td>
+<td><code>"tesseract"</code></td>
 <td><code>mesher</code> → <code>thermal_solver</code>/<code>elastic_solver</code></td>
 </tr>
 <tr class="odd">
-<td><code>"tesseract-dc"</code> (alias <code>"plugins-dc"</code>)</td>
+<td><code>"tesseract-dc"</code></td>
 <td><code>tetfill</code> → <code>thermal_solver</code>/<code>elastic_solver</code></td>
 </tr>
 </tbody>

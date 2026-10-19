@@ -3134,10 +3134,6 @@ ul.task-list li input[type="checkbox"] {
 <td><a href="#cadjoint.sdf.Cylinder.sdf">sdf</a></td>
 <td>Pure SDF function for cylinder.</td>
 </tr>
-<tr class="odd">
-<td><a href="#cadjoint.sdf.Cylinder.to_functional">to_functional</a></td>
-<td>Return pure function for compilation.</td>
-</tr>
 </tbody>
 </table>
 <section id="cadjoint.sdf.Cylinder.patch_fields" class="level3">
@@ -3205,14 +3201,9 @@ ul.task-list li input[type="checkbox"] {
 <section id="note" class="level4 doc-section doc-section-note">
 <h4 class="doc-section doc-section-note anchored" data-anchor-id="note">Note</h4>
 <p>Branches on inside/outside like :meth:<code>Box.sdf</code> so points exactly on the side or cap surfaces receive a valid one-sided subgradient instead of the exact zero an epsilon-smoothed outside norm produces there. The radial epsilon stays: its degenerate point is the axis, which is interior, never on the surface.</p>
-</section>
-</section>
-<section id="cadjoint.sdf.Cylinder.to_functional" class="level3">
-<h3 class="anchored" data-anchor-id="cadjoint.sdf.Cylinder.to_functional">to_functional</h3>
-<pre class="python"><code>sdf.Cylinder.to_functional()</code></pre>
-<p>Return pure function for compilation.</p>
 
 
+</section>
 </section>
 </section>
 </section>

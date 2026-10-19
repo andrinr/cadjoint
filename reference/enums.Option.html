@@ -3079,7 +3079,7 @@ ul.task-list li input[type="checkbox"] {
 <h1>enums.Option</h1>
 <pre class="python"><code>enums.Option()</code></pre>
 <p>Base for every option set here: a string with a fixed vocabulary.</p>
-<p>The one behaviour it adds to :class:<code>enum.StrEnum</code> is <code>repr</code>, which reports the value (<code>'hex'</code>) rather than the member (<code>&lt;MeshMethod.HEX: 'hex'&gt;</code>). Error messages all over cadjoint interpolate an offending or accepted value with <code>{value!r}</code>, and a member has to read there exactly as the string it replaced.</p>
+<p>The one behaviour it adds to :class:<code>enum.StrEnum</code> is <code>repr</code>, which reports the value (<code>'hex'</code>) rather than the member (<code>&lt;MeshMethod.HEX: 'hex'&gt;</code>). Error messages all over cadjoint interpolate an offending or accepted value with <code>{value!r}</code>, and a member has to read there exactly as its plain string would.</p>
 
 
 </section>

@@ -3088,7 +3088,7 @@ ul.task-list li input[type="checkbox"] {
 <h2 class="doc-section doc-section-parameters anchored" data-anchor-id="parameters">Parameters</h2>
 <table class="caption-top table">
 <colgroup>
-<col style="width: 1%">
+<col style="width: 2%">
 <col style="width: 1%">
 <col style="width: 94%">
 <col style="width: 1%">
@@ -3111,7 +3111,7 @@ ul.task-list li input[type="checkbox"] {
 <tr class="even">
 <td>smoothness</td>
 <td>float</td>
-<td>Blend half-width in <strong>model units</strong>, not a fillet radius. 0 is a sharp boolean; the default of 0.1 blends, so a plain <code>Intersection(a, b)</code> is a blended one and a caller who wants the sharp operation has to ask for <code>smoothness=0</code>. The value does not scale with the part: 0.1 is a tenth of a unit whatever the unit stands for, which on a normalised engine block came to 20 mm and removed a water jacket. See :mod:<code>cadjoint.sdf.boolean.smooth</code> for what the blend costs — it moves the field by up to <code>smoothness</code> per operation, and by the full amount wherever the operands agree.</td>
+<td>Blend half-width in <strong>model units</strong>, not a fillet radius. 0 is a sharp boolean; the default of 0.1 blends, so a plain <code>Intersection(a, b)</code> is a blended one and a caller who wants the sharp operation has to ask for <code>smoothness=0</code>. The value does not scale with the part: 0.1 is a tenth of a unit whatever the unit stands for, enough on a large part to erase a thin internal feature. See :mod:<code>cadjoint.sdf.boolean.smooth</code> for what the blend costs — it moves the field by up to <code>smoothness</code> per operation, and by the full amount wherever the operands agree.</td>
 <td><code>0.1</code></td>
 </tr>
 </tbody>
@@ -3138,10 +3138,6 @@ ul.task-list li input[type="checkbox"] {
 <tr class="odd">
 <td><a href="#cadjoint.sdf.Intersection.sdf">sdf</a></td>
 <td>Pure function for intersection operation.</td>
-</tr>
-<tr class="even">
-<td><a href="#cadjoint.sdf.Intersection.to_functional">to_functional</a></td>
-<td>Return pure function for compilation.</td>
 </tr>
 </tbody>
 </table>
@@ -3212,14 +3208,9 @@ ul.task-list li input[type="checkbox"] {
 </tr>
 </tbody>
 </table>
-</section>
-</section>
-<section id="cadjoint.sdf.Intersection.to_functional" class="level3">
-<h3 class="anchored" data-anchor-id="cadjoint.sdf.Intersection.to_functional">to_functional</h3>
-<pre class="python"><code>sdf.Intersection.to_functional()</code></pre>
-<p>Return pure function for compilation.</p>
 
 
+</section>
 </section>
 </section>
 </section>

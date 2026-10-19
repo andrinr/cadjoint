@@ -3106,7 +3106,7 @@ ul.task-list li input[type="checkbox"] {
     domain=None,
 )</code></pre>
 <p>Declarative conjugate heat transfer in forced convection.</p>
-<p>Declared in a scene exactly like :class:<code>~cadjoint.fem.study.ThermalStudy</code> – constructing one inside :func:<code>~cadjoint.fem.study.capture_studies</code> registers it – but it meshes nothing. The lattice is fixed and the design enters as a field on it, which is why the whole solve stays one differentiable JAX expression.</p>
+<p>Declared in a scene exactly like :class:<code>~cadjoint.fem.study.ThermalStudy</code> – constructing one inside :func:<code>~cadjoint.studies.capture_studies</code> registers it – but it meshes nothing. The lattice is fixed and the design enters as a field on it, which is why the whole solve stays one differentiable JAX expression.</p>
 <section id="attributes" class="level2 doc-section doc-section-attributes">
 <h2 class="doc-section doc-section-attributes anchored" data-anchor-id="attributes">Attributes</h2>
 <table class="caption-top table">
@@ -3291,9 +3291,9 @@ ul.task-list li input[type="checkbox"] {
 <h4 class="doc-section doc-section-returns anchored" data-anchor-id="returns">Returns</h4>
 <table class="caption-top table">
 <colgroup>
-<col style="width: 9%">
-<col style="width: 21%">
-<col style="width: 68%">
+<col style="width: 10%">
+<col style="width: 29%">
+<col style="width: 59%">
 </colgroup>
 <thead>
 <tr class="header">
@@ -3305,8 +3305,8 @@ ul.task-list li input[type="checkbox"] {
 <tbody>
 <tr class="odd">
 <td></td>
-<td>dict[str, Any]</td>
-<td>A dictionary whose <code>kind</code> is :data:<code>FLOW_STUDY_KIND</code>.</td>
+<td>FlowStudyDescription</td>
+<td>A dictionary whose <code>kind</code> is <code>"flow"</code>.</td>
 </tr>
 </tbody>
 </table>

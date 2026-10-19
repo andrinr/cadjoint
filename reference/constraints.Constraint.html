@@ -3083,7 +3083,7 @@ ul.task-list li input[type="checkbox"] {
 <h1>constraints.Constraint</h1>
 <pre class="python"><code>constraints.Constraint(weight=1.0)</code></pre>
 <p>Base class for geometric constraints.</p>
-<p>Constraints are represented as residual equations c(x) = 0. The Jacobian ∂c/∂x is computed via AD over the flat residual function in dof.py, not per-constraint.</p>
+<p>Constraints are represented as residual equations c(x) = 0. The Jacobian ∂c/∂x is computed via AD over the flat residual function (:func:<code>cadjoint.constraints.residual.build_residual_fn</code>), not per-constraint.</p>
 <p>Subclasses must implement: - compute_residual(): Returns constraint violation c(x) - dof_reduction(): Number of DOF this constraint removes - get_parameters(): List of parameters involved in this constraint</p>
 <section id="attributes" class="level2 doc-section doc-section-attributes">
 <h2 class="doc-section doc-section-attributes anchored" data-anchor-id="attributes">Attributes</h2>

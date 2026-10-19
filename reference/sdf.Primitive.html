@@ -3080,7 +3080,7 @@ ul.task-list li input[type="checkbox"] {
 <pre class="python"><code>sdf.Primitive()</code></pre>
 <p>Base class for primitive SDFs (leaf nodes in the SDF tree).</p>
 <p>Primitives are the basic building blocks - spheres, boxes, cylinders, etc. They have no SDF children, but may have a Fluent material child so that <code>extract_parameters</code> can discover material parameters automatically.</p>
-<p>Subclasses must implement: - <span class="citation" data-cites="staticmethod">@staticmethod</span> def sdf(p: Array, **params) -&gt; Array - <strong>call</strong>(self, p: Array) -&gt; Array - to_functional(self) -&gt; Callable</p>
+<p>Subclasses must implement: - <span class="citation" data-cites="staticmethod">@staticmethod</span> def sdf(p: Array, **params) -&gt; Array - <strong>call</strong>(self, p: Array) -&gt; Array</p>
 
 
 </section>

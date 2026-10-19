@@ -3111,19 +3111,17 @@ ul.task-list li input[type="checkbox"] {
 </table>
 <p>SDF classes are thin wrappers around pure functions: - Provide fluent API: .translate().rotate() chaining - Enable operators: sphere | box, sphere &amp; box - Store parameters for later compilation - Actual computation happens in pure functions</p>
 <p>Each SDF instance should store its parameters in self.params dictionary: self.params = { ‘radius’: Scalar(value=1.0, free=True, name=‘radius’), ‘offset’: Vector(value=[0, 0, 0], free=False), }</p>
-<p>Subclasses must implement: - <span class="citation" data-cites="staticmethod">@staticmethod</span> def sdf(…): Pure function for computation (CONVENTION) - <strong>call</strong>(p): Evaluate SDF (delegates to sdf()) - to_functional(): Return the static sdf method</p>
+<p>Subclasses must implement: - <span class="citation" data-cites="staticmethod">@staticmethod</span> def sdf(…): Pure function for computation (CONVENTION) - <strong>call</strong>(p): Evaluate SDF (delegates to sdf())</p>
 </section>
 <section id="pattern-for-primitives" class="level2 doc-section doc-section-pattern-for-primitives">
 <h2 class="doc-section doc-section-pattern-for-primitives anchored" data-anchor-id="pattern-for-primitives">Pattern for primitives</h2>
 <p><span class="citation" data-cites="staticmethod">@staticmethod</span> def sdf(p: Array, param1: float, param2: float) -&gt; Array: # Pure computation here</p>
 <p>def <strong>call</strong>(self, p: Array) -&gt; Array: return ClassName.sdf(p, self.params[‘param1’].value, self.params[‘param2’].value)</p>
-<p>def to_functional(self): return ClassName.sdf</p>
 </section>
 <section id="pattern-for-transforms" class="level2 doc-section doc-section-pattern-for-transforms">
 <h2 class="doc-section doc-section-pattern-for-transforms anchored" data-anchor-id="pattern-for-transforms">Pattern for transforms</h2>
 <p><span class="citation" data-cites="staticmethod">@staticmethod</span> def sdf(child_sdf: Callable, p: Array, param: float) -&gt; Array: # Transform computation here</p>
 <p>def <strong>call</strong>(self, p: Array) -&gt; Array: return ClassName.sdf(self.child_sdf, p, self.params[‘param’].value)</p>
-<p>def to_functional(self): return ClassName.sdf</p>
 </section>
 <section id="methods" class="level2">
 <h2 class="anchored" data-anchor-id="methods">Methods</h2>
@@ -3142,10 +3140,6 @@ ul.task-list li input[type="checkbox"] {
 <tr class="even">
 <td><a href="#cadjoint.SDF.patch_fields">patch_fields</a></td>
 <td>Return this node’s smooth patch fields in its own frame, if known.</td>
-</tr>
-<tr class="odd">
-<td><a href="#cadjoint.SDF.to_functional">to_functional</a></td>
-<td>Return pure function for JAX tracing and compilation.</td>
 </tr>
 </tbody>
 </table>
@@ -3239,45 +3233,6 @@ ul.task-list li input[type="checkbox"] {
 </tr>
 </tbody>
 </table>
-</section>
-</section>
-<section id="cadjoint.SDF.to_functional" class="level3">
-<h3 class="anchored" data-anchor-id="cadjoint.SDF.to_functional">to_functional</h3>
-<pre class="python"><code>SDF.to_functional()</code></pre>
-<p>Return pure function for JAX tracing and compilation.</p>
-<section id="returns-2" class="level4 doc-section doc-section-returns">
-<h4 class="doc-section doc-section-returns anchored" data-anchor-id="returns-2">Returns</h4>
-<table class="caption-top table">
-<colgroup>
-<col style="width: 10%">
-<col style="width: 12%">
-<col style="width: 77%">
-</colgroup>
-<thead>
-<tr class="header">
-<th>Name</th>
-<th>Type</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr class="odd">
-<td></td>
-<td>Callable</td>
-<td>Pure function with signature: (p: Array, **params) -&gt; Array</td>
-</tr>
-<tr class="even">
-<td></td>
-<td>Callable</td>
-<td>where params are the primitive/transform parameters.</td>
-</tr>
-</tbody>
-</table>
-</section>
-<section id="example" class="level4 doc-section doc-section-example">
-<h4 class="doc-section doc-section-example anchored" data-anchor-id="example">Example</h4>
-<pre class="python"><code>sphere = Sphere(radius=1.0)
-func = sphere.to_functional()</code></pre>
 
 
 </section>
