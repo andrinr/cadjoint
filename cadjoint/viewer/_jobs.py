@@ -54,6 +54,7 @@ except ImportError:  # pragma: no cover
 JOB_KINDS = (
     "compile",
     "mesh",
+    "brep",
     "mesh_inspect",
     "simulate",
     "optimize",
@@ -65,7 +66,7 @@ JOB_KINDS = (
 #: Kinds whose full response payload is worth keeping for re-fetching.  Lint
 #: is excluded: it is keystroke-cadence work that is cheaper to redo than to
 #: remember, and its diagnostics are meaningless once the text has moved on.
-RESULT_KINDS = ("compile", "mesh", "mesh_inspect", "simulate", "optimize")
+RESULT_KINDS = ("compile", "mesh", "brep", "mesh_inspect", "simulate", "optimize")
 
 #: How many jobs of any kind are kept.  Older *finished* jobs are dropped
 #: first; running jobs are never evicted.

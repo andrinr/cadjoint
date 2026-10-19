@@ -26,6 +26,7 @@ import {
   slicePosition,
 } from "../viewer/renderer";
 import { sdfRampCss } from "../viewer/sdfRamp";
+import { brepMessage, brepStatus } from "../state";
 import { MM_PER_UNIT, formatDistance } from "../viewer/graticule";
 import { PanelHeader, Segmented, ToggleSwitch, axisOptions, type SegmentedOption } from "./ui";
 import { BoxIcon, StudioIcon, WireIcon, XrayIcon } from "./icons";
@@ -590,6 +591,24 @@ export function RenderPanel(props: RenderPanelProps) {
                   </ToggleSwitch>
                 )}
               </For>
+              {/* The inspector replaces the solid with the derived B-rep, so it
+                  sits with the switches that change what the solid is drawn
+                  as. Without the private tier the server's sentence is the
+                  hint, and the switch stays off. */}
+              <ToggleSwitch
+                checked={props.display.showBrep === true}
+                disabled={brepStatus() === "unavailable"}
+                onChange={(showBrep) => props.onChange({ showBrep })}
+                testId="toggle-showBrep"
+                title={brepStatus() === "unavailable" ? (brepMessage() ?? undefined) : undefined}
+              >
+                B-rep inspector
+                <small>
+                  {brepStatus() === "unavailable"
+                    ? "Needs diff-brep (not installed)"
+                    : "Faces, edges and vertices the extraction found"}
+                </small>
+              </ToggleSwitch>
             </section>
 
             <section>

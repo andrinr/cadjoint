@@ -44,7 +44,7 @@ from cadjoint.viewer._pathtracer import (
     build_path_tracer_shader,
 )
 from cadjoint.viewer._webgpu import build_viewer_shader
-from cadjoint.viewer.schema.payloads import validate_compile_payload
+from cadjoint.viewer.schema.payloads import BRepInspectionPayload, validate_compile_payload
 from cadjoint.viewer.source_map import (
     PLAYGROUND_FILENAME,
     build_construction_payload,
@@ -91,6 +91,23 @@ def _mesh_source(source: str) -> dict[str, Any]:
         "refresh": refresh,
         "output": captured.getvalue()[-8_000:],
     }
+
+
+def _brep_source(source: str) -> dict[str, Any]:
+    """Derive the scene's B-rep for the inspector (:mod:`cadjoint.viewer._brep_inspector`).
+
+    Without the private tier the answer is still ``ok``: ``brep.available``
+    is ``False`` and ``brep.reason`` says why, so the viewer can say so
+    rather than show an error.
+    """
+    from cadjoint.viewer._brep_inspector import brep_inspection
+
+    captured = io.StringIO()
+    with contextlib.redirect_stdout(captured), contextlib.redirect_stderr(captured):
+        namespace = _execute_scene(source)
+        brep = brep_inspection(namespace["scene"])
+    BRepInspectionPayload.model_validate(brep)
+    return {"ok": True, "brep": brep, "output": captured.getvalue()[-8_000:]}
 
 
 def _shader_options() -> tuple[bool, bool, str]:
@@ -349,6 +366,8 @@ def _answer(request: dict[str, Any]) -> dict[str, Any]:
         mode = request.get("mode", "compile")
         if mode == "mesh":
             return _mesh_source(source)
+        if mode == "brep":
+            return _brep_source(source)
         if mode == "simulate":
             return _simulate_source(request)
         if mode == "mesh_inspect":

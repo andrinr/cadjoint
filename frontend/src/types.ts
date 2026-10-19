@@ -24,6 +24,7 @@
  */
 
 import type {
+  BRepInspectionPayload,
   ConstraintSolverRun,
   ConstructionConstraint as ConstructionConstraintPayload,
   ConstructionElement,
@@ -41,6 +42,11 @@ import type {
 } from "../../cadjoint/viewer/schema/payloads";
 
 export type {
+  BRepDiagnostics,
+  BRepEdgePayload,
+  BRepFacePayload,
+  BRepInspectionPayload,
+  BRepVertexPayload,
   ConstraintSolverRun,
   ConstructionArgument,
   ConstructionElement,
@@ -300,6 +306,13 @@ export type BcProposal =
 export interface MeshResponse {
   ok: boolean;
   mesh_edges?: MeshEdgePayload | null;
+  error?: string;
+}
+
+/** The derived B-rep for the inspector, requested only while it is on. */
+export interface BrepResponse {
+  ok: boolean;
+  brep?: BRepInspectionPayload | null;
   error?: string;
 }
 
