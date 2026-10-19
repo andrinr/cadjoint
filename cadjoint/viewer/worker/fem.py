@@ -16,8 +16,7 @@ import numpy as np
 
 from cadjoint.capture import one_named
 from cadjoint.viewer.worker.payloads import (
-    _element_edge_pairs,
-    _render_surface_payload,
+    _mesh_surface,
     _study_payload,
 )
 from cadjoint.viewer.worker.scene import (
@@ -139,8 +138,7 @@ def _inspect_mesh(
     else:  # cut cells: no elements, so nothing to grade — a flat surface
         metric_name = None
         node_quality = np.ones(mesh.num_points, dtype=np.float64)
-    payload = _render_surface_payload(mesh, node_quality)
-    payload["edges"] = [int(index) for index in _element_edge_pairs(mesh).reshape(-1)]
+    payload = _mesh_surface(mesh, node_quality)
     return {
         "ok": True,
         "kind": "mesh_inspect",

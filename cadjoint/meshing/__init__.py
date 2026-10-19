@@ -80,6 +80,7 @@ from cadjoint.meshing.patch_fields import (
     patch_signatures,
     scene_patch_fields,
     signature_function,
+    stacked_values,
     world_frame_leaves,
 )
 from cadjoint.meshing.simplify import simplify_mesh
@@ -129,6 +130,7 @@ __all__ = [
     "ScenePatchFields",
     "world_frame_leaves",
     "scene_patch_fields",
+    "stacked_values",
     "signature_function",
     "patch_signatures",
     "exact_feature_mask",

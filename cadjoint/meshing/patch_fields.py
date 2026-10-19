@@ -29,13 +29,24 @@ differentiable.
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from typing import Any, NamedTuple
 
 import jax
 import jax.numpy as jnp
 import numpy as np
 from jax import Array
+
+
+def stacked_values(fields: Sequence[Callable[[Array], Any]]) -> Callable[[Array], Array]:
+    """Every field at every point as one ``(fields, points)`` array.
+
+    Unjitted: the caller wraps it in the one program it wants, so evaluating
+    many SDF trees costs one XLA dispatch rather than one per primitive.
+    """
+    return lambda points: jnp.stack(
+        [jax.vmap(lambda point, field=field: jnp.asarray(field(point)))(points) for field in fields]
+    )
 
 
 def world_frame_leaves(node: Any) -> list[Any]:

@@ -37,6 +37,7 @@ from jax import Array
 
 from cadjoint.meshing._lattice import _flatten, _strides, _unflatten
 from cadjoint.meshing.edge_detection import CrossingEdges, GridSpec, HermiteData
+from cadjoint.meshing.patch_fields import stacked_values
 
 FACE = 0
 CREASE = 1
@@ -468,10 +469,11 @@ def active_branches(
     # SDF tree, dispatching an XLA program per primitive of each.
     pick = jnp.argmin if mode == "min" else jnp.argmax
 
+    values = stacked_values(child_fields)
+
     @jax.jit
     def winner(p: Array) -> Array:
-        stacked = jnp.stack([jax.vmap(field)(p) for field in child_fields])
-        return jax.lax.stop_gradient(pick(stacked, axis=0))
+        return jax.lax.stop_gradient(pick(values(p), axis=0))
 
     return np.asarray(winner(points), dtype=np.int32)
 

@@ -30,11 +30,14 @@ def _boundary_vertex_nodes(mesh: Any) -> np.ndarray:
     return np.unique(mesh.surface().faces.reshape(-1))
 
 
-def _render_surface_payload(mesh: Any, node_scalar: np.ndarray) -> dict[str, Any]:
-    """The viewer's boundary-surface payload for any discretization."""
+def _mesh_surface(mesh: Any, node_scalar: np.ndarray) -> dict[str, Any]:
+    """The viewer's boundary surface of any discretization, with its element edges."""
     from cadjoint.fem.render_payload import surface_render_payload
 
-    return surface_render_payload(mesh.surface(), node_scalar)
+    return {
+        **surface_render_payload(mesh.surface(), node_scalar),
+        "edges": [int(index) for index in _element_edge_pairs(mesh).reshape(-1)],
+    }
 
 
 def _element_edge_pairs(mesh: Any) -> np.ndarray:
@@ -60,16 +63,8 @@ def _element_edge_pairs(mesh: Any) -> np.ndarray:
     return np.unique(np.sort(edges, axis=1), axis=0)
 
 
-def _finite_range(values: np.ndarray) -> list[float]:
-    """``[min, max]`` over the finite entries, like the render payload's range."""
-    finite = values[np.isfinite(values)]
-    low = float(finite.min()) if finite.size else 0.0
-    high = float(finite.max()) if finite.size else 0.0
-    return [round(low, 6), round(high, 6)]
-
-
-def _result_field_payload(result: Any, payload: dict[str, Any]) -> None:
-    """Attach the full per-vertex field catalog to a render payload.
+def _result_fields(result: Any, scalars: list[float]) -> dict[str, Any]:
+    """The full per-vertex field catalog of a solved result, for its render surface.
 
     The base payload carries one display scalar per vertex; inspection
     wants every solved field.  Thermal results expose ``temperature``
@@ -80,23 +75,27 @@ def _result_field_payload(result: Any, payload: dict[str, Any]) -> None:
     to its finite ``[lo, hi]``.  Mapping happens here, viewer-side, from
     the concrete SimulationResult arrays.
     """
+    from cadjoint.fem.render_payload import finite_range
+
+    catalog: dict[str, Any] = {}
     if result.kind == "thermal":
-        payload["fields"] = {"temperature": list(payload["scalars"])}
+        fields = {"temperature": list(scalars)}
     else:
         used = _boundary_vertex_nodes(result.mesh)
         displacement = np.asarray(result.solution.displacement, dtype=np.float64)[used]
         magnitude = np.linalg.norm(displacement, axis=-1)
-        payload["fields"] = {
-            "von_mises": list(payload["scalars"]),
+        fields = {
+            "von_mises": list(scalars),
             "displacement_magnitude": [round(float(value), 6) for value in magnitude],
         }
-        payload["displacements"] = [
+        catalog["displacements"] = [
             [round(float(component), 6) for component in row] for row in displacement
         ]
-    payload["ranges"] = {
-        name: _finite_range(np.asarray(values, dtype=np.float64))
-        for name, values in payload["fields"].items()
+    catalog["fields"] = fields
+    catalog["ranges"] = {
+        name: finite_range(np.asarray(values, dtype=np.float64)) for name, values in fields.items()
     }
+    return catalog
 
 
 def _study_payload(study: Any, result: Any, sdf: Any) -> dict[str, Any]:
@@ -115,9 +114,8 @@ def _study_payload(study: Any, result: Any, sdf: Any) -> dict[str, Any]:
     # Asked of the condition, not of a selection it is assumed to carry:
     # see :func:`cadjoint.viewer.worker.declarations._study_entries`.
     described["bcs"] = [{**bc.describe(), "serializable": bc.serializable} for bc in study.bcs]
-    render_payload = _render_surface_payload(result.mesh, scalar)
-    render_payload["edges"] = [int(index) for index in _element_edge_pairs(result.mesh).reshape(-1)]
-    _result_field_payload(result, render_payload)
+    surface = _mesh_surface(result.mesh, scalar)
+    render_payload = {**surface, **_result_fields(result, surface["scalars"])}
     return {
         "study": described,
         "field": result.field,

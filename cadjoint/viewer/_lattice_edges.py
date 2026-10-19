@@ -15,6 +15,7 @@ from typing import Any
 
 import numpy as np
 
+from cadjoint.meshing import stacked_values
 from cadjoint.viewer._design_leaves import _design_leaves, _world_frame_leaves
 
 # ── leaf-level seam projection ───────────────────────────────────────────────
@@ -59,14 +60,8 @@ def _seam_residual(fields: list[Any], points: np.ndarray) -> np.ndarray:
     probes = jnp.asarray(points, dtype=jnp.float32)
     # One program over every field, not an eager walk of each: see
     # `_project_seam_groups`.
-    program = jax.jit(
-        lambda p: jnp.max(
-            jnp.abs(
-                jnp.stack([jax.vmap(lambda q, f=field: jnp.asarray(f(q)))(p) for field in fields])
-            ),
-            axis=0,
-        )
-    )
+    values = stacked_values(fields)
+    program = jax.jit(lambda p: jnp.max(jnp.abs(values(p)), axis=0))
     return np.asarray(program(probes), dtype=np.float64)
 
 
@@ -308,11 +303,7 @@ def _lattice_layers(scene: Any, grid: Any) -> tuple[np.ndarray, np.ndarray, np.n
         # one XLA program per primitive of that leaf's whole SDF tree.
         magnitudes = np.abs(
             np.asarray(
-                jax.jit(
-                    lambda p: jnp.stack(
-                        [jax.vmap(lambda q, f=leaf: jnp.asarray(f(q)))(p) for leaf in leaves]
-                    )
-                )(points),
+                jax.jit(stacked_values(leaves))(points),
                 dtype=np.float64,
             )
         )
