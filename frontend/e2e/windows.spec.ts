@@ -108,7 +108,7 @@ test("a window can be dragged onto another's tab strip to stack them", async ({ 
 });
 
 test("a window minimises to the tray and comes back", async ({ page }) => {
-  // The tray is never empty now — Processes is parked in every desk — so
+  // The tray is never empty — Processes is parked in every desk — so
   // what is asserted is which windows are in it, not whether it exists.
   await expect(page.getByTestId("window-restore-objects")).toHaveCount(0);
 
@@ -340,10 +340,9 @@ test("the Window menu floats a window, docks it again, and resets the layout", a
 /**
  * The process monitor, and the persistence it exists to make possible.
  *
- * Before the job registry a result lived only in the panel that asked for
- * it: leaving Simulate mode disposed that panel's Solid root and a nine-
- * second solve went with it. These tests are the proof that it no longer
- * does — and that the proof is not a cache trick, because the number of
+ * Leaving Simulate mode disposes the panel's Solid root; a nine-second solve
+ * survives it because the result lives in the job registry, not the panel.
+ * These tests prove that — and that the proof is not a cache trick, because the number of
  * `/api/simulate` requests is counted, not assumed.
  */
 
@@ -421,8 +420,8 @@ test("a solved field survives a mode switch and is fetched back by job id", asyn
   await expect(page.getByTestId("simulate-legend")).toContainText("temperature");
   expect(solves()).toBe(1);
 
-  // Leave Simulate. The panel's Solid root is disposed with the desk — this
-  // is exactly the moment the result used to be lost.
+  // Leave Simulate. The panel's Solid root is disposed with the desk — a
+  // result held only by the panel would be lost here.
   await page.getByTestId("editmode-model").click();
   await expect(page.getByTestId("simulate-panel")).toHaveCount(0);
 
@@ -520,9 +519,9 @@ test("an optimization trajectory outlives a mode switch and a reload", async ({ 
 /**
  * The Simulate desk.
  *
- * Simulation used to be one window with a tab strip inside it, which meant
- * four views the dock could not move, split, float or park independently.
- * They are ordinary windows now, and "Simulate" is what arranges them.
+ * Simulation is four ordinary windows, not one window with a tab strip, so
+ * the dock can move, split, float or park each independently. "Simulate" is
+ * what arranges them.
  */
 test("the Simulate desk arranges four windows that move like any other", async ({
   page,
@@ -665,11 +664,10 @@ test("the scene browser describes what is saved and opens one", async ({ page })
 /**
  * A solve that fails has to say so where it was asked for.
  *
- * The failure this is written against: switching a mesh to TET10 made the
- * solver refuse the surface, and the only sign in the UI was the previous
+ * Switching a mesh to TET10 makes the solver refuse the surface. Without the
+ * solver's message in the Results window, the only sign would be the previous
  * result still on screen with a "stale" chip — which reads as "still
- * thinking", not as "that run failed". The solver's own words went to the
- * server log.
+ * thinking", not as "that run failed".
  */
 test("a failed solve shows the solver's message in the Results window", async ({
   page,

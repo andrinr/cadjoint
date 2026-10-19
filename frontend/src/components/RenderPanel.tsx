@@ -1,7 +1,6 @@
 /**
  * The full render settings, hosted in the eye-icon popover in the top bar
- * (usable from any editing mode; formerly a dock panel of the retired
- * Render mode).
+ * (usable from any editing mode).
  *
  * Mutually exclusive choices (shading, shadows, quality) are segmented
  * controls rather than checkboxes, so the current state reads at a glance and

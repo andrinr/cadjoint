@@ -64,10 +64,9 @@ type Placement = Pick<GizmoGesture, "position" | "rotation" | "dimensions">;
  * Which source argument this drag writes back, and its value right now.
  *
  * One function, used twice: the pointer move asks it what to put in the
- * uniform buffer, and the release asks it what to patch. They were two
- * copies of the same three-way branch, and a drag whose preview and whose
- * commit disagreed about *which* argument it was moving would show one thing
- * and write another.
+ * uniform buffer, and the release asks it what to patch. A drag whose
+ * preview and whose commit disagreed about *which* argument it was moving
+ * would show one thing and write another.
  */
 export function draggedArgument(
   gesture: Pick<GizmoGesture, "mode" | "axis">,

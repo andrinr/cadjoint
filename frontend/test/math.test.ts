@@ -348,12 +348,12 @@ describe("plane coordinates", () => {
 });
 
 describe("the orthographic depth slab", () => {
-  // The bug this covers: `viewProjection` used the perspective near plane in
-  // both projections. Measured from the camera *position*, which is right when
-  // the eye is a point and wrong when it is not — an orthographic camera still
-  // sits at `distance` in front of its target, so everything nearer the camera
-  // plane than 0.05 was clipped: the whole half of the scene on the camera's
-  // own side of the target.
+  // The perspective near plane is measured from the camera *position*, which
+  // is right when the eye is a point and wrong when it is not — an
+  // orthographic camera still sits at `distance` in front of its target, so
+  // with that plane everything nearer the camera plane than 0.05 would be
+  // clipped: the whole half of the scene on the camera's own side of the
+  // target.
   const clipDepth = (view: View, world: Vec3): number => {
     const clip = transform(viewProjection(view), world);
     return clip[2] / clip[3];
@@ -400,7 +400,7 @@ describe("the orthographic depth slab", () => {
     for (const distance of [0.4, 1, 4.6, 20, 60]) {
       const view = orbit(distance);
       // The whole way from the target up to the camera plane, and a frame
-      // beyond it — the case that regressed. Capped at the marcher's reach,
+      // beyond it. Capped at the marcher's reach,
       // which is where the slab honestly ends: nothing further in front of the
       // target than that can be drawn, because no primary ray gets there.
       const ahead0 = distance * 0.5;
@@ -415,8 +415,8 @@ describe("the orthographic depth slab", () => {
   });
 
   it("clipped that geometry before, which is what the report was", () => {
-    // The old constants, restated, so the regression cannot come back quietly
-    // as "it always did that".
+    // A fixed DEPTH_NEAR..DEPTH_FAR range clips this geometry; pinned so a
+    // return to it fails here.
     for (const distance of [0.4, 4.6, 60]) {
       const view = orbit(distance);
       const front = inFront(view, distance + 0.1);
@@ -484,7 +484,7 @@ describe("picking across the orthographic camera plane", () => {
   it("still hits a plane that lies in front of the camera plane", () => {
     // A sketch plane through the target, seen from a camera that is not looking
     // at it edge-on: half the frame's rays reach it *behind* their own origin,
-    // and rejecting those was how clicks stopped landing on the near half.
+    // and rejecting those would stop clicks landing on the near half.
     const ray = rayFromPixel(400, 250, ortho);
     const behind: Vec3 = [
       ray.origin[0] + ray.direction[0] * -2,

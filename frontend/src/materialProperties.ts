@@ -23,9 +23,8 @@
  *               a span but no number it can round-trip; the row shows what it
  *               can and sends the reader to the code.
  *
- * The rows used to be built by dropping everything that was not the first
- * case, which made the inspector a read-only list of whatever happened to be
- * declared — the one thing you could not do from it was declare something.
+ * Every case gets a row, so the inspector can declare a property as well as
+ * edit one.
  *
  * Pure; unit tested in `test/materialProperties.test.ts`.
  */

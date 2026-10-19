@@ -168,10 +168,10 @@ export const FACETS: Facet[] = (() => {
       // instead, and both borrow the *same* +Y: that is the axis the camera's
       // own screen-up collapses onto at either pole (`cameraBasisFor` falls
       // back to +Y there, for the same degeneracy), so a label pinned to it
-      // stands upright whichever pole you are under. Giving BOTTOM −Y — one
-      // sign, mirroring TOP as if the cube were being unfolded — is what drew
-      // it as "WOTTO8", upside down in its own view; `test/viewRose.test.ts`
-      // now measures the projected basis rather than only its squareness.
+      // stands upright whichever pole you are under. Giving BOTTOM −Y —
+      // mirroring TOP as if the cube were being unfolded — would draw it as
+      // "WOTTO8", upside down in its own view; `test/viewRose.test.ts`
+      // measures the projected basis, not only its squareness.
       const labelUp: Vec3 = axis === 2 ? [0, 1, 0] : [0, 0, 1];
       facets.push({
         key,

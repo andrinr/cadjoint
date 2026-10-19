@@ -490,7 +490,7 @@ export function ViewerPane(props: ViewerPaneProps) {
     // Selecting a sketch point auto-enters sketch mode, the dock rearranges
     // its panels for that mode, and the canvas holding the pointer capture is
     // re-parented mid-gesture — so the `pointerup` lands on a detached node
-    // and `finishGesture` never runs. Measured: a plain click on a handle
+    // and `finishGesture` never runs. A plain click on a handle then
     // delivers `pointerdown` and no `pointerup` at all, after which the
     // cursor stays `grabbing`, every further move keeps calling `setDrag`,
     // and the point follows the mouse untouched until the next press, which

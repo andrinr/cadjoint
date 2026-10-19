@@ -12,7 +12,7 @@
  * - a burst coalesces into one run, and — the property that matters most —
  *   **the last request of any burst always runs**. An edit that is cancelled
  *   and never re-run would leave the viewport permanently behind the code,
- *   which is a worse bug than the one being fixed.
+ *   which is worse than running a superseded edit to the end.
  *
  * The timers are injected, so these are milliseconds of test rather than
  * seconds of waiting on a real clock.

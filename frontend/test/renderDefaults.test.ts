@@ -1,13 +1,10 @@
 /**
  * What the app starts on, and whether both sides of the picture agree.
  *
- * "Ultra" used to be a word that meant four things in TypeScript and nothing
- * at all in WGSL: the pixel budget, the bounce count, the shadow samples and
- * the sample target crossed the boundary, but the sphere-tracing march was a
- * constant baked into each shader — 96 steps in the preview, 160 in the path
- * tracer — so the preview and the trace it converges to marched differently
- * whatever tier was chosen. The budget is a uniform now, and this holds the
- * ladder and its two shaders to one story.
+ * A tier crosses the boundary whole: the pixel budget, the bounce count, the
+ * shadow samples, the sample target and the sphere-tracing budget, which is a
+ * uniform both shaders read. This holds the ladder and its two shaders to one
+ * story.
  */
 
 import { readFileSync } from "node:fs";
@@ -67,10 +64,10 @@ describe("the default quality tier", () => {
 
   it("holds the march budget flat, because it is not one of them", () => {
     // A tier should only ladder what a tier actually buys. The step budget is
-    // a cap, not a cost: measured on end_cap at 319 k / 900 k / 1600 k
-    // pixels, 64 steps against 384 is inside the noise at every one. Laddering
-    // it bought no time and cost Draft a broken silhouette, so it is now one
-    // number for all three and `DisplaySettings.marchSteps` overrides it.
+    // a cap, not a cost: on end_cap, 64 steps against 384 is inside the noise
+    // at every resolution. Laddering it buys no time and costs Draft a broken
+    // silhouette, so it is one number for all three and
+    // `DisplaySettings.marchSteps` overrides it.
     const tiers = [QUALITY_PRESETS.draft, QUALITY_PRESETS.high, QUALITY_PRESETS.ultra];
     expect(new Set(tiers.map((tier) => tier.marchSteps)).size).toBe(1);
   });
@@ -87,7 +84,7 @@ describe("the march budget crosses into WGSL", () => {
     ] as const) {
       expect(source, name).toContain("u.path_settings.w");
       expect(source, name).toContain("fn trace_steps()");
-      // The old constants are gone from the marching loops.
+      // No marching loop carries a literal step count.
       expect(source, name).not.toMatch(/for \(var step = 0u; step < 96u;/);
       expect(source, name).not.toMatch(/for \(var i = 0; i < 96;/);
     }

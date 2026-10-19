@@ -311,9 +311,7 @@ export const [selectionMode, setSelectionMode] = createSignal<SelectionMode>("ob
  * Camera angles mirrored into a signal so the ViewCube can track them.
  *
  * Seeded from the same table the renderer's own camera is, rather than from a
- * second copy of the numbers: they were two copies, and when the default view
- * moved onto the true isometric corner this one stayed behind, so the rose lit
- * nothing at rest while the cube — reading the renderer — was correct.
+ * second copy of the numbers, so the rose and the cube agree at rest.
  */
 export const [cameraAngles, setCameraAngles] = createSignal({
   yaw: VIEW_PRESETS.iso.yaw,

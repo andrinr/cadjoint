@@ -4,18 +4,14 @@ import { recompile, waitForCompile } from "./helpers/app";
 /**
  * Two pieces of "the app should just do the obvious thing".
  *
- * **Focus.** Selecting something in the viewport is supposed to reveal it in
- * the code. It half worked: a primitive scrolled to its *position literal* —
- * three numbers, not the object — and a sketch scrolled nowhere at all,
- * because the payload published no argument spans for a profile and the memo
- * gave up. Sketches are the thing a user selects most while placing one, so
- * "nowhere at all" was the common case. Now every node publishes the span of
- * the statement that declares it.
+ * **Focus.** Selecting something in the viewport reveals it in the code.
+ * Every node publishes the span of the statement that declares it, so a
+ * primitive reveals its declaration rather than its *position literal* —
+ * three numbers, not the object — and a sketch, whose profile publishes no
+ * argument spans, is revealed at all.
  *
- * **Escape.** It existed, but as a single flat clear: one press dropped the
- * pending pick, the loft, the probe, the selection, the tool *and* the mode
- * together, so there was no way to back out of one step. Now it is a ladder,
- * one rung per press.
+ * **Escape.** A ladder, one rung per press, rather than one flat clear of the
+ * pending pick, the loft, the probe, the selection, the tool *and* the mode.
  *
  * Both are CPU-side — selection, payload spans, DOM — so neither needs a GPU.
  */
@@ -37,7 +33,7 @@ test("selecting an object reveals the statement that declares it", async ({ page
   await page.goto("/");
   await waitForCompile(page, COMPILE_TIMEOUT);
 
-  // ── a sketch: the case that used to reveal nothing at all ────────────
+  // ── a sketch: no argument spans, only its statement ──────────────────
   await page.getByTestId("tree-row-profile_0").click();
   await expect
     .poll(() => highlighted(page), { timeout: 10_000 })
@@ -47,7 +43,7 @@ test("selecting an object reveals the statement that declares it", async ({ page
   // reveal lands on the statement without painting a block over the file.
   expect((await highlighted(page)).split("\n").length).toBe(1);
 
-  // ── a primitive: used to reveal its position literal ─────────────────
+  // ── a primitive: its declaration, not its position literal ───────────
   await page.getByTestId("tree-row-cylinder_2").click();
   await expect
     .poll(() => highlighted(page), { timeout: 10_000 })
@@ -149,17 +145,15 @@ test("Escape cancels one thing per press, starting with the pending command", as
 /**
  * A click on a handle must not leave the viewport dragging it.
  *
- * Found while building the Escape ladder, and worse than the thing it was
- * found by. Selecting a sketch point auto-enters sketch mode; the dock
- * rearranges its panels for that mode and re-parents the canvas mid-gesture,
- * so the `pointerup` is delivered to a detached node and the gesture never
- * finishes. Measured: a plain click sends `pointerdown` and no `pointerup`.
+ * Selecting a sketch point auto-enters sketch mode; the dock rearranges its
+ * panels for that mode and re-parents the canvas mid-gesture, so the
+ * `pointerup` is delivered to a detached node and the gesture never finishes:
+ * a plain click sends `pointerdown` and no `pointerup`.
  *
- * The viewport was then stuck mid-drag — cursor `grabbing`, every subsequent
- * mouse move calling `setDrag` — so the point silently followed the pointer
- * with no button held, and the next press committed it to the source. This is
- * the regression test for that: move the mouse after a click and nothing may
- * move with it.
+ * Unhandled, the viewport stays stuck mid-drag — cursor `grabbing`, every
+ * subsequent mouse move calling `setDrag` — so the point silently follows the
+ * pointer with no button held, and the next press commits it to the source.
+ * So: move the mouse after a click, and nothing may move with it.
  */
 test("clicking a sketch handle does not leave the point following the mouse", async ({
   page,

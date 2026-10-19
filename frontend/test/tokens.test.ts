@@ -3,7 +3,7 @@
  *
  * src/tokens.ts is the source of truth and src/tokens.css its generated
  * mirror, so the first job here is proving the two cannot drift, and that no
- * stylesheet reintroduces the literals the tokens replaced.
+ * stylesheet reintroduces the literals the tokens stand for.
  *
  * The second job is legibility. simColors.test.ts already covers the data
  * palette (the ramps, the BC hues, the element edges); this file covers the

@@ -19,8 +19,8 @@
  * two edits queued back to back can disagree about what "line 91" meant. A
  * stable id does not move. Both are sent (`addressing`): the id is the real
  * address, the line is the fallback for an entry the identity table could not
- * name, and neither call sites nor signatures had to change to get it —
- * the shell already knows which node lives at the line it was handed.
+ * name. Call sites pass only the line: the shell already knows which node
+ * lives at the line it is handed.
  */
 
 import { nodeById, nodes, selection } from "../state";

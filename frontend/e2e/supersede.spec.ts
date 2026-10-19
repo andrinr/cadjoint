@@ -6,10 +6,8 @@ import { setEditorText } from "./helpers/app";
 /**
  * Chained edits, against a server that is really slow to answer.
  *
- * The report was *"there is a fundamental problem with chaining operations…
- * when I drag an object twice, before the first one compiled, that should
- * cancel the first drag and just apply the second one"*. Unit tests pin the
- * ordering rule; this pins the whole loop, on the real server, with two edits
+ * Dragging an object twice before the first drag has compiled cancels the
+ * first and applies only the second. Unit tests pin the ordering rule; this pins the whole loop, on the real server, with two edits
  * eight seconds apart in compile time and one second apart in wall time:
  *
  * - the **second** program is what ends up on screen, never the first;

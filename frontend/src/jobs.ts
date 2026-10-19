@@ -3,8 +3,8 @@
  *
  * Every request that costs real time — compile, mesh, mesh inspection, solve,
  * optimization run, export, lint, the startup warm-up — is registered on the server as
- * a *job* and keeps its result after the response is read. That turns three
- * things that used to be impossible into ordinary bookkeeping:
+ * a *job* and keeps its result after the response is read. That makes three
+ * things ordinary bookkeeping:
  *
  *   - **A result outlives the panel that asked for it.** A panel stores four
  *     small fields ({@link JobRef}) instead of a megabyte of mesh, and asks

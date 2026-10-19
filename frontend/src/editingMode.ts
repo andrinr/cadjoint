@@ -95,8 +95,8 @@ export function loadEditingMode(
 ): EditingMode {
   try {
     const raw = storage?.getItem(EDITING_MODE_STORAGE_KEY);
-    // A persisted "render" from before the mode was retired falls back to
-    // model — render settings live in the eye-icon popover now.
+    // Anything else, a stored "render" included, falls back to model; render
+    // settings live in the eye-icon popover.
     return raw === "sketch" || raw === "simulate" ? raw : "model";
   } catch {
     return "model";

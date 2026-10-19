@@ -1,18 +1,16 @@
 /**
  * The four simulation windows, and what they each put in the dock.
  *
- * Simulation used to be one panel with a tab strip — Meshes, Studies,
- * Optimize, Results — inside a mode that had its own second-level navigation.
- * That was one arrangement too many: the dock already tabs windows, and a
- * strip inside a tab is a strip the user cannot move, split, float or park.
- * So the tabs became windows. "Simulate" is now purely a *desk*: the mode's
+ * Meshes, Studies, Optimize and Results are windows rather than tabs inside
+ * one panel: the dock already tabs windows, and a strip inside a tab is a
+ * strip the user cannot move, split, float or park. "Simulate" is purely a
+ * *desk*: the mode's
  * default layout puts Studies over Results beside the viewport, with Meshes
  * tabbed behind the first and Optimize behind the second — setup above,
  * outcomes below — and every one of them can be dragged anywhere from there.
  *
- * The views themselves are unchanged: each window hosts the same
- * `MeshesTab` / `StudiesTab` / `ResultsTab` module it hosted as a tab, over
- * the same shared controller. What each window adds is only its frame.
+ * Each window hosts one `MeshesTab` / `StudiesTab` / `ResultsTab` module over
+ * the shared controller. What each window adds is only its frame.
  *
  * Two placements are worth stating, because they are what keeps a shared
  * controller from showing the same control twice:
@@ -26,9 +24,8 @@
  *     result) are shared state, so each window shows them under its own id
  *     rather than three windows claiming the same one.
  *
- * The Optimize window is `components/OptimizePanel.tsx`: it was already a
- * window in the Model desk, and folding the Simulate tab into it is what
- * makes the two homes literally the same window rather than two copies of
+ * The Optimize window is `components/OptimizePanel.tsx`, the same window the
+ * Model desk shows, so the two homes are one window rather than two copies of
  * one card list.
  */
 

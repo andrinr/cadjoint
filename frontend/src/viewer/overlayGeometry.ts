@@ -143,8 +143,8 @@ export function packConstructionOverlay(
       edges.push(start[0], start[1], start[2], end[0], end[1], end[2], ...edgeColor);
     }
     // A handle is drawn only where it can be taken: a derived (read-only)
-    // node shows its skeleton and no handles, which on a scene built mostly
-    // from derived geometry was a scatter of squares over the part.
+    // node shows its skeleton and no handles; on a scene built mostly from
+    // derived geometry they would be a scatter of squares over the part.
     if (!node.editable) continue;
     for (let index = 0; index < node.vertices.length; index++) {
       const isSelected = selection?.nodeId === node.id && selection.vertexIndex === index;

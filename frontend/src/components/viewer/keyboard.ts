@@ -58,8 +58,7 @@ export function createViewerKeyboard(context: ViewerKeyboardContext) {
         ".dialog-backdrop, .menu-dropdown, .tool-group.open",
       );
       if (!overlayOpen) {
-        // One rung per press: see `escape.ts` for why this is a ladder and
-        // not the single flat clear it used to be.
+        // One rung per press: see `escape.ts` for why this is a ladder.
         const level = escapeLevel({
           gesture: context.gestureActive(),
           pendingConstraint: context.pendingConstraintActive(),

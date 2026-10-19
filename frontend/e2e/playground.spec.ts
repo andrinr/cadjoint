@@ -22,9 +22,8 @@ import { expectValue, pickOption } from "./helpers/select";
  * Run the real renderer, not the fallback.
  *
  * Everything about *picking* here is CPU-side — `viewer/hittest.ts` and the
- * reimplemented projection — so these tests were written to pass on a
- * browser with no WebGPU at all, and they still do. But a handful of the
- * things now under test are only true of a running renderer: the status line
+ * reimplemented projection — so these tests pass on a browser with no WebGPU
+ * at all. But a handful of the things under test are only true of a running renderer: the status line
  * names the quality tier the shader is budgeting against, and the floor grid
  * is occluded by the part in the depth buffer. Headless Chromium will give us
  * a Metal adapter if asked, so ask; `hasWebGpu` skips the two assertions that
@@ -366,7 +365,7 @@ test("dragging a handle rewrites the vertex literal", async ({ page }) => {
  * `add_primitive` names what it places `box1`, `box2`, … and the starter scene
  * has boxes of its own — a board and a die under the heat sink — declared
  * above it. A bare `/Solid\.box\(/` therefore matches the *board*, and a test
- * that placed a box then read "its" position was reading the board's, aiming
+ * that places a box then reads "its" position would read the board's, aiming
  * the gizmo drag at empty space several units away. Ask for the variable.
  */
 const boxCall = (source: string, variable: string): string | null =>
@@ -394,7 +393,7 @@ test("the polygon tool inserts a vertex and stays active", async ({ page }) => {
 
   // The patch and its recompile are async; poll rather than racing them.
   await expect.poll(() => vertexLiteralCount(page), { timeout: 45_000 }).toBe(before + 1);
-  // Unlike the old one-shot button, the tool keeps going for the next click.
+  // The tool stays armed for the next click.
   await expect(page.getByTestId("tool-polygon")).toHaveClass(/active/);
   await waitForCompile(page);
 
@@ -437,8 +436,7 @@ const visibleFaceLabels = (page: Page) =>
 
 test("the cube sets a direction and never the projection", async ({ page }) => {
   // Isometric is a direction; orthographic is a projection. Choosing a
-  // standpoint must not quietly change how the scene is projected — which is
-  // what the retired ISO preset button used to do.
+  // standpoint must not quietly change how the scene is projected.
   expect(await projectionMode(page)).toContain("Orthographic");
   expect(await viewReadout(page)).toContain("ISO");
 
@@ -467,8 +465,8 @@ test("the cube sets a direction and never the projection", async ({ page }) => {
 });
 
 test("the cube shows the face the camera is standing on", async ({ page }) => {
-  // The defect this replaces: the container's pitch rotation had the wrong
-  // sign, so a camera above the floor was shown BOTTOM. The cube states which
+  // A pitch rotation of the wrong sign shows a camera above the floor
+  // BOTTOM. The cube states which
   // facet it has turned to the front, so ask it, and check the answer against
   // which face names are legible at all — a face nobody can read is a face the
   // camera is not standing on.
@@ -574,9 +572,9 @@ test("the projection toggle works on its own", async ({ page }) => {
 
 test("the projection toggle sits in the viewport bar beside render settings", async ({ page }) => {
   // Projection is not a direction, and the cube is the direction control, so
-  // the toggle left the cube's square for the bar of controls for how the
-  // picture is drawn: it shares a row with the render-settings button, right
-  // beside it, and no longer overlaps the cube's stage.
+  // the toggle sits in the bar of controls for how the picture is drawn: it
+  // shares a row with the render-settings button, right beside it, and stays
+  // clear of the cube's stage.
   const bar = page.getByTestId("view-controls");
   await expect(bar.getByTestId("projection-toggle")).toBeVisible();
   await expect(bar.getByTestId("display-options")).toBeVisible();
@@ -625,11 +623,10 @@ const inkBox = (page: Page, selector: string) =>
   });
 
 test("the axis triad clears the cube, whichever way the camera turns", async ({ page }) => {
-  // The defect this pins: the triad was drawn inside the cube's own square,
-  // and because it turns with the camera its arms swept a disc across the
-  // silhouette, the face labels and the projection toggle — the X label ran
-  // off the left edge of the stage and the Z arm crossed the top facet. It
-  // has a square of its own under the cube now, so the two never meet: the
+  // The triad turns with the camera, so its arms sweep a disc; inside the
+  // cube's own square that disc would cross the silhouette, the face labels
+  // and the projection toggle. It has a square of its own under the cube, so
+  // the two never meet: the
   // topmost triad ink stays below the lowest cube ink at every standpoint.
   const canvas = page.getByTestId("viewer-canvas");
   const frame = (await canvas.boundingBox())!;
@@ -716,9 +713,7 @@ test("selection mode decides what a click picks", async ({ page }) => {
 
   // Object mode is the default, so a sketch vertex is not picked as a vertex:
   // the click selects the sketch, and what the editor reveals is that sketch's
-  // declaration rather than a single point's literal. (It used to assert no
-  // highlight at all, which stopped being true when selecting an object began
-  // revealing the statement that declares it.)
+  // declaration rather than a single point's literal.
   await expect(page.getByTestId("mode-object")).toHaveClass(/active/);
   await page.mouse.click(metrics.left + point.x, metrics.top + point.y);
   await expect(page.getByTestId("selection-chip")).not.toHaveText("vertex 0");
@@ -754,11 +749,10 @@ test("render presets activate, edit, and persist without bloating the closed UI"
   // Closed, the panel holds the three preset cards and the distance-field
   // switch — a *view* selector, sibling to the presets rather than a detail of
   // one — and nothing else. The budget covers those two blocks; the preset
-  // editor, which is the bulky part, is still absent above. The design
-  // language gave each preset card an icon tile and the panel a titled
-  // header, which together cost ~40px over the old 380 budget (measured 422
-  // at 288px wide); 440 keeps that and still fails if the editor or any
-  // other block leaks into the closed state.
+  // editor, which is the bulky part, is still absent above. Each preset
+  // card's icon tile and the panel's titled header bring it to about 422px at
+  // 288px wide; 440 allows that and still fails if the editor or any other
+  // block leaks into the closed state.
   const compactPanel = await page.getByTestId("render-panel").boundingBox();
   expect(compactPanel!.width).toBeLessThanOrEqual(310);
   expect(compactPanel!.height).toBeLessThan(440);
@@ -812,9 +806,8 @@ test("render presets activate, edit, and persist without bloating the closed UI"
 });
 
 test("a floated window covers the pane it is dropped over", async ({ page }) => {
-  // The panels used to float over the viewport and had to be ordered against
-  // the code pane by hand. They are real windows now, so the only overlap
-  // left is a deliberate one: a group lifted out of the grid.
+  // Panels are real windows, so the only overlap is a deliberate one: a
+  // group lifted out of the grid.
   await page.evaluate(() => window.__cadjointWindows!.float("objects"));
   const floating = page.locator(".dv-groupview-floating");
   await expect(floating).toHaveCount(1);
@@ -930,9 +923,8 @@ test("the material browser creates, edits, and drag-assigns materials", async ({
     .toMatch(/bush_b = Solid\.cylinder\([\s\S]*?material=copper/);
   await waitForCompile(page);
 
-  // Parking is the window frame's job, and only the frame's: the panel used to
-  // carry an em-dash of its own beside the frame's minimise, so every panel
-  // showed two identical controls doing one thing. The frame's control parks
+  // Parking is the window frame's job, and only the frame's: a panel carries
+  // no minimise of its own beside the frame's. The frame's control parks
   // it — it leaves the dock and turns into a tray entry, and clicking that
   // brings it back where it was.
   await expect(page.getByTestId("material-close")).toHaveCount(0);
@@ -951,10 +943,8 @@ const materialCall = (source: string, variable: string): string =>
   source.match(new RegExp(String.raw`^${variable} = Material\([\s\S]*?^\)`, "m"))?.[0] ?? "";
 
 test("the inspector states, edits and removes a physical property", async ({ page }) => {
-  // The physical rows were a printed list: what a study's result depends on,
-  // shown but not touchable. Every one of them is optional on a `Material`, so
-  // "not touchable" meant the one thing the inspector could not do was declare
-  // a property — you left the panel and typed the keyword yourself.
+  // Every physical property is optional on a `Material`, so the inspector
+  // has to declare one as well as show and edit what is stated.
   await page.getByTestId("material-copper").click();
   const rows = page.getByTestId("material-physical");
   await expect(rows).toBeVisible();
@@ -1687,10 +1677,9 @@ test("a face pick plants a sketch on the comb's cap", async ({ page }) => {
 });
 
 test("the code panels leave with the pointer and with the focus", async ({ page }) => {
-  // The complaint: "those coding infos panels are great but stick around even
-  // when I move out of the code window." The signature tooltip is a StateField
-  // — shown because of where the caret is, not where the pointer is — so
-  // nothing about leaving the editor was ever going to close it.
+  // The signature tooltip is a StateField — shown because of where the caret
+  // is, not where the pointer is — so nothing about leaving the editor closes
+  // it on its own.
   const editor = page.getByTestId("editor");
   const tooltip = page.locator(".cm-signature-tooltip");
 
@@ -1833,12 +1822,11 @@ async function framePixels(
 }
 
 test("the floor grid is behind the part, X-Ray included", async ({ page }) => {
-  // "also lets put that floor grid behind all objects". It was not: the
-  // default preset is X-Ray, an x-rayed solid used to withhold its depth so
-  // that construction geometry could read through it, and the ground grid —
-  // which draws behind whatever depth the scene wrote — came through the heat
-  // sink with it. The part read as something laid over a grid rather than
-  // something standing on the ground.
+  // The default preset is X-Ray, and an x-rayed solid writes its depth like
+  // an opaque one, so the ground grid — which draws behind whatever depth the
+  // scene wrote — cannot come through the heat sink. A grid showing through
+  // makes the part read as laid over a grid rather than standing on the
+  // ground.
   //
   // This is a question about pixels, so it is asked in pixels: the same patch
   // of frame with the grid on and with it off. Off the part the two differ,

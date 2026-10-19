@@ -43,9 +43,8 @@ describe("the defaults reproduce the image the viewer has always drawn", () => {
   });
 
   it("gives every tier the same budget, because it costs the same on each", () => {
-    // Measured on end_cap at three resolutions: 64 against 384 is inside the
-    // noise at all of them, so a ladder here bought nothing and cost Draft a
-    // broken silhouette. What separates the tiers is the pixel budget.
+    // On end_cap, 64 against 384 is inside the noise at every resolution, so
+    // a ladder here buys nothing and costs Draft a broken silhouette. What separates the tiers is the pixel budget.
     for (const tier of Object.values(QUALITY_PRESETS)) {
       expect(tier.marchSteps).toBe(MARCH_STEPS_TIER);
     }
@@ -171,7 +170,7 @@ describe("the cull margin in the parameter buffer", () => {
 
   it("leaves a program without the slot alone", () => {
     // Absent and explicitly null both mean "no margin slot": a literal-form
-    // shader, or one built before the toggle existed. Writing on that basis
+    // shader, or one without the cull toggle. Writing on that basis
     // would land on a real parameter.
     const { cull_margin_offset: _absent, ...older } = program;
     expect(packParameters(older, undefined, CULL_MARGIN_OFF)[0]).toBeCloseTo(0.6, 6);

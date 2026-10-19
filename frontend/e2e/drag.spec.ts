@@ -149,18 +149,18 @@ test("a free handle drags live; a fixed one falls back to a recompile", async ({
 /**
  * Switching scenes must not draw through a destroyed buffer.
  *
- * The regression this pins: installing the new program and its parameter
- * buffer at the *top* of `setShaders` destroyed the buffer that the cached
- * `previewParameterGroup` and `pathParameterGroup` were still holding, and
- * then spent tens of milliseconds — 745 ms on `scenes/motor_shield.py` —
- * building modules and pipelines before replacing them. Any frame drawn in
- * that window failed validation with "Buffer with 'SDF parameters' label has
- * been destroyed", which on a big scene is every frame the user causes by
+ * Installing the new program and its parameter buffer at the *top* of
+ * `setShaders` would destroy the buffer that the cached
+ * `previewParameterGroup` and `pathParameterGroup` still hold, while modules
+ * and pipelines take up to hundreds of milliseconds to build (745 ms on
+ * `scenes/motor_shield.py`). Any frame drawn in that window would fail
+ * validation with "Buffer with 'SDF parameters' label has been destroyed",
+ * which on a big scene is every frame the user causes by
  * touching the mouse while they wait.
  *
  * So the test needs three things at once, and the assertion is worthless
  * without all three: a scene whose buffer is a *different size* from the one
- * installed (an equal size took an early return and hid the bug), a shader
+ * installed (an equal size takes an early return and would hide the fault), a shader
  * big enough that its pipelines take real time to build, and frames actually
  * being drawn while that happens. `scenes/end_cap.py` supplies the first two
  * — 11 free parameters against the first scene's one, 1.7 MB of WGSL — and

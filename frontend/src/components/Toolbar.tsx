@@ -41,9 +41,8 @@ function progressLabel(job: RunningJob): string | null {
 /**
  * "Something is running", in the one place the eye is already resting.
  *
- * The request was for an indicator in the viewport and then, on seeing it, for
- * it to be up beside the mode switcher instead — which is right: the modes are
- * where you say what you are doing, and this says what the machine is doing
+ * It sits beside the mode switcher, not in the viewport: the modes are where
+ * you say what you are doing, and this says what the machine is doing
  * about it. It is a *chip*, not a panel: kind, name, and a clock counting up,
  * enough to know a solve is alive without opening the monitor. Pressing it
  * opens the monitor; the × kills the job.
@@ -104,10 +103,10 @@ function JobChip() {
    *
    * A lint does not belong here: it fires on a pause in typing, which would
    * make the chip blink several times a minute while you write code. A
-   * compile does, and used to be excluded on the grounds that the status line
-   * and a disabled Run button already said it — which was true and still left
-   * the longest wait in the app as the quietest thing on screen. What is here
-   * now is everything the machine is doing that a person is waiting on: the
+   * compile does: the status line and a disabled Run button also say it, but
+   * it is the longest wait in the app and must not be the quietest thing on
+   * screen. What is here is everything the machine is doing that a person is
+   * waiting on: the
    * compile first, because it is the one that decides whether the picture is
    * current, then the work you start and go away from — a solve, an
    * optimization, a mesh, an export. The Processes window lists every job;

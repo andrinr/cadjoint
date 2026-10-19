@@ -51,8 +51,8 @@ export interface SketchPlaneEmission {
  * world plane through the origin, falling back to a point in front of the
  * camera when the view is edge-on to that plane.
  *
- * The XY choice emits no normal — it is the `SketchPlane` default, and the
- * generated source stays as short as before this feature existed.
+ * The XY choice emits no normal — it is the `SketchPlane` default, so the
+ * generated source stays short.
  */
 export function quickPlaneEmission(
   choice: Exclude<SketchPlaneChoice, "face">,

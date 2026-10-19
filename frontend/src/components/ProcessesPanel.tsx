@@ -3,11 +3,10 @@
  * the machine is paying for it.
  *
  * A CAD session here is mostly waiting — a mesh is five seconds, a solve is
- * nine, an optimization is minutes — and until now none of that waiting was
- * visible. The work happened inside a subprocess, in a panel you may have
- * navigated away from, with no way to tell a slow solve from a hung one and
- * no way to stop either. This window is the instrument that closes that gap,
- * and it is deliberately shaped like the rest of the sheet: three zones, mono
+ * nine, an optimization is minutes — and the work happens inside a
+ * subprocess, often for a panel you have navigated away from. This window
+ * makes that waiting visible, tells a slow solve from a hung one and stops
+ * either. It is deliberately shaped like the rest of the sheet: three zones, mono
  * readouts, no colour that is not already in the system.
  *
  *   RUNNING  what is executing right now, with a cancel per row

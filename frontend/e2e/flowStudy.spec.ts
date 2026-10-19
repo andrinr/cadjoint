@@ -2,11 +2,10 @@
  * A flow study, declared and authored in the panel like the other two.
  *
  * `scenes/duct_sink.py` is the one shipped scene whose study is a
- * `FlowStudy`, and it is the case the Studies window had no rendering for.
- * Two things are checked here that a unit test cannot: that a real payload
+ * `FlowStudy`. Two things are checked here that a unit test cannot: that a real payload
  * from a real compile renders without throwing — three of a flow study's
- * conditions carry no node selection, which every mesh-study row assumed it
- * had — and that adding one writes a program the server can run.
+ * conditions carry no node selection, which a mesh-study row expects — and
+ * that adding one writes a program the server can run.
  */
 
 import { expect, test, type Page } from "@playwright/test";

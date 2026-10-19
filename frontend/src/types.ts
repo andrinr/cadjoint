@@ -7,10 +7,7 @@
  * `python -m cadjoint.viewer.schema.emit`, pinned by
  * `tests/viewer/test_parity_schema.py` and `test_api_contract.py`), and this
  * module re-exports them. A hand-maintained copy of a generated contract is a
- * copy that drifts, and it had: a `cylinder` selection the server sends and
- * the preview could not evaluate, an `equal_length` constraint the add-tool
- * vocabulary did not have, face groups typed non-null on tet meshes that send
- * null, and a whole simulate request shape the server stopped accepting.
+ * copy that drifts.
  *
  * What is still declared here is what the *frontend* owns: the selection,
  * tool and gizmo state, a viewport-picked BC proposal, and a few names derived

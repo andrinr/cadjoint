@@ -12,9 +12,9 @@
  * stated in SI with the unit printed beside the number.
  *
  * ── Why the physical rows are boxes and not sliders ──────────────────────
- * These were read-only, on the argument that a study's result depends on them
- * and they should be shown as declared rather than nudged. Half of that is
- * right and the conclusion was wrong: a number a solve depends on is exactly
+ * A study's result depends on these, which is a reason to show them as
+ * declared rather than nudge them — not a reason to make them read-only: a
+ * number a solve depends on is exactly
  * the number you want to be able to *type*, to a stated significant figure,
  * rather than approach with a slider — 7e10 and 6.9e10 are different materials
  * and no slider distinguishes them. So each stated row is a number box that

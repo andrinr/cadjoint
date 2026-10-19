@@ -13,8 +13,8 @@
  * Two more things belong to the cluster:
  *   · the projection toggle, tucked into the stage's top-right corner. The
  *     cube's silhouette never reaches a corner of its own square, so the glyph
- *     sits inside the widget's block rather than hanging off it — it was under
- *     the square once, where a button under a square reads as orphaned;
+ *     sits inside the widget's block rather than hanging off it — a button
+ *     under a square reads as orphaned;
  *   · an axis triad in its own square *below* the cube, in red/green/blue.
  *     That is the one place saturated hue is allowed in this chrome, and it is
  *     allowed because it is not chrome: X-red, Y-green, Z-blue is a reading of
@@ -22,8 +22,8 @@
  *     would make it three identical grey lines.
  *
  * ── Why the triad is not in the cube's square ────────────────────────────
- * It was, in the square's top-left corner, and it collided with the cube at
- * most standpoints: the triad turns, so its arms sweep a *disc* about their
+ * In the square's top-left corner it would collide with the cube at most
+ * standpoints: the triad turns, so its arms sweep a *disc* about their
  * origin, and a disc that fits in the corner of a 124px box without touching
  * the cube's own 77px silhouette has a radius of about 19px — an eleven-pixel
  * arm with the letters sitting on its tip. Widening the stage's viewBox buys
@@ -72,9 +72,9 @@ const SCALE = 34;
  * Half the viewBox. The solid's furthest vertex is √(1 + 2·0.56²) ≈ 1.28 cube
  * units out, so the silhouette reaches about 43 whichever way it is turned;
  * the rest is the corner the projection toggle sits in and the room the cube
- * needs not to touch the edge of its own square. It used to be 92 to clear
- * four quarter-turn controls on the flanks, which are gone — a face, bevel or
- * corner is a click, and the view keys reach what the silhouette hides.
+ * needs not to touch the edge of its own square. There are no controls on the
+ * flanks: a face, bevel or corner is a click, and the view keys reach what the
+ * silhouette hides.
  */
 const EXTENT = 70;
 /**
@@ -82,8 +82,8 @@ const EXTENT = 70;
  *
  * Drawing it 1:1 is what makes the numbers below readable as sizes: a 20-unit
  * arm is 20px on the screen and the 9px label in the stylesheet is 9px. Inside
- * the cube's stage the same figures were scaled by 124/140 and the type came
- * out under 8px, which is where a three-letter legend starts to fail.
+ * the cube's stage the same figures would scale by 124/140 and the type would
+ * come out under 8px, which is where a three-letter legend starts to fail.
  */
 const TRIAD_EXTENT = 32;
 /** Arm length, in the same pixels. Labels sit a third of an arm beyond the tip. */
@@ -230,8 +230,7 @@ export function ViewCube(props: ViewCubeProps) {
    * The modifier is **Shift**, and not Ctrl, which is what the same meaning is
    * bound to on the view keys (Ctrl+7 is Blender's Bottom). macOS is why: the
    * system claims Control-click as the secondary click, and the browser
-   * delivers a `contextmenu` where the page expected a `click` — measured, not
-   * assumed. A modifier that works on the keyboard and silently does nothing
+   * delivers a `contextmenu` where the page expected a `click`. A modifier that works on the keyboard and silently does nothing
    * under the pointer on a third of the machines running this is not a
    * modifier. Ctrl is accepted as well, so the habit costs nothing on the
    * platforms where it does arrive.
