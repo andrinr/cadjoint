@@ -55,7 +55,8 @@ A default run takes about 30 seconds; `--solve` about 60.
 
 `model`, `model-menu-file`, `model-tray`, `model-floating`,
 `model-render-popover`, `sketch`, `sketch-solver`, `simulate-meshes`,
-`simulate-studies`, `simulate-optimize`, `simulate-results` — each at every
+`simulate-studies`, `simulate-optimize`, `simulate-results`, `model-scenes`,
+`model-processes` — each at every
 viewport. The sketch states select a profile from the object tree first,
 because the sketch panel only exists while one is selected. Since every panel
 became a window, the object tree and the material browser are part of the
@@ -88,9 +89,8 @@ short paths of at most three levels, cut at the first `data-testid`.
 Every distinct `font-size` / `font-weight` / `line-height` / family in use on
 an element that owns text, with a count and examples. If any CSS custom
 property whose name mentions font/text/type/size/scale/leading/weight exists,
-it is reported as `declaredTypeScale` for comparison; the stylesheet currently
-declares none, so the census *is* the evidence from which a scale should be
-chosen. Sort by count: the long tail of one- and two-use variants is the
+it is reported as `declaredTypeScale` for comparison against the `--text-*`
+scale that `src/tokens.css` declares. Sort by count: the long tail of one- and two-use variants is the
 cleanup list.
 
 ### 2. Overflow

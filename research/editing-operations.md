@@ -1,7 +1,7 @@
 # Editing operations — the spec of record
 
 The scene is a Python file and the file is the truth. Every gesture in the
-viewer is a `POST /patch` that rewrites a span of that file and nothing else;
+viewer is a `POST /api/patch` that rewrites a span of that file and nothing else;
 the compile that follows is what the user sees. This document states, for
 each of the 28 operations, what a request looks like, what must already be in
 the source, exactly what is rewritten, what the next compile must show, and
