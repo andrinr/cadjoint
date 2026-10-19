@@ -47,6 +47,16 @@ describe("selection summaries", () => {
     expect(
       describeSelection({ kind: "halfspace", point: [0, 0, 1], normal: [0, 0, 1] }),
     ).toBe("halfspace at [0, 0, 1] · n [0, 0, 1]");
+    expect(
+      describeSelection({
+        kind: "cylinder",
+        center: [0, 0, 0],
+        axis: [0, 0, 1],
+        radius: 0.5,
+        inner: 0.25,
+        half_length: 1,
+      }),
+    ).toBe("cylinder [0, 0, 0] ↕ [0, 0, 1] r 0.25–0.5 ± 1");
     expect(describeSelection({ kind: "side", side: "+x", tol: null })).toBe("side +x");
     expect(describeSelection({ kind: "side", side: "-z", tol: 0.05 })).toBe(
       "side -z ± 0.05",

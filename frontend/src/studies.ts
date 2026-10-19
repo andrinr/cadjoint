@@ -9,7 +9,7 @@
 
 import type {
   StudyBc,
-  StudyBcType,
+  BoundaryConditionType,
   StudyKind,
   StudyPayload,
   StudyPayloadKind,
@@ -34,6 +34,14 @@ export function describeSelection(selection: StudySelection): string {
       return `sphere ${vec(selection.center)} r ${num(selection.radius)}`;
     case "halfspace":
       return `halfspace at ${vec(selection.point)} · n ${vec(selection.normal)}`;
+    case "cylinder": {
+      const radius =
+        selection.inner > 0
+          ? `r ${num(selection.inner)}–${num(selection.radius)}`
+          : `r ${num(selection.radius)}`;
+      const length = selection.half_length === null ? "" : ` ± ${num(selection.half_length)}`;
+      return `cylinder ${vec(selection.center)} ↕ ${vec(selection.axis)} ${radius}${length}`;
+    }
     case "side":
       return selection.tol === null
         ? `side ${selection.side}`
@@ -49,7 +57,7 @@ export function describeSelection(selection: StudySelection): string {
   }
 }
 
-export const BC_LABELS: Record<StudyBcType, string> = {
+export const BC_LABELS: Record<BoundaryConditionType, string> = {
   dirichlet: "Fixed value",
   heat_flux: "Heat flux",
   fixed: "Fixed support",
@@ -69,7 +77,7 @@ export const BC_LABELS: Record<StudyBcType, string> = {
  * lattice, so they place no region and the form must not ask for one. See
  * `bcPlacesRegion`.
  */
-export function bcTypesFor(kind: StudyPayloadKind): StudyBcType[] {
+export function bcTypesFor(kind: StudyPayloadKind): BoundaryConditionType[] {
   if (kind === "thermal") return ["dirichlet", "heat_flux"];
   if (kind === "elastic") return ["fixed", "traction"];
   if (kind === "flow") return ["inlet", "outlet", "walls", "heat_source", "held_temperature"];
@@ -82,7 +90,7 @@ export function isEditableStudyKind(kind: StudyPayloadKind): kind is StudyKind {
 }
 
 /** Whether this condition picks a region, or is a face of the lattice. */
-export function bcPlacesRegion(type: StudyBcType): boolean {
+export function bcPlacesRegion(type: BoundaryConditionType): boolean {
   return BC_PLACEMENT[type] === undefined;
 }
 
@@ -105,7 +113,7 @@ export function bcValue(bc: StudyBc): number | [number, number, number] | null {
 }
 
 /** How a condition that places nothing describes where it acts. */
-export const BC_PLACEMENT: Partial<Record<StudyBcType, string>> = {
+export const BC_PLACEMENT: Partial<Record<BoundaryConditionType, string>> = {
   inlet: "lattice inlet face",
   outlet: "lattice outlet face",
   walls: "duct walls",
@@ -136,7 +144,7 @@ export type BuilderSelectionKind = "side" | "box" | "sphere" | "halfspace";
 
 /** Editable state of the add-BC builder form, converted on submit. */
 export interface BcDraft {
-  bcType: StudyBcType;
+  bcType: BoundaryConditionType;
   selectionKind: BuilderSelectionKind;
   side: string;
   minCorner: [number, number, number];

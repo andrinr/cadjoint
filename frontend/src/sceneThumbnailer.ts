@@ -143,8 +143,8 @@ export function createThumbnailer(): Thumbnailer {
       const reason = await start();
       if (reason) return { state: "unavailable", message: reason };
       const loaded = await api.loadScene(name);
-      if (!loaded.ok || typeof loaded.source !== "string") {
-        return { state: "failed", message: loaded.error ?? `Could not read ${name}.` };
+      if (!loaded.ok) {
+        return { state: "failed", message: loaded.error || `Could not read ${name}.` };
       }
       const outcome = await draw(loaded.source);
       if (outcome.state === "ok" && hash) await writeThumbnail(hash, outcome.dataUrl);

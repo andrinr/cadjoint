@@ -579,13 +579,15 @@ class Optimization:
 
         return StudyKind.THERMAL if isinstance(self.study, ThermalStudy) else StudyKind.ELASTIC
 
-    def _study_target(self, scene: Any = None) -> Any:
+    def study_target(self, scene: Any = None) -> Any:
         """The object whose free parameters a study-backed run optimizes.
 
         The study's meshed domain when it declares one (on its SimMesh or
         on the study itself); otherwise the ``scene`` the caller supplies —
         the same field the study would mesh at solve time.  ``None`` when
-        neither is available (describe degrades, run raises).
+        neither is available (describe degrades, run raises).  Callers that
+        write optimized values back (``apply_parameters``) write them here.
+        Only defined for a study-backed optimization (``study=`` given).
         """
         study = self.study
         mesh = getattr(study, "mesh", None)
@@ -609,7 +611,7 @@ class Optimization:
                 parameters (the compile worker passes it).
         """
         if self.study is not None:
-            target = self._study_target(scene)
+            target = self.study_target(scene)
             parameters = (
                 list(self._free_parameters(target))
                 if target is not None and hasattr(target, "children")
@@ -881,7 +883,7 @@ class Optimization:
         from cadjoint.functionalize import functionalize
 
         study = self.study
-        target = self._study_target(scene)
+        target = self.study_target(scene)
         if target is None:
             raise ValueError(
                 f"Optimization {self.name!r} is study-backed and study {study.name!r} "

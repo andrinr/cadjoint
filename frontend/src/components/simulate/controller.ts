@@ -83,8 +83,8 @@ import type {
   MeshInspectResponse,
   SimMeshPayload,
   SimulateResponse,
-  SimulationMeshPayload,
-  SimulationResultSummary,
+  SurfacePayload,
+  ResultSummary,
   StudyPayload,
 } from "../../types";
 import { windowManager } from "../../windows/manager";
@@ -112,8 +112,8 @@ const HISTOGRAM_BINS = 24;
 /** Everything a completed solve leaves behind for results browsing. */
 export interface SolveState {
   name: string;
-  payload: SimulationMeshPayload;
-  result: SimulationResultSummary | null;
+  payload: SurfacePayload;
+  result: ResultSummary | null;
   meshInfo: MeshInspectInfo | null;
   /** Per-vertex fields for display switching (may only hold the default). */
   fields: Record<string, number[]>;
@@ -128,7 +128,7 @@ export interface SolveState {
 /** A standalone mesh inspection (no solve). */
 export interface InspectState {
   name: string;
-  payload: SimulationMeshPayload;
+  payload: SurfacePayload;
   info: MeshInspectInfo;
   qualityScalars: number[];
 }
@@ -279,7 +279,11 @@ export function createSimulateController(props: SimulateControllerProps) {
       // its solved field through `optimizeSimulate` on the same mount.
       if (options.onlyIfEmpty && (result() || inspected())) return;
       const name =
-        typeof ref.fields?.name === "string" ? ref.fields.name : (outcome.payload.name ?? ref.kind);
+        typeof ref.fields?.name === "string"
+          ? ref.fields.name
+          : "name" in outcome.payload && typeof outcome.payload.name === "string"
+            ? outcome.payload.name
+            : ref.kind;
       const adopted =
         ref.kind === "mesh_inspect"
           ? adoptInspect(name, outcome.payload)
@@ -543,24 +547,19 @@ export function createSimulateController(props: SimulateControllerProps) {
    * of a fresh one.
    */
   const adoptSolve = (name: string, response: SimulateResponse): boolean => {
-    if (!response.mesh) return false;
-    const defaultField = response.field ?? "field";
+    if (!response.ok) return false;
+    const defaultField = response.field;
     setInspected(null);
-    // The field catalog rides on the mesh payload (top level is the
-    // legacy home; coalesce both while the backend contract settles).
+    // The field catalog rides on the mesh payload (`SurfacePayload.fields`).
     setResult({
       name,
       payload: response.mesh,
-      result: response.result ?? null,
-      meshInfo: response.mesh_info ?? null,
-      fields:
-        response.mesh.fields ??
-        response.fields ?? { [defaultField]: response.mesh.scalars },
-      ranges:
-        response.mesh.ranges ??
-        response.ranges ?? { [defaultField]: response.mesh.range },
+      result: response.result,
+      meshInfo: response.mesh_info,
+      fields: response.mesh.fields ?? { [defaultField]: response.mesh.scalars },
+      ranges: response.mesh.ranges ?? { [defaultField]: response.mesh.range },
       defaultField,
-      displacements: response.mesh.displacements ?? response.displacements ?? null,
+      displacements: response.mesh.displacements ?? null,
       qualityScalars: null,
     });
     setActiveField(defaultField);
@@ -590,16 +589,16 @@ export function createSimulateController(props: SimulateControllerProps) {
         kind: "study",
         name: study.name,
       });
-      if (response.error_kind === "cancelled") {
+      if (!response.ok && response.error_kind === "cancelled") {
         // A cancellation is something the user asked for, not a failure.
         return;
       }
-      if (response.error_kind === "fem_unavailable") {
+      if (!response.ok && response.error_kind === "fem_unavailable") {
         setUnavailable(true);
-        fail(response.error ?? "The jax-fem extra is not installed.", response.job_id);
+        fail(response.error || "The jax-fem extra is not installed.", response.job_id);
         return;
       }
-      if (!response.ok || !response.mesh) {
+      if (!response.ok) {
         // Whatever is on screen stays on screen. A failed solve does not
         // make the last one wrong — it makes it *old*, which the stale chip
         // already says — and clearing it would replace a real answer with a
@@ -653,13 +652,13 @@ export function createSimulateController(props: SimulateControllerProps) {
 
   /** Take an inspection response as the displayed mesh. See `adoptSolve`. */
   const adoptInspect = (name: string, response: MeshInspectResponse): boolean => {
-    if (!response.mesh || !response.info) return false;
+    if (!response.ok) return false;
     setResult(null);
     setInspected({
-      name: response.name ?? name,
+      name: response.name || name,
       payload: response.mesh,
       info: response.info,
-      qualityScalars: response.quality_scalars ?? response.mesh.scalars,
+      qualityScalars: response.quality_scalars,
     });
     // A mesh you are inspecting should look like a mesh: edges on.
     setShowEdges(true);
@@ -679,8 +678,8 @@ export function createSimulateController(props: SimulateControllerProps) {
     setErrorJob(null);
     try {
       const response = await api.meshInspect(posted, mesh.name);
-      if (response.error_kind === "cancelled") return;
-      if (!response.ok || !response.mesh || !response.info) {
+      if (!response.ok) {
+        if (response.error_kind === "cancelled") return;
         fail(response.error ?? "Mesh inspection failed.", response.job_id);
         return;
       }
@@ -712,7 +711,7 @@ export function createSimulateController(props: SimulateControllerProps) {
       setInspecting(target);
       try {
         const response = await api.meshInspect(source(), target);
-        if (!response.ok || !response.quality_scalars) {
+        if (!response.ok) {
           fail(
             response.error ?? "Mesh quality is unavailable for this result.",
             response.job_id,

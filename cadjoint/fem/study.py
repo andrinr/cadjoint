@@ -78,6 +78,7 @@ __all__ = [
     "Traction",
     "capture_studies",
     "register_study",
+    "study_mesh",
 ]
 
 # Same domain convention as the viewer's simulate path (compile worker).
@@ -87,10 +88,10 @@ _DEFAULT_SIZE = DEFAULT_SIZE
 #: Private spelling kept for the two study classes below.
 _register = register_study
 
-#: Re-exported so ``from cadjoint.studies import capture_studies`` keeps
-#: naming the registry the studies in this module land in; it is defined in
-#: :mod:`cadjoint.studies.capture`, which the flow package shares.
-__all__ = ["capture_studies", "register_study"]
+# ``capture_studies`` and ``register_study`` (in ``__all__`` above) are
+# re-exported so ``from cadjoint.fem.study import capture_studies`` keeps
+# naming the registry the studies in this module land in; they are defined
+# in :mod:`cadjoint.studies.capture`, which the flow package shares.
 
 
 def _expect_selection(nodes: Any, bc_kind: str) -> NodeSelection:
@@ -411,21 +412,30 @@ def _solve_mesh(
     """
     if isinstance(mesh, Discretization):  # an explicit discretization: used as is
         return None, mesh
-    if mesh is not None:
-        target = _resolve_mesh_reference(mesh)
-    elif study.mesh is not None:
-        target = study.mesh
-    else:
-        if study._implicit_mesh is None:
-            study._implicit_mesh = _anonymous(
-                name=f"{study.name}::mesh",
-                resolution=study.resolution,
-                domain=study.domain,
-                bounds=study.bounds,
-                size=study.size,
-            )
-        target = study._implicit_mesh
+    target = _resolve_mesh_reference(mesh) if mesh is not None else study_mesh(study)
     return target, target.build(sdf)
+
+
+def study_mesh(study: ThermalStudy | ElasticStudy) -> SimMesh:
+    """The SimMesh a study solves on when ``solve`` is given no mesh.
+
+    The study's declared ``mesh=`` when it has one; otherwise the anonymous
+    ``"<study name>::mesh"`` implied by its resolution/bounds/size/domain,
+    created once and kept on the study so its build cache is shared with
+    every later solve.  Nothing is built here — call ``.build(sdf)`` on the
+    result, which is the same build (and cache) ``solve`` uses.
+    """
+    if study.mesh is not None:
+        return study.mesh
+    if study._implicit_mesh is None:
+        study._implicit_mesh = _anonymous(
+            name=f"{study.name}::mesh",
+            resolution=study.resolution,
+            domain=study.domain,
+            bounds=study.bounds,
+            size=study.size,
+        )
+    return study._implicit_mesh
 
 
 def _check_resolvable(bcs: list[Any], mesh: Any) -> None:

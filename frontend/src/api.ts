@@ -5,33 +5,89 @@
  * that response, so requiring the token on writes keeps them same-origin only.
  */
 
-import type { JobDetail, JobsSnapshot, JobStamped } from "./jobs";
 import {
   parseOptimizeStreamLine,
   splitStreamBuffer,
   type OptimizeProgress,
 } from "./optimize";
 import type {
+  ApiRoutes,
+  ApiVersion,
+  BrepResponse,
   CompileResponse,
   CompleteResponse,
   ExportRequest,
+  CancelClientResponse,
+  ExportSummary,
+  Failure,
+  JobDetail,
+  JobDetailResponse,
+  JobStamped,
+  JobsSnapshot,
   LintResponse,
   MeshInspectResponse,
   MeshRefreshResponse,
   MeshResponse,
   OptimizeRequest,
   OptimizeResponse,
-  PatchOperation,
+  PatchRequest,
   PatchResponse,
   SceneListResponse,
   SceneLoadResponse,
   SceneSaveResponse,
   SessionResponse,
+  SignatureResponse,
   SimulateRequest,
   SimulateResponse,
-  SignatureResponse,
-  SimulateStudyRequest,
 } from "./types";
+
+/**
+ * The contract version this page was built against.
+ *
+ * Typed by the generated `ApiVersion`, so regenerating the contract at a new
+ * version fails `tsc` until this line is changed with it — the number cannot
+ * silently fall behind the types it vouches for.
+ */
+export const CLIENT_API_VERSION: ApiVersion = 2;
+
+/** Thrown by {@link startSession} when the server speaks another contract version. */
+export class ApiVersionMismatch extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "ApiVersionMismatch";
+  }
+}
+
+/**
+ * Why this page cannot talk to a server reporting `serverVersion`, or null.
+ *
+ * A server older than the versioned contract reports nothing at all, which is
+ * a mismatch too: every type this page was built with may be wrong for it.
+ */
+export function apiVersionMismatch(serverVersion: unknown): string | null {
+  if (serverVersion === CLIENT_API_VERSION) return null;
+  const server =
+    typeof serverVersion === "number"
+      ? `the server speaks version ${serverVersion}`
+      : "the server does not report a version (it predates the versioned API)";
+  return (
+    `This page was built for playground API version ${CLIENT_API_VERSION}, but ${server}. ` +
+    "The page and the server come from different cadjoint builds: restart the playground " +
+    "(`cadjoint-playground` or `python -m cadjoint.viewer.playground`) from the install " +
+    "that served this page, or rebuild the frontend (`npm run build` in frontend/) to " +
+    "match the server, then reload."
+  );
+}
+
+/** A route that takes a JSON body. */
+type PostPath = {
+  [P in keyof ApiRoutes]: ApiRoutes[P]["method"] extends "POST" ? P : never;
+}[keyof ApiRoutes];
+
+/** What a route answers, with the job id a tracked route adds. */
+type Answer<P extends keyof ApiRoutes> = ApiRoutes[P]["tracked"] extends true
+  ? ApiRoutes[P]["response"] & JobStamped
+  : ApiRoutes[P]["response"];
 
 let token = "";
 
@@ -64,24 +120,36 @@ async function readJson<T>(response: Response): Promise<T> {
   }
 }
 
-/** Fetch the session token and starter program. */
+/**
+ * Fetch the session token and starter program, and check the contract version.
+ *
+ * Throws {@link ApiVersionMismatch} before anything else can use the session
+ * when the server speaks a different version: every later response would be
+ * read with types that do not describe it.
+ */
 export async function startSession(): Promise<SessionResponse> {
   const response = await fetch("/api/session");
   if (!response.ok) throw new Error(`Could not start a session (${response.status}).`);
   const session = await readJson<SessionResponse>(response);
+  const mismatch = apiVersionMismatch(session.api_version);
+  if (mismatch) throw new ApiVersionMismatch(mismatch);
   token = session.token;
   markSessionReady();
   return session;
 }
 
-async function post<T>(path: string, body: unknown, signal?: AbortSignal): Promise<T> {
+async function post<P extends PostPath>(
+  path: P,
+  body: ApiRoutes[P]["request"],
+  signal?: AbortSignal,
+): Promise<Answer<P>> {
   const response = await fetch(path, {
     method: "POST",
     headers: { "Content-Type": "application/json", "X-Cadjoint-Token": token },
     body: JSON.stringify(body),
     signal,
   });
-  return readJson<T>(response);
+  return readJson<Answer<P>>(response);
 }
 
 /**
@@ -103,23 +171,16 @@ export async function compile(
   source: string,
   options: RequestOptions = {},
 ): Promise<CompileResponse & JobStamped> {
-  return post<CompileResponse & JobStamped>(
-    "/compile",
+  return post(
+    "/api/compile",
     { source, ...(options.clientId ? { client_id: options.clientId } : {}) },
     options.signal,
   );
 }
 
-/**
- * Apply one edit to the program text.
- *
- * Operations differ in shape — a vertex edit needs an index, a placement edit
- * needs an argument name — so the body is passed through as given.
- */
-export async function patch(
-  body: { source: string; op?: PatchOperation | string } & Record<string, unknown>,
-): Promise<PatchResponse> {
-  return post<PatchResponse>("/patch", body);
+/** Apply one edit to the program text. */
+export async function patch(body: PatchRequest): Promise<PatchResponse> {
+  return post("/api/patch", body);
 }
 
 /**
@@ -132,8 +193,26 @@ export async function mesh(
   source: string,
   options: RequestOptions = {},
 ): Promise<MeshResponse & JobStamped> {
-  return post<MeshResponse & JobStamped>(
+  return post(
     "/api/mesh",
+    { source, ...(options.clientId ? { client_id: options.clientId } : {}) },
+    options.signal,
+  );
+}
+
+/**
+ * Derive the scene's B-rep through the private tier, for the inspector.
+ *
+ * A registered job like `mesh`: lazy, cancellable by `clientId`, and only
+ * asked for while the inspector is on. Without the private tier the answer
+ * is still `ok`, with `brep.available` false and `brep.reason` saying why.
+ */
+export async function brep(
+  source: string,
+  options: RequestOptions = {},
+): Promise<BrepResponse & JobStamped> {
+  return post(
+    "/api/brep",
     { source, ...(options.clientId ? { client_id: options.clientId } : {}) },
     options.signal,
   );
@@ -155,26 +234,19 @@ export async function meshRefresh(
   values: Record<string, number[]>,
   certify: boolean,
 ): Promise<MeshRefreshResponse> {
-  return post<MeshRefreshResponse>("/api/mesh_refresh", { source, values, certify });
+  return post("/api/mesh_refresh", { source, values, certify });
 }
 
 /**
- * Mesh the scene into hexahedra and run (or just probe) a FEM simulation.
+ * Run a study declared in the program; the declaration owns mesh and BCs.
  *
  * Errors come back in the body — including `error_kind: "fem_unavailable"`
  * when the optional jax-fem extra is missing — so callers can render them.
  */
-export async function simulate(
+export async function simulateStudy(
   body: SimulateRequest,
 ): Promise<SimulateResponse & JobStamped> {
-  return post<SimulateResponse & JobStamped>("/api/simulate", body);
-}
-
-/** Run a study declared in the program; the declaration owns mesh and BCs. */
-export async function simulateStudy(
-  body: SimulateStudyRequest,
-): Promise<SimulateResponse & JobStamped> {
-  return post<SimulateResponse & JobStamped>("/api/simulate", body);
+  return post("/api/simulate", body);
 }
 
 /** Build a declared SimMesh and return its quality report + surface. */
@@ -182,7 +254,7 @@ export async function meshInspect(
   source: string,
   name: string,
 ): Promise<MeshInspectResponse & JobStamped> {
-  return post<MeshInspectResponse & JobStamped>("/api/mesh_inspect", { source, name });
+  return post("/api/mesh_inspect", { source, name });
 }
 
 /**
@@ -258,7 +330,7 @@ export async function optimize(
  * Lines are 1-based and columns 0-based; see `LintDiagnostic`.
  */
 export async function lint(source: string): Promise<LintResponse> {
-  return post<LintResponse>("/api/lint", { source });
+  return post("/api/lint", { source });
 }
 
 /** Completions at a caret (1-based `line`, 0-based `column`). */
@@ -267,7 +339,7 @@ export async function complete(
   line: number,
   column: number,
 ): Promise<CompleteResponse> {
-  return post<CompleteResponse>("/api/complete", { source, line, column });
+  return post("/api/complete", { source, line, column });
 }
 
 /** The signature of the call the caret sits inside, if it sits inside one. */
@@ -276,20 +348,12 @@ export async function signature(
   line: number,
   column: number,
 ): Promise<SignatureResponse> {
-  return post<SignatureResponse>("/api/signature", { source, line, column });
-}
-
-/** What the server says about the file beside the bytes (`X-Cadjoint-Export`). */
-export interface ExportReport {
-  format?: string;
-  name?: string;
-  size?: number;
-  report?: Record<string, unknown>;
+  return post("/api/signature", { source, line, column });
 }
 
 /** What `exportFile` came back with: the file, or why there is none. */
 export type ExportOutcome =
-  | { ok: true; blob: Blob; filename: string; jobId: string | null; report: ExportReport | null }
+  | { ok: true; blob: Blob; filename: string; jobId: string | null; report: ExportSummary | null }
   | { ok: false; error: string; errorKind: string | null; jobId: string | null };
 
 /**
@@ -310,7 +374,7 @@ export async function exportFile(body: ExportRequest): Promise<ExportOutcome> {
   const jobId = response.headers.get("X-Cadjoint-Job") || null;
   const type = response.headers.get("Content-Type") ?? "";
   if (!response.ok || type.startsWith("application/json")) {
-    const failure = await readJson<{ error?: string; error_kind?: string }>(response);
+    const failure = await readJson<Partial<Failure>>(response);
     return {
       ok: false,
       error: failure.error ?? `Export failed (${response.status}).`,
@@ -321,10 +385,10 @@ export async function exportFile(body: ExportRequest): Promise<ExportOutcome> {
   const blob = await response.blob();
   const disposition = response.headers.get("Content-Disposition");
   const filename = /filename="([^"]+)"/.exec(disposition ?? "")?.[1] ?? `export.${body.format}`;
-  let report: ExportReport | null = null;
+  let report: ExportSummary | null = null;
   try {
     const raw = response.headers.get("X-Cadjoint-Export");
-    report = raw ? (JSON.parse(raw) as ExportReport) : null;
+    report = raw ? (JSON.parse(raw) as ExportSummary) : null;
   } catch {
     report = null;
   }
@@ -339,7 +403,7 @@ export async function listScenes(): Promise<SceneListResponse> {
 
 /** Read one saved scene file. */
 export async function loadScene(name: string): Promise<SceneLoadResponse> {
-  return post<SceneLoadResponse>("/api/scenes/load", { name });
+  return post("/api/scenes/load", { name });
 }
 
 /** Write one scene file into the server's `scenes` workspace. */
@@ -347,7 +411,7 @@ export async function saveScene(
   name: string,
   source: string,
 ): Promise<SceneSaveResponse> {
-  return post<SceneSaveResponse>("/api/scenes/save", { name, source });
+  return post("/api/scenes/save", { name, source });
 }
 
 // ── the job registry ───────────────────────────────────────────────────────
@@ -373,8 +437,8 @@ export async function jobDetail(jobId: string): Promise<JobDetail | null> {
     headers: { "X-Cadjoint-Token": token },
   });
   if (!response.ok) return null;
-  const body = await readJson<{ ok: boolean; job?: JobDetail }>(response);
-  return body.job ?? null;
+  const body = await readJson<JobDetailResponse>(response);
+  return body.ok ? body.job : null;
 }
 
 /** What `fetchJobResult` found: the payload, or why there is none. */
@@ -450,8 +514,8 @@ export async function cancelClientJobs(clientId: string): Promise<number> {
       body: JSON.stringify({ client_id: clientId }),
     });
     if (!response.ok) return 0;
-    const body = await readJson<{ cancelled?: string[] }>(response);
-    return body.cancelled?.length ?? 0;
+    const body = await readJson<CancelClientResponse>(response);
+    return body.ok ? body.cancelled.length : 0;
   } catch {
     // A cancel is an optimization: the caller's revision guard is what keeps
     // the answer from being applied, and that needs no server at all.

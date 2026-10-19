@@ -35,6 +35,7 @@ import { removalLabel } from "./shell/removal";
 import "./shell/layoutGrid.css";
 import { RenderSettingsButton } from "./components/viewer/RenderSettingsButton";
 import { ViewerPane } from "./components/ViewerPane";
+import { createBrepCycle } from "./shell/brepCycle";
 import { createCompileCycle } from "./shell/compileCycle";
 import { createPatchOperations } from "./shell/patchOperations";
 import { createRenderState } from "./shell/renderState";
@@ -160,6 +161,11 @@ export function App() {
     history,
     display: render.display,
   });
+  createBrepCycle({
+    display: render.display,
+    compiledSource: compile.compiledSource,
+    disable: () => render.applyDisplay({ showBrep: false }),
+  });
   /**
    * The last removal, while the source is still the one it produced (F7).
    * Named here because every edit goes through `applyPatch`.
@@ -276,7 +282,13 @@ export function App() {
       setSource(session.example);
       await compile.run();
     } catch (error) {
-      setStatus({ kind: "error", text: "Could not reach the playground server." });
+      setStatus({
+        kind: "error",
+        text:
+          error instanceof api.ApiVersionMismatch
+            ? "This page and the playground server are from different versions — see the console."
+            : "Could not reach the playground server.",
+      });
       setConsoleText(error instanceof Error ? error.message : String(error));
     }
   });

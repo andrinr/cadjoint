@@ -28,6 +28,7 @@ from jax import Array
 from cadjoint.construction.faces import FaceSet, attach_faces, primitive_faces
 from cadjoint.fluent import Fluent
 from cadjoint.geometry.parameters import Scalar, Vector
+from cadjoint.provenance import record_placement, records_construction
 
 # Points per full circle when tracing a curved silhouette.
 _CIRCLE_SEGMENTS = 48
@@ -105,6 +106,7 @@ def _default_name(kind: str) -> str:
     return kind if count == 1 else f"{kind}_{count}"
 
 
+@records_construction
 class ConstructionPrimitive(Fluent):
     """A primitive with an editable placement, mirroring the SDF it generates.
 
@@ -219,7 +221,9 @@ class ConstructionPrimitive(Fluent):
         for axis, angle in zip("xyz", self.rotation):
             if float(angle.value) != 0.0:
                 solid = Rotate(solid, axis=axis, angle=angle)
-        return attach_faces(Translate(solid, offset=self.position), self.faces)
+        placed = attach_faces(Translate(solid, offset=self.position), self.faces)
+        record_placement(self, placed)
+        return placed
 
     # ── outline ──────────────────────────────────────────────────────────────
 

@@ -259,12 +259,11 @@ export function OptimizeCards(props: OptimizeCardsProps) {
         // Stamped on every streamed event, so Cancel is live from step one.
         (id) => setJobId(id),
       );
-      if (response.error_kind === "cancelled") {
+      if (!response.ok) {
         // Stopping a run is a decision, not a failure: no notice, no toast.
-        return;
-      }
-      if (!response.ok || !response.source) {
-        setError(response.error ?? "The optimization failed.");
+        if (response.error_kind !== "cancelled") {
+          setError(response.error || "The optimization failed.");
+        }
         return;
       }
       setOptimizeRun({

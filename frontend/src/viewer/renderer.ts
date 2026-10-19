@@ -30,7 +30,7 @@ import type {
   GizmoMode,
   MeshEdgePayload,
   Selection,
-  SimulationMeshPayload,
+  SurfacePayload,
 } from "../types";
 import { gizmoScale, type AxisIndex } from "./gizmo";
 import {
@@ -350,6 +350,20 @@ export class Renderer {
   private meshSharpCount = 0;
   private meshEdges: MeshEdgePayload | null = null;
 
+  // The B-rep inspector (src/brep.ts packs these): the derived B-rep's own
+  // faces, drawn instead of the raymarched solid while it is shown, with its
+  // edges and vertices on top. Present only while there is something to show.
+  private brepFacePipeline: GPURenderPipeline | null = null;
+  private brepFaceBuffer: GPUBuffer | null = null;
+  private brepFaceCapacity = 0;
+  private brepFaceVertices = 0;
+  private brepEdgeBuffer: GPUBuffer | null = null;
+  private brepEdgeCapacity = 0;
+  private brepEdgeCount = 0;
+  private brepVertexBuffer: GPUBuffer | null = null;
+  private brepVertexCapacity = 0;
+  private brepVertexCount = 0;
+
   // FEM simulation surface: an indexed triangle mesh with a scalar per
   // vertex, drawn instead of the raymarched solid while simulation display
   // is on. Two bind groups share one pipeline: the base pass and the
@@ -374,7 +388,7 @@ export class Renderer {
   // an alternative nodal field, warped (deformed) positions, and a per-
   // vertex highlight tint for BC previews. Any change re-interleaves the
   // vertex buffer — tens of thousands of vertices, cheap enough per edit.
-  private simPayload: SimulationMeshPayload | null = null;
+  private simPayload: SurfacePayload | null = null;
   private simScalarOverride: readonly number[] | null = null;
   private simPositionOverride: readonly number[] | null = null;
   private simOverlay: Float32Array | null = null;
@@ -586,7 +600,86 @@ export class Renderer {
   }
 
   private displayFlags(): number {
-    return displayFlags(this.display, this._simulationActive);
+    // The inspector's faces replace the solid exactly as the FEM surface does.
+    return displayFlags(this.display, this._simulationActive || this.brepActive);
+  }
+
+  /** Whether the B-rep inspector's faces stand in for the raymarched solid. */
+  private get brepActive(): boolean {
+    return this.display.showBrep === true && this.brepFaceVertices > 0 && !this._simulationActive;
+  }
+
+  /**
+   * Replace the B-rep inspector's geometry (null clears it).
+   *
+   * Takes the packed arrays rather than the payload: colouring, the legend's
+   * hidden kinds and the hover are the inspector's business (src/brep.ts),
+   * and a hover is a re-pack of one buffer, not a new B-rep.
+   */
+  setBrep(
+    geometry: { faces: Float32Array; edges: Float32Array; vertices: Float32Array } | null,
+  ): void {
+    if (!this.device) return;
+    const faces = geometry?.faces ?? new Float32Array(0);
+    const edges = geometry?.edges ?? new Float32Array(0);
+    const vertices = geometry?.vertices ?? new Float32Array(0);
+    this.brepFaceVertices = faces.length / (FACE_STRIDE / 4);
+    this.brepEdgeCount = edges.length / (EDGE_STRIDE / 4);
+    this.brepVertexCount = vertices.length / (HANDLE_STRIDE / 4);
+    this.brepFaceBuffer = this.writeInstances(
+      this.brepFaceBuffer,
+      faces as Float32Array<ArrayBuffer>,
+      FACE_STRIDE,
+      (capacity) => (this.brepFaceCapacity = capacity),
+      this.brepFaceCapacity,
+      "B-rep faces",
+    );
+    this.brepEdgeBuffer = this.writeInstances(
+      this.brepEdgeBuffer,
+      edges as Float32Array<ArrayBuffer>,
+      EDGE_STRIDE,
+      (capacity) => (this.brepEdgeCapacity = capacity),
+      this.brepEdgeCapacity,
+      "B-rep edges",
+    );
+    this.brepVertexBuffer = this.writeInstances(
+      this.brepVertexBuffer,
+      vertices as Float32Array<ArrayBuffer>,
+      HANDLE_STRIDE,
+      (capacity) => (this.brepVertexCapacity = capacity),
+      this.brepVertexCapacity,
+      "B-rep vertices",
+    );
+    // The solid's visibility rides in the scene uniform's flags.
+    this.invalidate();
+  }
+
+  /**
+   * Draw the B-rep inspector: faces first (they write the depth the solid
+   * would have), then edges and vertices depth-tested against them. Always
+   * the tested variants — x-ray translucency belongs to the raymarched solid,
+   * which is not on screen.
+   */
+  private drawBrep(pass: GPURenderPassEncoder): void {
+    if (!this.brepActive || !this.brepFacePipeline || !this.brepFaceBuffer) return;
+    if (!this.overlayBindGroup || !this.meshOverlayBindGroup) return;
+    pass.setPipeline(this.brepFacePipeline);
+    pass.setBindGroup(0, this.overlayBindGroup);
+    pass.setVertexBuffer(0, this.brepFaceBuffer);
+    pass.draw(this.brepFaceVertices);
+    if (this.brepEdgeCount && this.brepEdgeBuffer && this.edgePipeline) {
+      // The mesh overlay's uniform: no casing, and the smaller nudge.
+      pass.setPipeline(this.edgePipeline.tested);
+      pass.setBindGroup(0, this.meshOverlayBindGroup);
+      pass.setVertexBuffer(0, this.brepEdgeBuffer);
+      pass.draw(6, this.brepEdgeCount);
+    }
+    if (this.brepVertexCount && this.brepVertexBuffer && this.handlePipeline) {
+      pass.setPipeline(this.handlePipeline.tested);
+      pass.setBindGroup(0, this.overlayBindGroup);
+      pass.setVertexBuffer(0, this.brepVertexBuffer);
+      pass.draw(6, this.brepVertexCount);
+    }
   }
 
   async init(canvas: HTMLCanvasElement): Promise<void> {
@@ -675,6 +768,7 @@ export class Renderer {
     this.edgePipeline = overlay.edgePipeline;
     this.facePipeline = overlay.facePipeline;
     this.handlePipeline = overlay.handlePipeline;
+    this.brepFacePipeline = overlay.brepFacePipeline;
     this.gizmoEdgePipeline = overlay.gizmoEdgePipeline;
     this.gizmoArrowPipeline = overlay.gizmoArrowPipeline;
     this.gizmoScalePipeline = overlay.gizmoScalePipeline;
@@ -715,7 +809,7 @@ export class Renderer {
   }
 
   /** Replace the FEM surface mesh (null clears it); resets view overrides. */
-  setSimulationMesh(payload: SimulationMeshPayload | null): void {
+  setSimulationMesh(payload: SurfacePayload | null): void {
     this.simIndexCount = 0;
     this.simHighlight = null;
     this.simOutlineBuffer?.destroy();
@@ -1757,7 +1851,9 @@ export class Renderer {
    * it always tests depth and is always occluded by the part standing on it.
    */
   private get seeThroughOverlays(): boolean {
-    return this.display.xray > 0;
+    // The inspector's faces are opaque: x-ray is the raymarched solid's, and
+    // a skeleton drawn through the B-rep would read as one of its edges.
+    return this.display.xray > 0 && !this.brepActive;
   }
 
   private drawOverlay(pass: GPURenderPassEncoder): void {
@@ -1954,7 +2050,11 @@ export class Renderer {
     };
     // The path tracer draws the SDF scene, which simulation display replaces.
     const tracing =
-      this.pathTracing && this.pathReady && !this.interacting && !this._simulationActive;
+      this.pathTracing &&
+      this.pathReady &&
+      !this.interacting &&
+      !this._simulationActive &&
+      !this.brepActive;
     /** Pixels the preview march ran at this frame; 0 when it did not run. */
     let previewPixels = 0;
 
@@ -2010,7 +2110,7 @@ export class Renderer {
       // A gesture on a scene too slow for the frame budget: raymarch into the
       // small targets, then let the upscale pass stand in for the preview
       // draw. The FEM surface is a mesh and draws at full size regardless.
-      const scale = this._simulationActive ? 1 : this.gestureScale;
+      const scale = this._simulationActive || this.brepActive ? 1 : this.gestureScale;
       if (scale < 1) {
         const size = this.ensureGestureTargets(scale);
         // The march derives its rays from `u.resolution`, so the small pass
@@ -2062,6 +2162,7 @@ export class Renderer {
       }
       previewPass.draw(3);
       this.drawSimulation(previewPass);
+      this.drawBrep(previewPass);
       // After every pass that writes depth, before every pass that does not:
       // the faceplate is occluded by the part and the FEM surface, and the
       // construction overlays are drawn on top of it.

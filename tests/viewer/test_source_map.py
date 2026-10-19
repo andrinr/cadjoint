@@ -50,13 +50,13 @@ class TestCaptureProfiles:
         assert len(captured) == 1
         assert captured[0][1] == 2
 
-    def test_restores_the_original_initialiser(self):
+    def test_records_nothing_once_the_block_exits(self):
         from cadjoint.construction.sketch import PolygonProfile
 
-        original = PolygonProfile.__init__
-        with capture_profiles(PLAYGROUND_FILENAME):
-            assert PolygonProfile.__init__ is not original
-        assert PolygonProfile.__init__ is original
+        with capture_profiles(PLAYGROUND_FILENAME) as captured:
+            inside = PolygonProfile([(0, 0), (1, 0), (0, 1)])
+        PolygonProfile([(0, 0), (2, 0), (0, 2)])
+        assert [obj for obj, _line in captured] == [inside]
 
 
 class TestLocateProfileCall:

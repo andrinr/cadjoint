@@ -4098,3 +4098,83 @@ button.icon {
     animation: none;
   }
 }
+
+/* ── B-rep inspector ──────────────────────────────────────────────────────
+   The scale readout's title block, pinned top-left while the inspector is
+   on, with the edge legend as a second sheet under it. The legend is the one
+   part of the card that takes the pointer: its rows are switches. */
+/* Right of the tool rail (16 + 42 px) and under the scale readout. */
+.brep-inspector {
+  position: absolute;
+  top: calc(var(--unit) * 12);
+  left: calc(var(--unit) * 17);
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap);
+  max-width: calc(100% - var(--unit) * 27);
+}
+
+.brep-inspector .title-block {
+  position: static;
+}
+
+/* Wider than the scale readout, and wrapping: a fallback reason is a
+   sentence, and an ellipsis would hide the one thing worth reading. */
+.brep-card {
+  grid-template-columns: calc(var(--unit) * 20) calc(var(--unit) * 56);
+}
+
+.brep-card dd {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.brep-inspector dd small,
+.brep-legend small {
+  color: var(--viewport-ink-2);
+}
+
+.brep-legend {
+  display: grid;
+  width: calc(var(--unit) * 76);
+  box-sizing: border-box;
+  padding: var(--gap) var(--inset);
+  border: var(--line);
+  background: var(--surface-viewport);
+  color: var(--viewport-ink);
+  font: var(--text-body);
+  letter-spacing: var(--track-body);
+}
+
+.brep-legend-row {
+  display: grid;
+  grid-template-columns: auto calc(var(--unit) * 4) 1fr auto;
+  gap: var(--gap);
+  align-items: center;
+  min-height: calc(var(--unit) * 6);
+  cursor: pointer;
+}
+
+.brep-legend-row input {
+  margin: 0;
+}
+
+.brep-legend-row small {
+  font-variant-numeric: tabular-nums;
+}
+
+/* A stroke, not a chip: the legend keys line tones. */
+.brep-swatch {
+  height: 2px;
+}
+
+.brep-off-surface {
+  margin-top: var(--gap);
+  padding-top: var(--gap);
+  border-top: var(--line);
+}
+
+.brep-alert {
+  color: var(--danger-ink);
+}

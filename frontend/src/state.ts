@@ -8,7 +8,9 @@
  */
 
 import { createSignal } from "solid-js";
+import type { BrepHover } from "./brep";
 import type {
+  BRepInspectionPayload,
   BcProposal,
   ConstructionNode,
   ConstructionRelation,
@@ -18,13 +20,13 @@ import type {
   MeshEdgePayload,
   MeshInspectInfo,
   OptimizationPayload,
-  OptimizeHistoryEntry,
-  OptimizeTrajectoryEntry,
+  OptimizeStep,
+  OptimizeFrame,
   Selection,
   SelectionMode,
   SimMeshPayload,
-  SimulationMeshPayload,
-  SimulationResultSummary,
+  SurfacePayload,
+  ResultSummary,
   StudyPayload,
   ToolMode,
 } from "./types";
@@ -103,7 +105,7 @@ export const [planePreview, setPlanePreview] = createSignal<{
  */
 export interface SimViewState {
   /** Render payload with the base (undeformed) vertex positions. */
-  payload: SimulationMeshPayload;
+  payload: SurfacePayload;
   info: MeshInspectInfo | null;
   /** Scalars currently mapped through the ramp (field, or mesh quality). */
   scalars: readonly number[];
@@ -127,8 +129,8 @@ export interface OptimizeSimulateResult {
   /** The optimization's name, for the results header. */
   name: string;
   field: string;
-  mesh: SimulationMeshPayload;
-  result: SimulationResultSummary | null;
+  mesh: SurfacePayload;
+  result: ResultSummary | null;
   meshInfo: MeshInspectInfo | null;
 }
 
@@ -144,8 +146,8 @@ export interface OptimizeRunState {
   name: string;
   /** The adopted program with the final literals written back. */
   source: string;
-  history: OptimizeHistoryEntry[];
-  trajectory: OptimizeTrajectoryEntry[];
+  history: OptimizeStep[];
+  trajectory: OptimizeFrame[];
   parameters: Record<string, number | number[]>;
   initial: Record<string, number | number[]>;
   /** The backing study's name for study-backed runs, else null. */
@@ -181,6 +183,20 @@ export interface SimProbe {
 
 export const [simProbe, setSimProbe] = createSignal<SimProbe | null>(null);
 export const [meshEdges, setMeshEdges] = createSignal<MeshEdgePayload | null>(null);
+
+/**
+ * The B-rep inspector (`src/brep.ts`): the last derived B-rep and where its
+ * request stands. `unavailable` is sticky for the session — the private tier
+ * does not appear mid-run — and is what greys the display switch out.
+ */
+export type BrepStatus = "idle" | "loading" | "ready" | "error" | "unavailable";
+export const [brepPayload, setBrepPayload] = createSignal<BRepInspectionPayload | null>(null);
+export const [brepStatus, setBrepStatus] = createSignal<BrepStatus>("idle");
+/** The failure or the missing-tier sentence, for the panel. */
+export const [brepMessage, setBrepMessage] = createSignal<string | null>(null);
+export const [brepHover, setBrepHover] = createSignal<BrepHover>(null);
+export const [brepHiddenKinds, setBrepHiddenKinds] = createSignal<ReadonlySet<string>>(new Set());
+export const [brepOffSurfaceOnly, setBrepOffSurfaceOnly] = createSignal(false);
 
 /**
  * The analytic face under the pointer while the face tool is armed.

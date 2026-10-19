@@ -28,7 +28,7 @@
  * a bug, not a nuance.
  */
 
-import type { StudyBcType } from "./types";
+import type { BoundaryConditionType } from "./types";
 
 // ── colour math ───────────────────────────────────────────────────────────
 // Kept here, with no runtime imports, so `tools/emit-tokens.ts` can load this
@@ -587,7 +587,7 @@ export const VIEWPORT_BACKGROUND: Rgb = [0.902, 0.902, 0.914];
  * paper, clear of both ramps' high ends, the proposal teal and every chrome
  * tone — held to those numbers by test/simColors.test.ts.
  */
-export const BC_TYPE_COLORS: Record<StudyBcType, Rgb> = {
+export const BC_TYPE_COLORS: Record<BoundaryConditionType, Rgb> = {
   dirichlet: [0.122, 0.482, 0.961],
   heat_flux: [0.753, 0.408, 0.114],
   fixed: [0.667, 0.322, 0.965],
@@ -613,6 +613,52 @@ export const ELEMENT_EDGE_COLOR_LIGHT: Rgb = hexToRgb(CHROME["surface-float"]);
 export const SDF_INSIDE: Rgb = [0.3924, 0.0015, 0.9925];
 export const SDF_OUTSIDE: Rgb = [0.5398, 0.3384, 0.0033];
 export const SDF_CENTRE: Rgb = VIEWPORT_BACKGROUND;
+
+/**
+ * The B-rep inspector's face palette (role: identity). Categorical, not a
+ * ramp: a face's colour says *which* face, never how much of anything, so —
+ * like the field ramp — it is data, and the one other place a hue is allowed
+ * inside the viewport rectangle. Nine light tones, each a step from its
+ * neighbours in hue, light enough that every edge tone below clears 3:1 on
+ * the darkest of them once shaded; neighbouring faces are given different
+ * entries by `colourFaces` (src/brep.ts). No grey: a grey face would read as
+ * the solid the inspector replaces.
+ */
+export const BREP_FACE_PALETTE: readonly Rgb[] = [
+  "#a0cbe8",
+  "#ffbe7d",
+  "#ff9d9a",
+  "#86bcb6",
+  "#8cd17d",
+  "#f1ce63",
+  "#d4a6c8",
+  "#fabfd2",
+  "#d7b5a6",
+].map(hexToRgb);
+
+/**
+ * How the inspector strokes an edge, by the kind the private tier gave it.
+ *
+ * Keyed by the tier's own vocabulary and open-ended: a kind missing here
+ * (a new edge state) is drawn in `other` and listed under its own name in
+ * the legend, so the inspector never hides an edge for not knowing its word.
+ * `traced` is the exact curve the feature-edge overlay draws, so it takes
+ * ink; everything that is *not* drawn as a crease takes a hue, so the eye
+ * goes to what the overlay would get wrong.
+ */
+export const BREP_EDGE_TONES: Record<string, { token: ChromeToken; label: string }> = {
+  traced: { token: "ink", label: "Traced" },
+  sampled: { token: "accent-press", label: "Sampled" },
+  undrawn: { token: "danger", label: "Undrawn crossing" },
+  blend: { token: "param", label: "Blend boundary" },
+  tangent: { token: "ok", label: "Tangent" },
+  coincident: { token: "construction-locked", label: "Coincident" },
+  contact: { token: "construction-locked", label: "Contact" },
+  other: { token: "ink-3", label: "Other" },
+};
+
+/** The inspector's off-surface highlight: the offending edges, at full strength. */
+export const BREP_OFF_SURFACE: ChromeToken = "danger-ink";
 
 // ── viewport overlays ─────────────────────────────────────────────────────
 

@@ -313,7 +313,7 @@ the settings under the selected preset, with Save and Reset.
 | Resolution | Draft, High, Ultra |
 | Marching | Step cap, Refine hit |
 | Diagnostics | Bounds culling |
-| Effects | Path tracing, X-ray, Reflections, Hide solid, Feature edges, Mesh wireframe |
+| Effects | Path tracing, X-ray, Reflections, Hide solid, Feature edges, Mesh wireframe, B-rep inspector |
 | Annotations | Ground grid, Construction overlay, Sketch geometry, All sketch planes, Constraints (Fixed badges, Distance dimensions, Dimension values) |
 
 ### Distance-field views
@@ -351,6 +351,32 @@ curves exactly instead; the compile payload says which source drew them
 (`lattice` or `graph`).
 
 [![Feature edges drawn over the heat sink's creases and seams, with a mesh job counting in the toolbar's job chip](assets/screens/feature-edges.png)](assets/screens/feature-edges.png)
+
+### B-rep inspector
+
+**B-rep inspector** replaces the solid with the B-rep the private tier
+derived (the `brep` [plugin kind](plugins.qmd#the-five-in-process-kinds)), on
+the same 64³ grid, so an extraction can be judged by eye. Each face is drawn
+from the extraction's own tessellation in a categorical colour that no
+neighbour shares. Edges are stroked by kind: `traced` and `sampled` are the
+curves the feature-edge overlay draws, and every other boundary chain the
+graph built keeps its own state (`blend`, `tangent`, `coincident`, …, or
+`undrawn` for a crossing the overlay dropped). A kind the viewer has no tone
+for is drawn in grey under its own name. Vertices are dots.
+
+The card in the top-left corner gives the counts and the path. That is
+`Exact · analytic`, or the dual-contouring fallback with the reason the exact
+path refused. Hovering a face shows its id, surface type (plane, cylinder,
+sphere, cone, blend or faceted) and owning patch. Hovering an edge shows its
+faces and how far it lies off the solid. Hovering a vertex shows its position.
+**Highlight off-surface** marks the edges whose points sit more than a tenth
+of a cell off the scene's zero set, which is how a curve under a smooth
+blend gives itself away. Each legend row is a switch that hides its kind.
+
+The B-rep is requested lazily through `POST /api/brep` and only while the
+inspector is on. Without diff-brep the switch is greyed out with the reason;
+when the extraction raises, the card prints the exception and the frame it
+came from, and the solid stays on screen.
 
 ### Quality and path tracing
 
@@ -451,15 +477,25 @@ The server warms the cache for the scene it opens. See
 [program size](meshing.qmd#program-size) and the
 [performance notes](https://github.com/andrinr/cadjoint/blob/main/research/performance.md).
 
-**Source patches.** Every edit is a `/patch` request that rewrites a span of
+**Source patches.** Every edit is a `/api/patch` request that rewrites a span of
 the source; there are 28 operations. Each addressable thing carries a **stable
 id** derived from its AST path and the name the program gave it —
 `assign:comb_profile`, `call:extrude@comb_profile`, `box:block`,
 `bc:sink-conduction[1]`, `face:sink:cap+` — so an edit elsewhere in the file
 cannot redirect a patch; only an object with neither a variable nor a `name=`
-falls back to an ordinal `#<n>`. The payload is defined as pydantic models in
-`cadjoint/viewer/schema/`, which validate every response and generate
-`payloads.d.ts` (`python -m cadjoint.viewer.schema.emit`).
+falls back to an ordinal `#<n>`.
+
+**The contract.** Every request and response of every route, and every
+message between the server and its worker process, is a pydantic model in
+`cadjoint/viewer/schema/`; `api.ROUTES` lists the routes. The server checks
+each worker reply against its model before a route answers (a mismatch comes
+back as `error_kind: "contract"` rather than reaching the browser), and the
+frontend's types are generated from the same models into `payloads.d.ts`
+(`python -m cadjoint.viewer.schema.emit`). The contract is versioned:
+`GET /api/session` reports `api_version`, every response carries it in
+`X-Cadjoint-Api`, and a page built for another version says so instead of
+misreading the server. `/compile` and `/patch` moved to `/api/compile` and
+`/api/patch`; the old paths still answer.
 `tests/viewer/test_parity_roundtrip.py` checks that every operation's result
 parses, is deterministic and shows exactly the requested change, and that
 every `set_*` is idempotent.
