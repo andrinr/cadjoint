@@ -14,13 +14,21 @@ Command line::
 from __future__ import annotations
 
 from .kernels import NODE_TYPES, POLYGON_BUCKETS, kernel_sets
-from .scene import SCENE_FORMAT, SCENE_VERSION, UnsupportedNode, graph_sdf, scene_graph
+from .scene import (
+    SCENE_FORMAT,
+    SCENE_VERSION,
+    SCENE_VERSIONS,
+    UnsupportedNode,
+    graph_sdf,
+    scene_graph,
+)
 
 __all__ = [
     "NODE_TYPES",
     "POLYGON_BUCKETS",
     "SCENE_FORMAT",
     "SCENE_VERSION",
+    "SCENE_VERSIONS",
     "UnsupportedNode",
     "graph_sdf",
     "kernels_ts",

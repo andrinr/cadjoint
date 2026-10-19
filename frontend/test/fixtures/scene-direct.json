@@ -1,0 +1,3082 @@
+{
+ "cases": [
+  {
+   "label": "covered",
+   "graph": {
+    "format": "cadjoint-scene",
+    "version": 2,
+    "root": {
+     "type": "difference",
+     "params": {
+      "smoothness": 0.019999999552965164
+     },
+     "id": "n0",
+     "children": [
+      {
+       "type": "intersection",
+       "params": {
+        "smoothness": 0.0
+       },
+       "id": "n1",
+       "children": [
+        {
+         "type": "union",
+         "params": {
+          "smoothness": 0.05000000074505806
+         },
+         "id": "n2",
+         "children": [
+          {
+           "type": "translate",
+           "params": {
+            "offset": [
+             1.0,
+             0.0,
+             0.0
+            ]
+           },
+           "id": "n3",
+           "free": {
+            "offset": "shift"
+           },
+           "children": [
+            {
+             "type": "sphere",
+             "params": {
+              "radius": 0.30000001192092896
+             },
+             "id": "n4",
+             "free": {
+              "radius": "radius"
+             },
+             "material": {
+              "color": [
+               1.0,
+               1.0,
+               1.0
+              ],
+              "roughness": 0.5,
+              "metallic": 0.0,
+              "opacity": 1.0,
+              "ior": 1.0,
+              "reflectivity": 0.0
+             },
+             "children": []
+            }
+           ]
+          },
+          {
+           "type": "rotate",
+           "params": {
+            "axis": [
+             0.0,
+             1.0,
+             0.0
+            ],
+            "angle": 0.4000000059604645
+           },
+           "id": "n5",
+           "children": [
+            {
+             "type": "box",
+             "params": {
+              "size": [
+               0.30000001192092896,
+               0.20000000298023224,
+               0.25
+              ]
+             },
+             "id": "n6",
+             "material": {
+              "color": [
+               0.6000000238418579,
+               0.6200000047683716,
+               0.6499999761581421
+              ],
+              "roughness": 0.30000001192092896,
+              "metallic": 1.0,
+              "opacity": 1.0,
+              "ior": 1.0,
+              "reflectivity": 0.0
+             },
+             "children": []
+            }
+           ]
+          },
+          {
+           "type": "rotate",
+           "params": {
+            "axis": [
+             1.0,
+             1.0,
+             0.30000001192092896
+            ],
+            "angle": -1.100000023841858
+           },
+           "id": "n7",
+           "children": [
+            {
+             "type": "cylinder",
+             "params": {
+              "radius": 0.20000000298023224,
+              "height": 0.5
+             },
+             "id": "n8",
+             "material": {
+              "color": [
+               1.0,
+               1.0,
+               1.0
+              ],
+              "roughness": 0.5,
+              "metallic": 0.0,
+              "opacity": 1.0,
+              "ior": 1.0,
+              "reflectivity": 0.0
+             },
+             "children": []
+            }
+           ]
+          },
+          {
+           "type": "capsule",
+           "params": {
+            "radius": 0.15000000596046448,
+            "height": 0.4000000059604645
+           },
+           "id": "n9",
+           "free": {
+            "radius": "capsule_r"
+           },
+           "material": {
+            "color": [
+             1.0,
+             1.0,
+             1.0
+            ],
+            "roughness": 0.5,
+            "metallic": 0.0,
+            "opacity": 1.0,
+            "ior": 1.0,
+            "reflectivity": 0.0
+           },
+           "children": []
+          },
+          {
+           "type": "mirror",
+           "params": {
+            "origin": [
+             0.0,
+             0.0,
+             0.0
+            ],
+            "normal": [
+             1.0,
+             0.0,
+             0.0
+            ]
+           },
+           "id": "n10",
+           "children": [
+            {
+             "type": "translate",
+             "params": {
+              "offset": [
+               0.5,
+               0.5,
+               0.0
+              ]
+             },
+             "id": "n11",
+             "children": [
+              {
+               "type": "torus",
+               "params": {
+                "major_radius": 0.30000001192092896,
+                "minor_radius": 0.07999999821186066
+               },
+               "id": "n12",
+               "material": {
+                "color": [
+                 1.0,
+                 1.0,
+                 1.0
+                ],
+                "roughness": 0.5,
+                "metallic": 0.0,
+                "opacity": 1.0,
+                "ior": 1.0,
+                "reflectivity": 0.0
+               },
+               "children": []
+              }
+             ]
+            }
+           ]
+          },
+          {
+           "type": "offset",
+           "params": {
+            "distance": 0.019999999552965164
+           },
+           "id": "n13",
+           "children": [
+            {
+             "type": "extruded_polygon",
+             "params": {
+              "depth": 0.30000001192092896,
+              "draft": 0.0,
+              "twist": 0.0,
+              "vertices": [
+               [
+                0.4000000059604645,
+                0.0
+               ],
+               [
+                0.20000000298023224,
+                0.3464101552963257
+               ],
+               [
+                -0.20000000298023224,
+                0.3464101552963257
+               ],
+               [
+                -0.4000000059604645,
+                4.8985870794684264e-17
+               ],
+               [
+                -0.20000000298023224,
+                -0.3464101552963257
+               ],
+               [
+                0.20000000298023224,
+                -0.3464101552963257
+               ]
+              ]
+             },
+             "id": "n14",
+             "free": {
+              "vertices": [
+               null,
+               "hex1",
+               null,
+               null,
+               null,
+               null
+              ],
+              "depth": "d"
+             },
+             "implicit": [
+              "draft",
+              "twist"
+             ],
+             "material": {
+              "color": [
+               1.0,
+               1.0,
+               1.0
+              ],
+              "roughness": 0.5,
+              "metallic": 0.0,
+              "opacity": 1.0,
+              "ior": 1.0,
+              "reflectivity": 0.0
+             },
+             "children": []
+            }
+           ]
+          },
+          {
+           "type": "shell",
+           "params": {
+            "thickness": 0.05000000074505806
+           },
+           "id": "n15",
+           "children": [
+            {
+             "type": "extruded_polygon",
+             "params": {
+              "depth": 0.30000001192092896,
+              "draft": 5.0,
+              "twist": 30.0,
+              "vertices": [
+               [
+                0.4000000059604645,
+                0.0
+               ],
+               [
+                0.2493959218263626,
+                0.31273260712623596
+               ],
+               [
+                -0.0890083760023117,
+                0.38997116684913635
+               ],
+               [
+                -0.36038753390312195,
+                0.1735534965991974
+               ],
+               [
+                -0.36038753390312195,
+                -0.1735534965991974
+               ],
+               [
+                -0.0890083760023117,
+                -0.38997116684913635
+               ],
+               [
+                0.2493959218263626,
+                -0.31273260712623596
+               ]
+              ]
+             },
+             "id": "n16",
+             "material": {
+              "color": [
+               1.0,
+               1.0,
+               1.0
+              ],
+              "roughness": 0.5,
+              "metallic": 0.0,
+              "opacity": 1.0,
+              "ior": 1.0,
+              "reflectivity": 0.0
+             },
+             "children": []
+            }
+           ]
+          },
+          {
+           "type": "revolved_polygon",
+           "params": {
+            "offset": 0.10000000149011612,
+            "vertices": [
+             [
+              0.20000000298023224,
+              -0.20000000298023224
+             ],
+             [
+              0.3499999940395355,
+              -0.20000000298023224
+             ],
+             [
+              0.3499999940395355,
+              0.20000000298023224
+             ],
+             [
+              0.20000000298023224,
+              0.20000000298023224
+             ]
+            ]
+           },
+           "id": "n17",
+           "material": {
+            "color": [
+             1.0,
+             1.0,
+             1.0
+            ],
+            "roughness": 0.5,
+            "metallic": 0.0,
+            "opacity": 1.0,
+            "ior": 1.0,
+            "reflectivity": 0.0
+           },
+           "children": []
+          },
+          {
+           "type": "lofted_polygon",
+           "params": {
+            "height": 0.6000000238418579,
+            "vertices": [
+             [
+              -0.30000001192092896,
+              -0.30000001192092896
+             ],
+             [
+              0.30000001192092896,
+              -0.30000001192092896
+             ],
+             [
+              0.30000001192092896,
+              0.30000001192092896
+             ],
+             [
+              -0.30000001192092896,
+              0.30000001192092896
+             ]
+            ],
+            "vertices_b": [
+             [
+              -0.15000000596046448,
+              -0.15000000596046448
+             ],
+             [
+              0.15000000596046448,
+              -0.15000000596046448
+             ],
+             [
+              0.15000000596046448,
+              0.15000000596046448
+             ],
+             [
+              -0.15000000596046448,
+              0.15000000596046448
+             ]
+            ]
+           },
+           "id": "n18",
+           "material": {
+            "color": [
+             1.0,
+             1.0,
+             1.0
+            ],
+            "roughness": 0.5,
+            "metallic": 0.0,
+            "opacity": 1.0,
+            "ior": 1.0,
+            "reflectivity": 0.0
+           },
+           "children": []
+          },
+          {
+           "type": "linear_pattern",
+           "params": {
+            "direction": [
+             1.0,
+             1.0,
+             0.0
+            ],
+            "spacing": 0.30000001192092896,
+            "count": 5,
+            "skip_mask": 4
+           },
+           "id": "n19",
+           "children": [
+            {
+             "type": "sphere",
+             "params": {
+              "radius": 0.10000000149011612
+             },
+             "id": "n20",
+             "material": {
+              "color": [
+               1.0,
+               1.0,
+               1.0
+              ],
+              "roughness": 0.5,
+              "metallic": 0.0,
+              "opacity": 1.0,
+              "ior": 1.0,
+              "reflectivity": 0.0
+             },
+             "children": []
+            }
+           ]
+          },
+          {
+           "type": "polar_pattern",
+           "params": {
+            "origin": [
+             0.0,
+             0.0,
+             0.0
+            ],
+            "direction": [
+             0.0,
+             0.0,
+             1.0
+            ],
+            "count": 6,
+            "skip_mask": 16
+           },
+           "id": "n21",
+           "children": [
+            {
+             "type": "translate",
+             "params": {
+              "offset": [
+               0.6000000238418579,
+               0.0,
+               0.0
+              ]
+             },
+             "id": "n22",
+             "children": [
+              {
+               "type": "box",
+               "params": {
+                "size": [
+                 0.05000000074505806,
+                 0.05000000074505806,
+                 0.30000001192092896
+                ]
+               },
+               "id": "n23",
+               "material": {
+                "color": [
+                 1.0,
+                 1.0,
+                 1.0
+                ],
+                "roughness": 0.5,
+                "metallic": 0.0,
+                "opacity": 1.0,
+                "ior": 1.0,
+                "reflectivity": 0.0
+               },
+               "children": []
+              }
+             ]
+            }
+           ]
+          },
+          {
+           "type": "translate",
+           "params": {
+            "offset": [
+             0.0,
+             0.0,
+             0.5
+            ]
+           },
+           "id": "n24",
+           "children": [
+            {
+             "type": "sphere",
+             "params": {
+              "radius": 0.30000001192092896
+             },
+             "id": "n25",
+             "free": {
+              "radius": "radius"
+             },
+             "material": {
+              "color": [
+               0.800000011920929,
+               0.20000000298023224,
+               0.10000000149011612
+              ],
+              "roughness": 0.6000000238418579,
+              "metallic": 0.0,
+              "opacity": 1.0,
+              "ior": 1.0,
+              "reflectivity": 0.03999999910593033
+             },
+             "children": []
+            }
+           ]
+          },
+          {
+           "type": "mirror",
+           "params": {
+            "origin": [
+             0.0,
+             0.0,
+             0.0
+            ],
+            "normal": [
+             0.0,
+             0.0,
+             1.0
+            ]
+           },
+           "id": "n26",
+           "children": [
+            {
+             "type": "translate",
+             "params": {
+              "offset": [
+               0.0,
+               0.0,
+               0.5
+              ]
+             },
+             "id": "n24",
+             "children": [
+              {
+               "type": "sphere",
+               "params": {
+                "radius": 0.30000001192092896
+               },
+               "id": "n25",
+               "free": {
+                "radius": "radius"
+               },
+               "material": {
+                "color": [
+                 0.800000011920929,
+                 0.20000000298023224,
+                 0.10000000149011612
+                ],
+                "roughness": 0.6000000238418579,
+                "metallic": 0.0,
+                "opacity": 1.0,
+                "ior": 1.0,
+                "reflectivity": 0.03999999910593033
+               },
+               "children": []
+              }
+             ]
+            }
+           ]
+          }
+         ]
+        },
+        {
+         "type": "box",
+         "params": {
+          "size": [
+           1.2000000476837158,
+           1.2000000476837158,
+           0.800000011920929
+          ]
+         },
+         "id": "n27",
+         "material": {
+          "color": [
+           1.0,
+           1.0,
+           1.0
+          ],
+          "roughness": 0.5,
+          "metallic": 0.0,
+          "opacity": 1.0,
+          "ior": 1.0,
+          "reflectivity": 0.0
+         },
+         "children": []
+        }
+       ]
+      },
+      {
+       "type": "translate",
+       "params": {
+        "offset": [
+         0.0,
+         0.0,
+         0.699999988079071
+        ]
+       },
+       "id": "n28",
+       "children": [
+        {
+         "type": "sphere",
+         "params": {
+          "radius": 0.20000000298023224
+         },
+         "id": "n29",
+         "material": {
+          "color": [
+           1.0,
+           1.0,
+           1.0
+          ],
+          "roughness": 0.5,
+          "metallic": 0.0,
+          "opacity": 1.0,
+          "ior": 1.0,
+          "reflectivity": 0.0
+         },
+         "children": []
+        }
+       ]
+      }
+     ]
+    }
+   },
+   "uniforms": true,
+   "culling": true,
+   "wgsl": "// 57 free parameters, one vec4<f32> slot each.\n//      0  3f  free   shift\n//     16  1f  free   radius\n//     32  1f  free   capsule_r\n//     48  2f  free   sketch0.v0\n//     64  2f  free   hex1\n//     80  2f  free   sketch0.v2\n//     96  2f  free   sketch0.v3\n//    112  2f  free   sketch0.v4\n//    128  2f  free   sketch0.v5\n//    144  1f  free   d\n//    160  2f  free   sketch1.v0\n//    176  2f  free   sketch1.v1\n//    192  2f  free   sketch1.v2\n//    208  2f  free   sketch1.v3\n//    224  2f  free   sketch1.v4\n//    240  2f  free   sketch1.v5\n//    256  2f  free   sketch1.v6\n//    272  2f  free   sketch2.v0\n//    288  2f  free   sketch2.v1\n//    304  2f  free   sketch2.v2\n//    320  2f  free   sketch2.v3\n//    336  2f  free   sketch3.v0\n//    352  2f  free   sketch3.v1\n//    368  2f  free   sketch3.v2\n//    384  2f  free   sketch3.v3\n//    400  2f  free   sketch3.w0\n//    416  2f  free   sketch3.w1\n//    432  2f  free   sketch3.w2\n//    448  2f  free   sketch3.w3\n//    464  3f  free   __cull0.center\n//    480  3f  free   __cull0.half\n//    496  3f  free   __cull1.center\n//    512  3f  free   __cull1.half\n//    528  3f  free   __cull2.center\n//    544  3f  free   __cull2.half\n//    560  3f  free   __cull3.center\n//    576  3f  free   __cull3.half\n//    592  3f  free   __cull4.center\n//    608  3f  free   __cull4.half\n//    624  3f  free   __cull5.center\n//    640  3f  free   __cull5.half\n//    656  3f  free   __cull6.center\n//    672  3f  free   __cull6.half\n//    688  3f  free   __cull7.center\n//    704  3f  free   __cull7.half\n//    720  3f  free   __cull8.center\n//    736  3f  free   __cull8.half\n//    752  3f  free   __cull9.center\n//    768  3f  free   __cull9.half\n//    784  3f  free   __cull10.center\n//    800  3f  free   __cull10.half\n//    816  3f  free   __cull11.center\n//    832  3f  free   __cull11.half\n//    848  3f  free   __cull12.center\n//    864  3f  free   __cull12.half\n//    880  3f  free   __cull13.center\n//    896  3f  free   __cull13.half\n//    912  1f  reserved  NaN (unread)\n//    928  1f  reserved  cull margin\nstruct SdfParameters {\n    values: array<vec4<f32>, 59>,\n};\n@group(3) @binding(0) var<storage, read> sdf_parameters: SdfParameters;\n\nfn prim_sphere(p: vec3<f32>, radius: f32) -> f32 {\n    return length(p) - radius;\n}\n\nfn node4(p: vec3<f32>) -> f32 {\n    return prim_sphere(p, sdf_parameters.values[1].x);\n}\n\nfn node3(p: vec3<f32>) -> f32 {\n    return node4(p - sdf_parameters.values[0].xyz);\n}\n\nfn prim_box(p: vec3<f32>, size: vec3<f32>) -> f32 {\n    let q = abs(p) - size;\n    let max_q = max(q.x, max(q.y, q.z));\n    let clamped = max(q, vec3<f32>(0.0));\n    let squared = dot(clamped, clamped);\n    if (max_q <= 0.0) { return max_q; }\n    return sqrt(squared);\n}\n\nfn node6(p: vec3<f32>) -> f32 {\n    return prim_box(p, vec3<f32>(0.300000012, 0.200000003, 0.25));\n}\n\nfn node5(p: vec3<f32>) -> f32 {\n    return node6(mat3x3<f32>(vec3<f32>(0.921060979, 0, 0.389418334), vec3<f32>(0, 1, 0), vec3<f32>(-0.389418334, 0, 0.921060979)) * p);\n}\n\nfn prim_cylinder(p: vec3<f32>, radius: f32, height: f32) -> f32 {\n    let d_xy = sqrt(p.x * p.x + p.y * p.y + 1e-20) - radius;\n    let d_z = abs(p.z) - height;\n    let max_d = max(d_xy, d_z);\n    if (max_d <= 0.0) { return max_d; }\n    let a = max(d_xy, 0.0);\n    let b = max(d_z, 0.0);\n    return sqrt(a * a + b * b);\n}\n\nfn node8(p: vec3<f32>) -> f32 {\n    return prim_cylinder(p, 0.200000003, 0.5);\n}\n\nfn node7(p: vec3<f32>) -> f32 {\n    return node8(mat3x3<f32>(vec3<f32>(0.715033352, 0.446375608, -0.53802985), vec3<f32>(0.0764989406, 0.715033352, 0.694892228), vec3<f32>(0.694892228, -0.53802985, 0.477125436)) * p);\n}\n\nfn prim_capsule(p: vec3<f32>, radius: f32, height: f32) -> f32 {\n    let z = clamp(p.z, -height, height);\n    return length(vec3<f32>(p.x, p.y, p.z - z)) - radius;\n}\n\nfn node9(p: vec3<f32>) -> f32 {\n    return prim_capsule(p, sdf_parameters.values[2].x, 0.400000006);\n}\n\nfn prim_torus(p: vec3<f32>, major_radius: f32, minor_radius: f32) -> f32 {\n    let q_xy = length(p.xy) - major_radius;\n    return length(vec2<f32>(q_xy, p.z)) - minor_radius;\n}\n\nfn node12(p: vec3<f32>) -> f32 {\n    return prim_torus(p, 0.300000012, 0.0799999982);\n}\n\nfn node11(p: vec3<f32>) -> f32 {\n    return node12(p - vec3<f32>(0.5, 0.5, 0));\n}\n\nfn node10(p: vec3<f32>) -> f32 {\n    let n = vec3<f32>(1, 0, 0);\n    return node11(p - 2.0 * dot(p - vec3<f32>(0, 0, 0), n) * n);\n}\n\nfn profile_vertex(i: u32) -> vec2<f32> {\n    return sdf_parameters.values[i].xy;\n}\n\nfn profile_distance(p: vec2<f32>, offset: u32, count: u32) -> f32 {\n    var d = dot(p - profile_vertex(offset), p - profile_vertex(offset));\n    var s = 1.0;\n    // The previous vertex is carried rather than re-read: one buffer load per\n    // edge instead of two, and no modulo. Edge for edge the same arithmetic.\n    var vj = profile_vertex(offset + count - 1u);\n    for (var i: u32 = 0u; i < count; i = i + 1u) {\n        let vi = profile_vertex(offset + i);\n        let e = vj - vi;\n        let w = p - vi;\n        let t = clamp(dot(w, e) / dot(e, e), 0.0, 1.0);\n        let b = w - e * t;\n        d = min(d, dot(b, b));\n        let c1 = p.y >= vi.y;\n        let c2 = p.y < vj.y;\n        let c3 = (e.x * w.y) > (e.y * w.x);\n        if ((c1 == c2) && (c2 == c3)) { s = -s; }\n        vj = vi;\n    }\n    return s * sqrt(d);\n}\n\nfn prim_extrudedpolygon(\n    p: vec3<f32>, offset: u32, count: u32, depth: f32, slope: f32, twist: f32\n) -> f32 {\n    // `slope` is tan(draft) and `twist` is radians over the full depth, both\n    // folded by the caller; zero is the plain extrusion and both terms\n    // vanish, matching the Python's static skips.\n    let theta = twist * p.z / depth;\n    let c = cos(theta);\n    let s = sin(theta);\n    let xy = vec2<f32>(p.x * c + p.y * s, p.y * c - p.x * s);\n    let d2 = profile_distance(xy, offset, count) + slope * (p.z + depth * 0.5);\n    let dz = abs(p.z) - depth * 0.5;\n    let max_d = max(d2, dz);\n    if (max_d <= 0.0) { return max_d; }\n    let a = max(d2, 0.0);\n    let b = max(dz, 0.0);\n    return sqrt(a * a + b * b);\n}\n\nfn node14(p: vec3<f32>) -> f32 {\n    return prim_extrudedpolygon(p, 3u, 6u, sdf_parameters.values[9].x, 0, 0);\n}\n\nfn node13(p: vec3<f32>) -> f32 {\n    return node14(p) - 0.0199999996;\n}\n\nfn node16(p: vec3<f32>) -> f32 {\n    return prim_extrudedpolygon(p, 10u, 7u, 0.300000012, 0.0874886635, 0.523598776);\n}\n\nfn node15(p: vec3<f32>) -> f32 {\n    return abs(node16(p)) - 0.0250000004;\n}\n\nfn on_axis(x: f32, axis: f32) -> bool {\n    return abs(x - axis) <= 1e-6 * (1.0 + abs(x) + abs(axis));\n}\n\nfn profile_distance_revolved(p: vec2<f32>, offset: u32, count: u32, axis: f32) -> f32 {\n    var d = 1e30;\n    var s = 1.0;\n    // The previous vertex is carried rather than re-read: one buffer load per\n    // edge instead of two, and no modulo. Edge for edge the same arithmetic.\n    var vj = profile_vertex(offset + count - 1u);\n    for (var i: u32 = 0u; i < count; i = i + 1u) {\n        let vi = profile_vertex(offset + i);\n        let e = vj - vi;\n        let w = p - vi;\n        if (!(on_axis(vi.x, axis) && on_axis(vj.x, axis))) {\n            let t = clamp(dot(w, e) / dot(e, e), 0.0, 1.0);\n            let b = w - e * t;\n            d = min(d, dot(b, b));\n        }\n        let c1 = p.y >= vi.y;\n        let c2 = p.y < vj.y;\n        let c3 = (e.x * w.y) > (e.y * w.x);\n        if ((c1 == c2) && (c2 == c3)) { s = -s; }\n        vj = vi;\n    }\n    return s * sqrt(d);\n}\n\nfn prim_revolvedpolygon(p: vec3<f32>, offset: u32, count: u32, radial: f32) -> f32 {\n    let r = sqrt(p.x * p.x + p.z * p.z + 1e-20) - radial;\n    return profile_distance_revolved(vec2<f32>(r, p.y), offset, count, -radial);\n}\n\nfn node17(p: vec3<f32>) -> f32 {\n    return prim_revolvedpolygon(p, 17u, 4u, 0.100000001);\n}\n\nfn profile_distance_lerped(\n    p: vec2<f32>, a: u32, b: u32, count: u32, t: f32\n) -> f32 {\n    let first = mix(profile_vertex(a), profile_vertex(b), t);\n    var d = dot(p - first, p - first);\n    var s = 1.0;\n    var vj = mix(profile_vertex(a + count - 1u), profile_vertex(b + count - 1u), t);\n    for (var i: u32 = 0u; i < count; i = i + 1u) {\n        let vi = mix(profile_vertex(a + i), profile_vertex(b + i), t);\n        let e = vj - vi;\n        let w = p - vi;\n        let u = clamp(dot(w, e) / dot(e, e), 0.0, 1.0);\n        let q = w - e * u;\n        d = min(d, dot(q, q));\n        let c1 = p.y >= vi.y;\n        let c2 = p.y < vj.y;\n        let c3 = (e.x * w.y) > (e.y * w.x);\n        if ((c1 == c2) && (c2 == c3)) { s = -s; }\n        vj = vi;\n    }\n    return s * sqrt(d);\n}\n\nfn prim_loftedpolygon(\n    p: vec3<f32>, a: u32, b: u32, count: u32, height: f32\n) -> f32 {\n    let t = clamp(p.z / height + 0.5, 0.0, 1.0);\n    let d2 = profile_distance_lerped(p.xy, a, b, count, t);\n    let dz = abs(p.z) - height * 0.5;\n    let max_d = max(d2, dz);\n    if (max_d <= 0.0) { return max_d; }\n    let ea = max(d2, 0.0);\n    let eb = max(dz, 0.0);\n    return sqrt(ea * ea + eb * eb);\n}\n\nfn node18(p: vec3<f32>) -> f32 {\n    return prim_loftedpolygon(p, 21u, 25u, 4u, 0.600000024);\n}\n\nfn node20(p: vec3<f32>) -> f32 {\n    return prim_sphere(p, 0.100000001);\n}\n\nfn cull_box(p: vec3<f32>, center: vec3<f32>, half_size: vec3<f32>) -> f32 {\n    let q = max(abs(p - center) - half_size, vec3<f32>(0.0));\n    return sqrt(dot(q, q));\n}\n\nfn node19(p: vec3<f32>) -> f32 {\n    var d = node20(p);\n    let instances = array<i32, 3>(1, 3, 4);\n    for (var k = 0; k < 3; k = k + 1) {\n        let i = f32(instances[k]);\n        let q = p - vec3<f32>(0.707106781, 0.707106781, 0) * (0.300000012 * i);\n        if (!(cull_box(q, sdf_parameters.values[29].xyz, sdf_parameters.values[30].xyz) >= max(d, 0.0) + sdf_parameters.values[58].x)) {\n            d = min(d, node20(q));\n        }\n    }\n    return d;\n}\n\nfn node23(p: vec3<f32>) -> f32 {\n    return prim_box(p, vec3<f32>(0.0500000007, 0.0500000007, 0.300000012));\n}\n\nfn node22(p: vec3<f32>) -> f32 {\n    return node23(p - vec3<f32>(0.600000024, 0, 0));\n}\n\nfn rotate_about(p: vec3<f32>, origin: vec3<f32>, axis: vec3<f32>, angle: f32) -> vec3<f32> {\n    let v = p - origin;\n    let c = cos(angle);\n    let s = sin(angle);\n    let parallel = axis * dot(v, axis);\n    return origin + v * c + cross(axis, v) * s + parallel * (1.0 - c);\n}\n\nfn node21(p: vec3<f32>) -> f32 {\n    var d = node22(p);\n    let instances = array<i32, 4>(1, 2, 3, 5);\n    for (var k = 0; k < 4; k = k + 1) {\n        let i = f32(instances[k]);\n        let theta = -6.283185307179586 * i / 6;\n        let q = rotate_about(p, vec3<f32>(0, 0, 0), vec3<f32>(0, 0, 1), theta);\n        if (!(cull_box(q, sdf_parameters.values[31].xyz, sdf_parameters.values[32].xyz) >= max(d, 0.0) + sdf_parameters.values[58].x)) {\n            d = min(d, node22(q));\n        }\n    }\n    return d;\n}\n\nfn node25(p: vec3<f32>) -> f32 {\n    return prim_sphere(p, sdf_parameters.values[1].x);\n}\n\nfn node24(p: vec3<f32>) -> f32 {\n    return node25(p - vec3<f32>(0, 0, 0.5));\n}\n\nfn node26(p: vec3<f32>) -> f32 {\n    let n = vec3<f32>(0, 0, 1);\n    return node24(p - 2.0 * dot(p - vec3<f32>(0, 0, 0), n) * n);\n}\n\nfn node2(p: vec3<f32>) -> f32 {\n    var d = node3(p);\n    if (!(cull_box(p, sdf_parameters.values[33].xyz, sdf_parameters.values[34].xyz) >= max(d + 0.200000003, 0.0) + sdf_parameters.values[58].x)) {\n        let e1 = node5(p);\n        let h1 = max(0.200000003 - abs(d - e1), 0.0);\n        d = min(d, e1) - h1 * h1 * 0.25 / 0.200000003;\n    }\n    if (!(cull_box(p, sdf_parameters.values[35].xyz, sdf_parameters.values[36].xyz) >= max(d + 0.200000003, 0.0) + sdf_parameters.values[58].x)) {\n        let e2 = node7(p);\n        let h2 = max(0.200000003 - abs(d - e2), 0.0);\n        d = min(d, e2) - h2 * h2 * 0.25 / 0.200000003;\n    }\n    if (!(cull_box(p, sdf_parameters.values[37].xyz, sdf_parameters.values[38].xyz) >= max(d + 0.200000003, 0.0) + sdf_parameters.values[58].x)) {\n        let e3 = node9(p);\n        let h3 = max(0.200000003 - abs(d - e3), 0.0);\n        d = min(d, e3) - h3 * h3 * 0.25 / 0.200000003;\n    }\n    if (!(cull_box(p, sdf_parameters.values[39].xyz, sdf_parameters.values[40].xyz) >= max(d + 0.200000003, 0.0) + sdf_parameters.values[58].x)) {\n        let e4 = node10(p);\n        let h4 = max(0.200000003 - abs(d - e4), 0.0);\n        d = min(d, e4) - h4 * h4 * 0.25 / 0.200000003;\n    }\n    if (!(cull_box(p, sdf_parameters.values[41].xyz, sdf_parameters.values[42].xyz) >= max(d + 0.200000003, 0.0) + sdf_parameters.values[58].x)) {\n        let e5 = node13(p);\n        let h5 = max(0.200000003 - abs(d - e5), 0.0);\n        d = min(d, e5) - h5 * h5 * 0.25 / 0.200000003;\n    }\n    let e6 = node15(p);\n    let h6 = max(0.200000003 - abs(d - e6), 0.0);\n    d = min(d, e6) - h6 * h6 * 0.25 / 0.200000003;\n    if (!(cull_box(p, sdf_parameters.values[43].xyz, sdf_parameters.values[44].xyz) >= max(d + 0.200000003, 0.0) + sdf_parameters.values[58].x)) {\n        let e7 = node17(p);\n        let h7 = max(0.200000003 - abs(d - e7), 0.0);\n        d = min(d, e7) - h7 * h7 * 0.25 / 0.200000003;\n    }\n    if (!(cull_box(p, sdf_parameters.values[45].xyz, sdf_parameters.values[46].xyz) >= max(d + 0.200000003, 0.0) + sdf_parameters.values[58].x)) {\n        let e8 = node18(p);\n        let h8 = max(0.200000003 - abs(d - e8), 0.0);\n        d = min(d, e8) - h8 * h8 * 0.25 / 0.200000003;\n    }\n    if (!(cull_box(p, sdf_parameters.values[47].xyz, sdf_parameters.values[48].xyz) >= max(d + 0.200000003, 0.0) + sdf_parameters.values[58].x)) {\n        let e9 = node19(p);\n        let h9 = max(0.200000003 - abs(d - e9), 0.0);\n        d = min(d, e9) - h9 * h9 * 0.25 / 0.200000003;\n    }\n    if (!(cull_box(p, sdf_parameters.values[49].xyz, sdf_parameters.values[50].xyz) >= max(d + 0.200000003, 0.0) + sdf_parameters.values[58].x)) {\n        let e10 = node21(p);\n        let h10 = max(0.200000003 - abs(d - e10), 0.0);\n        d = min(d, e10) - h10 * h10 * 0.25 / 0.200000003;\n    }\n    if (!(cull_box(p, sdf_parameters.values[51].xyz, sdf_parameters.values[52].xyz) >= max(d + 0.200000003, 0.0) + sdf_parameters.values[58].x)) {\n        let e11 = node24(p);\n        let h11 = max(0.200000003 - abs(d - e11), 0.0);\n        d = min(d, e11) - h11 * h11 * 0.25 / 0.200000003;\n    }\n    if (!(cull_box(p, sdf_parameters.values[53].xyz, sdf_parameters.values[54].xyz) >= max(d + 0.200000003, 0.0) + sdf_parameters.values[58].x)) {\n        let e12 = node26(p);\n        let h12 = max(0.200000003 - abs(d - e12), 0.0);\n        d = min(d, e12) - h12 * h12 * 0.25 / 0.200000003;\n    }\n    return d;\n}\n\nfn node27(p: vec3<f32>) -> f32 {\n    return prim_box(p, vec3<f32>(1.20000005, 1.20000005, 0.800000012));\n}\n\nfn node1(p: vec3<f32>) -> f32 {\n    var d = node2(p);\n    let e1 = node27(p);\n    let h1 = max(1e-10 - abs(d - e1), 0.0);\n    d = max(d, e1) + h1 * h1 * 0.25 / 1e-10;\n    return d;\n}\n\nfn node29(p: vec3<f32>) -> f32 {\n    return prim_sphere(p, 0.200000003);\n}\n\nfn node28(p: vec3<f32>) -> f32 {\n    return node29(p - vec3<f32>(0, 0, 0.699999988));\n}\n\nfn node0(p: vec3<f32>) -> f32 {\n    var d = node1(p);\n    if (!(cull_box(p, sdf_parameters.values[55].xyz, sdf_parameters.values[56].xyz) >= max(0.0799999982 - d, 0.0) + sdf_parameters.values[58].x)) {\n        let e1 = (-node28(p));\n        let h1 = max(0.0799999982 - abs(d - e1), 0.0);\n        d = max(d, e1) + h1 * h1 * 0.25 / 0.0799999982;\n    }\n    return d;\n}\n\nfn mat4(p: vec3<f32>) -> mat4x2<f32> {\n    return mat4x2<f32>(vec2<f32>(1, 0), vec2<f32>(1, 1), vec2<f32>(1, 1), vec2<f32>(0.5, 0));\n}\n\nfn mat3(p: vec3<f32>) -> mat4x2<f32> {\n    return mat4(p - sdf_parameters.values[0].xyz);\n}\n\nfn mat6(p: vec3<f32>) -> mat4x2<f32> {\n    return mat4x2<f32>(vec2<f32>(0.600000024, 1), vec2<f32>(0.620000005, 1), vec2<f32>(0.649999976, 1), vec2<f32>(0.300000012, 0));\n}\n\nfn mat5(p: vec3<f32>) -> mat4x2<f32> {\n    return mat6(mat3x3<f32>(vec3<f32>(0.921060979, 0, 0.389418334), vec3<f32>(0, 1, 0), vec3<f32>(-0.389418334, 0, 0.921060979)) * p);\n}\n\nfn mat8(p: vec3<f32>) -> mat4x2<f32> {\n    return mat4x2<f32>(vec2<f32>(1, 0), vec2<f32>(1, 1), vec2<f32>(1, 1), vec2<f32>(0.5, 0));\n}\n\nfn mat7(p: vec3<f32>) -> mat4x2<f32> {\n    return mat8(mat3x3<f32>(vec3<f32>(0.715033352, 0.446375608, -0.53802985), vec3<f32>(0.0764989406, 0.715033352, 0.694892228), vec3<f32>(0.694892228, -0.53802985, 0.477125436)) * p);\n}\n\nfn mat9(p: vec3<f32>) -> mat4x2<f32> {\n    return mat4x2<f32>(vec2<f32>(1, 0), vec2<f32>(1, 1), vec2<f32>(1, 1), vec2<f32>(0.5, 0));\n}\n\nfn mat12(p: vec3<f32>) -> mat4x2<f32> {\n    return mat4x2<f32>(vec2<f32>(1, 0), vec2<f32>(1, 1), vec2<f32>(1, 1), vec2<f32>(0.5, 0));\n}\n\nfn mat11(p: vec3<f32>) -> mat4x2<f32> {\n    return mat12(p - vec3<f32>(0.5, 0.5, 0));\n}\n\nfn mat10(p: vec3<f32>) -> mat4x2<f32> {\n    return mat11(p - 2.0 * dot(p - vec3<f32>(0, 0, 0), vec3<f32>(1, 0, 0)) * vec3<f32>(1, 0, 0));\n}\n\nfn mat14(p: vec3<f32>) -> mat4x2<f32> {\n    return mat4x2<f32>(vec2<f32>(1, 0), vec2<f32>(1, 1), vec2<f32>(1, 1), vec2<f32>(0.5, 0));\n}\n\nfn mat13(p: vec3<f32>) -> mat4x2<f32> {\n    return mat14(p);\n}\n\nfn mat16(p: vec3<f32>) -> mat4x2<f32> {\n    return mat4x2<f32>(vec2<f32>(1, 0), vec2<f32>(1, 1), vec2<f32>(1, 1), vec2<f32>(0.5, 0));\n}\n\nfn mat15(p: vec3<f32>) -> mat4x2<f32> {\n    return mat16(p);\n}\n\nfn mat17(p: vec3<f32>) -> mat4x2<f32> {\n    return mat4x2<f32>(vec2<f32>(1, 0), vec2<f32>(1, 1), vec2<f32>(1, 1), vec2<f32>(0.5, 0));\n}\n\nfn mat18(p: vec3<f32>) -> mat4x2<f32> {\n    return mat4x2<f32>(vec2<f32>(1, 0), vec2<f32>(1, 1), vec2<f32>(1, 1), vec2<f32>(0.5, 0));\n}\n\nfn mat20(p: vec3<f32>) -> mat4x2<f32> {\n    return mat4x2<f32>(vec2<f32>(1, 0), vec2<f32>(1, 1), vec2<f32>(1, 1), vec2<f32>(0.5, 0));\n}\n\nfn mat19(p: vec3<f32>) -> mat4x2<f32> {\n    return mat20(p);\n}\n\nfn mat23(p: vec3<f32>) -> mat4x2<f32> {\n    return mat4x2<f32>(vec2<f32>(1, 0), vec2<f32>(1, 1), vec2<f32>(1, 1), vec2<f32>(0.5, 0));\n}\n\nfn mat22(p: vec3<f32>) -> mat4x2<f32> {\n    return mat23(p - vec3<f32>(0.600000024, 0, 0));\n}\n\nfn mat21(p: vec3<f32>) -> mat4x2<f32> {\n    return mat22(p);\n}\n\nfn mat25(p: vec3<f32>) -> mat4x2<f32> {\n    return mat4x2<f32>(vec2<f32>(0.800000012, 0), vec2<f32>(0.200000003, 1), vec2<f32>(0.100000001, 1), vec2<f32>(0.600000024, 0.0399999991));\n}\n\nfn mat24(p: vec3<f32>) -> mat4x2<f32> {\n    return mat25(p - vec3<f32>(0, 0, 0.5));\n}\n\nfn mat26(p: vec3<f32>) -> mat4x2<f32> {\n    return mat24(p - 2.0 * dot(p - vec3<f32>(0, 0, 0), vec3<f32>(0, 0, 1)) * vec3<f32>(0, 0, 1));\n}\n\nfn mat2(p: vec3<f32>) -> mat4x2<f32> {\n    var acc = node3(p);\n    var m = mat3(p);\n    let d0 = node5(p);\n    let n0 = mat5(p);\n    let t0 = clamp(0.5 + 0.5 * (d0 - acc) / 0.200000003, 0.0, 1.0);\n    m = m * t0 + n0 * (1.0 - t0);\n    let h0 = max(0.200000003 - abs(acc - d0), 0.0);\n    acc = min(acc, d0) - h0 * h0 * 0.25 / 0.200000003;\n    let d1 = node7(p);\n    let n1 = mat7(p);\n    let t1 = clamp(0.5 + 0.5 * (d1 - acc) / 0.200000003, 0.0, 1.0);\n    m = m * t1 + n1 * (1.0 - t1);\n    let h1 = max(0.200000003 - abs(acc - d1), 0.0);\n    acc = min(acc, d1) - h1 * h1 * 0.25 / 0.200000003;\n    let d2 = node9(p);\n    let n2 = mat9(p);\n    let t2 = clamp(0.5 + 0.5 * (d2 - acc) / 0.200000003, 0.0, 1.0);\n    m = m * t2 + n2 * (1.0 - t2);\n    let h2 = max(0.200000003 - abs(acc - d2), 0.0);\n    acc = min(acc, d2) - h2 * h2 * 0.25 / 0.200000003;\n    let d3 = node10(p);\n    let n3 = mat10(p);\n    let t3 = clamp(0.5 + 0.5 * (d3 - acc) / 0.200000003, 0.0, 1.0);\n    m = m * t3 + n3 * (1.0 - t3);\n    let h3 = max(0.200000003 - abs(acc - d3), 0.0);\n    acc = min(acc, d3) - h3 * h3 * 0.25 / 0.200000003;\n    let d4 = node13(p);\n    let n4 = mat13(p);\n    let t4 = clamp(0.5 + 0.5 * (d4 - acc) / 0.200000003, 0.0, 1.0);\n    m = m * t4 + n4 * (1.0 - t4);\n    let h4 = max(0.200000003 - abs(acc - d4), 0.0);\n    acc = min(acc, d4) - h4 * h4 * 0.25 / 0.200000003;\n    let d5 = node15(p);\n    let n5 = mat15(p);\n    let t5 = clamp(0.5 + 0.5 * (d5 - acc) / 0.200000003, 0.0, 1.0);\n    m = m * t5 + n5 * (1.0 - t5);\n    let h5 = max(0.200000003 - abs(acc - d5), 0.0);\n    acc = min(acc, d5) - h5 * h5 * 0.25 / 0.200000003;\n    let d6 = node17(p);\n    let n6 = mat17(p);\n    let t6 = clamp(0.5 + 0.5 * (d6 - acc) / 0.200000003, 0.0, 1.0);\n    m = m * t6 + n6 * (1.0 - t6);\n    let h6 = max(0.200000003 - abs(acc - d6), 0.0);\n    acc = min(acc, d6) - h6 * h6 * 0.25 / 0.200000003;\n    let d7 = node18(p);\n    let n7 = mat18(p);\n    let t7 = clamp(0.5 + 0.5 * (d7 - acc) / 0.200000003, 0.0, 1.0);\n    m = m * t7 + n7 * (1.0 - t7);\n    let h7 = max(0.200000003 - abs(acc - d7), 0.0);\n    acc = min(acc, d7) - h7 * h7 * 0.25 / 0.200000003;\n    let d8 = node19(p);\n    let n8 = mat19(p);\n    let t8 = clamp(0.5 + 0.5 * (d8 - acc) / 0.200000003, 0.0, 1.0);\n    m = m * t8 + n8 * (1.0 - t8);\n    let h8 = max(0.200000003 - abs(acc - d8), 0.0);\n    acc = min(acc, d8) - h8 * h8 * 0.25 / 0.200000003;\n    let d9 = node21(p);\n    let n9 = mat21(p);\n    let t9 = clamp(0.5 + 0.5 * (d9 - acc) / 0.200000003, 0.0, 1.0);\n    m = m * t9 + n9 * (1.0 - t9);\n    let h9 = max(0.200000003 - abs(acc - d9), 0.0);\n    acc = min(acc, d9) - h9 * h9 * 0.25 / 0.200000003;\n    let d10 = node24(p);\n    let n10 = mat24(p);\n    let t10 = clamp(0.5 + 0.5 * (d10 - acc) / 0.200000003, 0.0, 1.0);\n    m = m * t10 + n10 * (1.0 - t10);\n    let h10 = max(0.200000003 - abs(acc - d10), 0.0);\n    acc = min(acc, d10) - h10 * h10 * 0.25 / 0.200000003;\n    let d11 = node26(p);\n    let n11 = mat26(p);\n    let t11 = clamp(0.5 + 0.5 * (d11 - acc) / 0.200000003, 0.0, 1.0);\n    m = m * t11 + n11 * (1.0 - t11);\n    let h11 = max(0.200000003 - abs(acc - d11), 0.0);\n    acc = min(acc, d11) - h11 * h11 * 0.25 / 0.200000003;\n    return m;\n}\n\nfn mat27(p: vec3<f32>) -> mat4x2<f32> {\n    return mat4x2<f32>(vec2<f32>(1, 0), vec2<f32>(1, 1), vec2<f32>(1, 1), vec2<f32>(0.5, 0));\n}\n\nfn mat1(p: vec3<f32>) -> mat4x2<f32> {\n    var acc = node2(p);\n    var m = mat2(p);\n    let d0 = node27(p);\n    let n0 = mat27(p);\n    let t0 = clamp(0.5 + 0.5 * (d0 - acc) / 1e-10, 0.0, 1.0);\n    m = m * t0 + n0 * (1.0 - t0);\n    let h0 = max(1e-10 - abs(acc - d0), 0.0);\n    acc = min(acc, d0) - h0 * h0 * 0.25 / 1e-10;\n    return m;\n}\n\nfn mat29(p: vec3<f32>) -> mat4x2<f32> {\n    return mat4x2<f32>(vec2<f32>(1, 0), vec2<f32>(1, 1), vec2<f32>(1, 1), vec2<f32>(0.5, 0));\n}\n\nfn mat28(p: vec3<f32>) -> mat4x2<f32> {\n    return mat29(p - vec3<f32>(0, 0, 0.699999988));\n}\n\nfn mat0(p: vec3<f32>) -> mat4x2<f32> {\n    var acc = node1(p);\n    var m = mat1(p);\n    let d0 = node28(p);\n    let n0 = mat28(p);\n    let t0 = clamp(0.5 + 0.5 * (d0 - acc) / 0.0799999982, 0.0, 1.0);\n    m = m * t0 + n0 * (1.0 - t0);\n    let h0 = max(0.0799999982 - abs(acc - d0), 0.0);\n    acc = min(acc, d0) - h0 * h0 * 0.25 / 0.0799999982;\n    return m;\n}\n\nfn sdf(p: vec3<f32>) -> f32 {\n    return node0(p);\n}\n\nfn material_block_impl(p: vec3<f32>) -> mat4x2<f32> {\n    return mat0(p);\n}\n\nfn material_base(p: vec3<f32>) -> vec4<f32> {\n    let m = material_block_impl(p);\n    return vec4<f32>(m[0].x, m[1].x, m[2].x, m[3].x);\n}\n\nfn material_optics(p: vec3<f32>) -> vec4<f32> {\n    let m = material_block_impl(p);\n    return vec4<f32>(m[0].y, m[1].y, m[2].y, m[3].y);\n}",
+   "parameters": [
+    [
+     "shift",
+     3,
+     [
+      1.0,
+      0.0,
+      0.0
+     ]
+    ],
+    [
+     "radius",
+     1,
+     [
+      0.30000001192092896
+     ]
+    ],
+    [
+     "capsule_r",
+     1,
+     [
+      0.15000000596046448
+     ]
+    ],
+    [
+     "sketch0.v0",
+     2,
+     [
+      0.4000000059604645,
+      0.0
+     ]
+    ],
+    [
+     "hex1",
+     2,
+     [
+      0.20000000298023224,
+      0.3464101552963257
+     ]
+    ],
+    [
+     "sketch0.v2",
+     2,
+     [
+      -0.20000000298023224,
+      0.3464101552963257
+     ]
+    ],
+    [
+     "sketch0.v3",
+     2,
+     [
+      -0.4000000059604645,
+      4.8985870794684264e-17
+     ]
+    ],
+    [
+     "sketch0.v4",
+     2,
+     [
+      -0.20000000298023224,
+      -0.3464101552963257
+     ]
+    ],
+    [
+     "sketch0.v5",
+     2,
+     [
+      0.20000000298023224,
+      -0.3464101552963257
+     ]
+    ],
+    [
+     "d",
+     1,
+     [
+      0.30000001192092896
+     ]
+    ],
+    [
+     "sketch1.v0",
+     2,
+     [
+      0.4000000059604645,
+      0.0
+     ]
+    ],
+    [
+     "sketch1.v1",
+     2,
+     [
+      0.2493959218263626,
+      0.31273260712623596
+     ]
+    ],
+    [
+     "sketch1.v2",
+     2,
+     [
+      -0.0890083760023117,
+      0.38997116684913635
+     ]
+    ],
+    [
+     "sketch1.v3",
+     2,
+     [
+      -0.36038753390312195,
+      0.1735534965991974
+     ]
+    ],
+    [
+     "sketch1.v4",
+     2,
+     [
+      -0.36038753390312195,
+      -0.1735534965991974
+     ]
+    ],
+    [
+     "sketch1.v5",
+     2,
+     [
+      -0.0890083760023117,
+      -0.38997116684913635
+     ]
+    ],
+    [
+     "sketch1.v6",
+     2,
+     [
+      0.2493959218263626,
+      -0.31273260712623596
+     ]
+    ],
+    [
+     "sketch2.v0",
+     2,
+     [
+      0.20000000298023224,
+      -0.20000000298023224
+     ]
+    ],
+    [
+     "sketch2.v1",
+     2,
+     [
+      0.3499999940395355,
+      -0.20000000298023224
+     ]
+    ],
+    [
+     "sketch2.v2",
+     2,
+     [
+      0.3499999940395355,
+      0.20000000298023224
+     ]
+    ],
+    [
+     "sketch2.v3",
+     2,
+     [
+      0.20000000298023224,
+      0.20000000298023224
+     ]
+    ],
+    [
+     "sketch3.v0",
+     2,
+     [
+      -0.30000001192092896,
+      -0.30000001192092896
+     ]
+    ],
+    [
+     "sketch3.v1",
+     2,
+     [
+      0.30000001192092896,
+      -0.30000001192092896
+     ]
+    ],
+    [
+     "sketch3.v2",
+     2,
+     [
+      0.30000001192092896,
+      0.30000001192092896
+     ]
+    ],
+    [
+     "sketch3.v3",
+     2,
+     [
+      -0.30000001192092896,
+      0.30000001192092896
+     ]
+    ],
+    [
+     "sketch3.w0",
+     2,
+     [
+      -0.15000000596046448,
+      -0.15000000596046448
+     ]
+    ],
+    [
+     "sketch3.w1",
+     2,
+     [
+      0.15000000596046448,
+      -0.15000000596046448
+     ]
+    ],
+    [
+     "sketch3.w2",
+     2,
+     [
+      0.15000000596046448,
+      0.15000000596046448
+     ]
+    ],
+    [
+     "sketch3.w3",
+     2,
+     [
+      -0.15000000596046448,
+      0.15000000596046448
+     ]
+    ],
+    [
+     "__cull0.center",
+     3,
+     [
+      0.0,
+      0.0,
+      0.0
+     ]
+    ],
+    [
+     "__cull0.half",
+     3,
+     [
+      0.10000000149011612,
+      0.10000000149011612,
+      0.10000000149011612
+     ]
+    ],
+    [
+     "__cull1.center",
+     3,
+     [
+      0.6000000238418579,
+      0.0,
+      0.0
+     ]
+    ],
+    [
+     "__cull1.half",
+     3,
+     [
+      0.05000000074505806,
+      0.05000000074505806,
+      0.30000001192092896
+     ]
+    ],
+    [
+     "__cull2.center",
+     3,
+     [
+      0.0,
+      0.0,
+      0.0
+     ]
+    ],
+    [
+     "__cull2.half",
+     3,
+     [
+      0.3736729025840759,
+      0.20000000298023224,
+      0.3470907509326935
+     ]
+    ],
+    [
+     "__cull3.center",
+     3,
+     [
+      0.0,
+      0.0,
+      0.0
+     ]
+    ],
+    [
+     "__cull3.half",
+     3,
+     [
+      0.5012966990470886,
+      0.5057525634765625,
+      0.4851471185684204
+     ]
+    ],
+    [
+     "__cull4.center",
+     3,
+     [
+      0.0,
+      0.0,
+      0.0
+     ]
+    ],
+    [
+     "__cull4.half",
+     3,
+     [
+      0.15000000596046448,
+      0.15000000596046448,
+      0.550000011920929
+     ]
+    ],
+    [
+     "__cull5.center",
+     3,
+     [
+      -0.5,
+      0.5,
+      0.0
+     ]
+    ],
+    [
+     "__cull5.half",
+     3,
+     [
+      0.3799999952316284,
+      0.3799999952316284,
+      0.07999999821186066
+     ]
+    ],
+    [
+     "__cull6.center",
+     3,
+     [
+      0.0,
+      0.0,
+      0.0
+     ]
+    ],
+    [
+     "__cull6.half",
+     3,
+     [
+      0.42000001668930054,
+      0.36641016602516174,
+      0.17000000178813934
+     ]
+    ],
+    [
+     "__cull7.center",
+     3,
+     [
+      0.0,
+      0.0,
+      0.0
+     ]
+    ],
+    [
+     "__cull7.half",
+     3,
+     [
+      0.44999998807907104,
+      0.20000000298023224,
+      0.44999998807907104
+     ]
+    ],
+    [
+     "__cull8.center",
+     3,
+     [
+      0.0,
+      0.0,
+      0.0
+     ]
+    ],
+    [
+     "__cull8.half",
+     3,
+     [
+      0.30000001192092896,
+      0.30000001192092896,
+      0.30000001192092896
+     ]
+    ],
+    [
+     "__cull9.center",
+     3,
+     [
+      0.4242640733718872,
+      0.4242640733718872,
+      0.0
+     ]
+    ],
+    [
+     "__cull9.half",
+     3,
+     [
+      0.5242640972137451,
+      0.5242640972137451,
+      0.10000000149011612
+     ]
+    ],
+    [
+     "__cull10.center",
+     3,
+     [
+      0.0,
+      0.0,
+      0.0
+     ]
+    ],
+    [
+     "__cull10.half",
+     3,
+     [
+      0.9082207679748535,
+      0.9082207679748535,
+      0.3082207143306732
+     ]
+    ],
+    [
+     "__cull11.center",
+     3,
+     [
+      0.0,
+      0.0,
+      0.5
+     ]
+    ],
+    [
+     "__cull11.half",
+     3,
+     [
+      0.30000001192092896,
+      0.30000001192092896,
+      0.30000001192092896
+     ]
+    ],
+    [
+     "__cull12.center",
+     3,
+     [
+      0.0,
+      0.0,
+      -0.5
+     ]
+    ],
+    [
+     "__cull12.half",
+     3,
+     [
+      0.30000001192092896,
+      0.30000001192092896,
+      0.30000001192092896
+     ]
+    ],
+    [
+     "__cull13.center",
+     3,
+     [
+      0.0,
+      0.0,
+      0.699999988079071
+     ]
+    ],
+    [
+     "__cull13.half",
+     3,
+     [
+      0.20000000298023224,
+      0.20000000298023224,
+      0.20000000298023224
+     ]
+    ]
+   ],
+   "derived": [
+    "__cull0.center",
+    "__cull0.half",
+    "__cull1.center",
+    "__cull1.half",
+    "__cull2.center",
+    "__cull2.half",
+    "__cull3.center",
+    "__cull3.half",
+    "__cull4.center",
+    "__cull4.half",
+    "__cull5.center",
+    "__cull5.half",
+    "__cull6.center",
+    "__cull6.half",
+    "__cull7.center",
+    "__cull7.half",
+    "__cull8.center",
+    "__cull8.half",
+    "__cull9.center",
+    "__cull9.half",
+    "__cull10.center",
+    "__cull10.half",
+    "__cull11.center",
+    "__cull11.half",
+    "__cull12.center",
+    "__cull12.half",
+    "__cull13.center",
+    "__cull13.half"
+   ],
+   "depends": {
+    "__cull0.center": [],
+    "__cull0.half": [],
+    "__cull1.center": [],
+    "__cull1.half": [],
+    "__cull2.center": [],
+    "__cull2.half": [],
+    "__cull3.center": [],
+    "__cull3.half": [],
+    "__cull4.center": [
+     "capsule_r"
+    ],
+    "__cull4.half": [
+     "capsule_r"
+    ],
+    "__cull5.center": [],
+    "__cull5.half": [],
+    "__cull6.center": [
+     "d",
+     "hex1",
+     "sketch0.v0",
+     "sketch0.v2",
+     "sketch0.v3",
+     "sketch0.v4",
+     "sketch0.v5"
+    ],
+    "__cull6.half": [
+     "d",
+     "hex1",
+     "sketch0.v0",
+     "sketch0.v2",
+     "sketch0.v3",
+     "sketch0.v4",
+     "sketch0.v5"
+    ],
+    "__cull7.center": [
+     "sketch2.v0",
+     "sketch2.v1",
+     "sketch2.v2",
+     "sketch2.v3"
+    ],
+    "__cull7.half": [
+     "sketch2.v0",
+     "sketch2.v1",
+     "sketch2.v2",
+     "sketch2.v3"
+    ],
+    "__cull8.center": [
+     "sketch3.v0",
+     "sketch3.v1",
+     "sketch3.v2",
+     "sketch3.v3",
+     "sketch3.w0",
+     "sketch3.w1",
+     "sketch3.w2",
+     "sketch3.w3"
+    ],
+    "__cull8.half": [
+     "sketch3.v0",
+     "sketch3.v1",
+     "sketch3.v2",
+     "sketch3.v3",
+     "sketch3.w0",
+     "sketch3.w1",
+     "sketch3.w2",
+     "sketch3.w3"
+    ],
+    "__cull9.center": [],
+    "__cull9.half": [],
+    "__cull10.center": [],
+    "__cull10.half": [],
+    "__cull11.center": [
+     "radius"
+    ],
+    "__cull11.half": [
+     "radius"
+    ],
+    "__cull12.center": [
+     "radius"
+    ],
+    "__cull12.half": [
+     "radius"
+    ],
+    "__cull13.center": [],
+    "__cull13.half": []
+   }
+  },
+  {
+   "label": "covered",
+   "graph": {
+    "format": "cadjoint-scene",
+    "version": 2,
+    "root": {
+     "type": "difference",
+     "params": {
+      "smoothness": 0.019999999552965164
+     },
+     "id": "n0",
+     "children": [
+      {
+       "type": "intersection",
+       "params": {
+        "smoothness": 0.0
+       },
+       "id": "n1",
+       "children": [
+        {
+         "type": "union",
+         "params": {
+          "smoothness": 0.05000000074505806
+         },
+         "id": "n2",
+         "children": [
+          {
+           "type": "translate",
+           "params": {
+            "offset": [
+             1.0,
+             0.0,
+             0.0
+            ]
+           },
+           "id": "n3",
+           "free": {
+            "offset": "shift"
+           },
+           "children": [
+            {
+             "type": "sphere",
+             "params": {
+              "radius": 0.30000001192092896
+             },
+             "id": "n4",
+             "free": {
+              "radius": "radius"
+             },
+             "material": {
+              "color": [
+               1.0,
+               1.0,
+               1.0
+              ],
+              "roughness": 0.5,
+              "metallic": 0.0,
+              "opacity": 1.0,
+              "ior": 1.0,
+              "reflectivity": 0.0
+             },
+             "children": []
+            }
+           ]
+          },
+          {
+           "type": "rotate",
+           "params": {
+            "axis": [
+             0.0,
+             1.0,
+             0.0
+            ],
+            "angle": 0.4000000059604645
+           },
+           "id": "n5",
+           "children": [
+            {
+             "type": "box",
+             "params": {
+              "size": [
+               0.30000001192092896,
+               0.20000000298023224,
+               0.25
+              ]
+             },
+             "id": "n6",
+             "material": {
+              "color": [
+               0.6000000238418579,
+               0.6200000047683716,
+               0.6499999761581421
+              ],
+              "roughness": 0.30000001192092896,
+              "metallic": 1.0,
+              "opacity": 1.0,
+              "ior": 1.0,
+              "reflectivity": 0.0
+             },
+             "children": []
+            }
+           ]
+          },
+          {
+           "type": "rotate",
+           "params": {
+            "axis": [
+             1.0,
+             1.0,
+             0.30000001192092896
+            ],
+            "angle": -1.100000023841858
+           },
+           "id": "n7",
+           "children": [
+            {
+             "type": "cylinder",
+             "params": {
+              "radius": 0.20000000298023224,
+              "height": 0.5
+             },
+             "id": "n8",
+             "material": {
+              "color": [
+               1.0,
+               1.0,
+               1.0
+              ],
+              "roughness": 0.5,
+              "metallic": 0.0,
+              "opacity": 1.0,
+              "ior": 1.0,
+              "reflectivity": 0.0
+             },
+             "children": []
+            }
+           ]
+          },
+          {
+           "type": "capsule",
+           "params": {
+            "radius": 0.15000000596046448,
+            "height": 0.4000000059604645
+           },
+           "id": "n9",
+           "free": {
+            "radius": "capsule_r"
+           },
+           "material": {
+            "color": [
+             1.0,
+             1.0,
+             1.0
+            ],
+            "roughness": 0.5,
+            "metallic": 0.0,
+            "opacity": 1.0,
+            "ior": 1.0,
+            "reflectivity": 0.0
+           },
+           "children": []
+          },
+          {
+           "type": "mirror",
+           "params": {
+            "origin": [
+             0.0,
+             0.0,
+             0.0
+            ],
+            "normal": [
+             1.0,
+             0.0,
+             0.0
+            ]
+           },
+           "id": "n10",
+           "children": [
+            {
+             "type": "translate",
+             "params": {
+              "offset": [
+               0.5,
+               0.5,
+               0.0
+              ]
+             },
+             "id": "n11",
+             "children": [
+              {
+               "type": "torus",
+               "params": {
+                "major_radius": 0.30000001192092896,
+                "minor_radius": 0.07999999821186066
+               },
+               "id": "n12",
+               "material": {
+                "color": [
+                 1.0,
+                 1.0,
+                 1.0
+                ],
+                "roughness": 0.5,
+                "metallic": 0.0,
+                "opacity": 1.0,
+                "ior": 1.0,
+                "reflectivity": 0.0
+               },
+               "children": []
+              }
+             ]
+            }
+           ]
+          },
+          {
+           "type": "offset",
+           "params": {
+            "distance": 0.019999999552965164
+           },
+           "id": "n13",
+           "children": [
+            {
+             "type": "extruded_polygon",
+             "params": {
+              "depth": 0.30000001192092896,
+              "draft": 0.0,
+              "twist": 0.0,
+              "vertices": [
+               [
+                0.4000000059604645,
+                0.0
+               ],
+               [
+                0.20000000298023224,
+                0.3464101552963257
+               ],
+               [
+                -0.20000000298023224,
+                0.3464101552963257
+               ],
+               [
+                -0.4000000059604645,
+                4.8985870794684264e-17
+               ],
+               [
+                -0.20000000298023224,
+                -0.3464101552963257
+               ],
+               [
+                0.20000000298023224,
+                -0.3464101552963257
+               ]
+              ]
+             },
+             "id": "n14",
+             "free": {
+              "vertices": [
+               null,
+               "hex1",
+               null,
+               null,
+               null,
+               null
+              ],
+              "depth": "d"
+             },
+             "implicit": [
+              "draft",
+              "twist"
+             ],
+             "material": {
+              "color": [
+               1.0,
+               1.0,
+               1.0
+              ],
+              "roughness": 0.5,
+              "metallic": 0.0,
+              "opacity": 1.0,
+              "ior": 1.0,
+              "reflectivity": 0.0
+             },
+             "children": []
+            }
+           ]
+          },
+          {
+           "type": "shell",
+           "params": {
+            "thickness": 0.05000000074505806
+           },
+           "id": "n15",
+           "children": [
+            {
+             "type": "extruded_polygon",
+             "params": {
+              "depth": 0.30000001192092896,
+              "draft": 5.0,
+              "twist": 30.0,
+              "vertices": [
+               [
+                0.4000000059604645,
+                0.0
+               ],
+               [
+                0.2493959218263626,
+                0.31273260712623596
+               ],
+               [
+                -0.0890083760023117,
+                0.38997116684913635
+               ],
+               [
+                -0.36038753390312195,
+                0.1735534965991974
+               ],
+               [
+                -0.36038753390312195,
+                -0.1735534965991974
+               ],
+               [
+                -0.0890083760023117,
+                -0.38997116684913635
+               ],
+               [
+                0.2493959218263626,
+                -0.31273260712623596
+               ]
+              ]
+             },
+             "id": "n16",
+             "material": {
+              "color": [
+               1.0,
+               1.0,
+               1.0
+              ],
+              "roughness": 0.5,
+              "metallic": 0.0,
+              "opacity": 1.0,
+              "ior": 1.0,
+              "reflectivity": 0.0
+             },
+             "children": []
+            }
+           ]
+          },
+          {
+           "type": "revolved_polygon",
+           "params": {
+            "offset": 0.10000000149011612,
+            "vertices": [
+             [
+              0.20000000298023224,
+              -0.20000000298023224
+             ],
+             [
+              0.3499999940395355,
+              -0.20000000298023224
+             ],
+             [
+              0.3499999940395355,
+              0.20000000298023224
+             ],
+             [
+              0.20000000298023224,
+              0.20000000298023224
+             ]
+            ]
+           },
+           "id": "n17",
+           "material": {
+            "color": [
+             1.0,
+             1.0,
+             1.0
+            ],
+            "roughness": 0.5,
+            "metallic": 0.0,
+            "opacity": 1.0,
+            "ior": 1.0,
+            "reflectivity": 0.0
+           },
+           "children": []
+          },
+          {
+           "type": "lofted_polygon",
+           "params": {
+            "height": 0.6000000238418579,
+            "vertices": [
+             [
+              -0.30000001192092896,
+              -0.30000001192092896
+             ],
+             [
+              0.30000001192092896,
+              -0.30000001192092896
+             ],
+             [
+              0.30000001192092896,
+              0.30000001192092896
+             ],
+             [
+              -0.30000001192092896,
+              0.30000001192092896
+             ]
+            ],
+            "vertices_b": [
+             [
+              -0.15000000596046448,
+              -0.15000000596046448
+             ],
+             [
+              0.15000000596046448,
+              -0.15000000596046448
+             ],
+             [
+              0.15000000596046448,
+              0.15000000596046448
+             ],
+             [
+              -0.15000000596046448,
+              0.15000000596046448
+             ]
+            ]
+           },
+           "id": "n18",
+           "material": {
+            "color": [
+             1.0,
+             1.0,
+             1.0
+            ],
+            "roughness": 0.5,
+            "metallic": 0.0,
+            "opacity": 1.0,
+            "ior": 1.0,
+            "reflectivity": 0.0
+           },
+           "children": []
+          },
+          {
+           "type": "linear_pattern",
+           "params": {
+            "direction": [
+             1.0,
+             1.0,
+             0.0
+            ],
+            "spacing": 0.30000001192092896,
+            "count": 5,
+            "skip_mask": 4
+           },
+           "id": "n19",
+           "children": [
+            {
+             "type": "sphere",
+             "params": {
+              "radius": 0.10000000149011612
+             },
+             "id": "n20",
+             "material": {
+              "color": [
+               1.0,
+               1.0,
+               1.0
+              ],
+              "roughness": 0.5,
+              "metallic": 0.0,
+              "opacity": 1.0,
+              "ior": 1.0,
+              "reflectivity": 0.0
+             },
+             "children": []
+            }
+           ]
+          },
+          {
+           "type": "polar_pattern",
+           "params": {
+            "origin": [
+             0.0,
+             0.0,
+             0.0
+            ],
+            "direction": [
+             0.0,
+             0.0,
+             1.0
+            ],
+            "count": 6,
+            "skip_mask": 16
+           },
+           "id": "n21",
+           "children": [
+            {
+             "type": "translate",
+             "params": {
+              "offset": [
+               0.6000000238418579,
+               0.0,
+               0.0
+              ]
+             },
+             "id": "n22",
+             "children": [
+              {
+               "type": "box",
+               "params": {
+                "size": [
+                 0.05000000074505806,
+                 0.05000000074505806,
+                 0.30000001192092896
+                ]
+               },
+               "id": "n23",
+               "material": {
+                "color": [
+                 1.0,
+                 1.0,
+                 1.0
+                ],
+                "roughness": 0.5,
+                "metallic": 0.0,
+                "opacity": 1.0,
+                "ior": 1.0,
+                "reflectivity": 0.0
+               },
+               "children": []
+              }
+             ]
+            }
+           ]
+          },
+          {
+           "type": "translate",
+           "params": {
+            "offset": [
+             0.0,
+             0.0,
+             0.5
+            ]
+           },
+           "id": "n24",
+           "children": [
+            {
+             "type": "sphere",
+             "params": {
+              "radius": 0.30000001192092896
+             },
+             "id": "n25",
+             "free": {
+              "radius": "radius"
+             },
+             "material": {
+              "color": [
+               0.800000011920929,
+               0.20000000298023224,
+               0.10000000149011612
+              ],
+              "roughness": 0.6000000238418579,
+              "metallic": 0.0,
+              "opacity": 1.0,
+              "ior": 1.0,
+              "reflectivity": 0.03999999910593033
+             },
+             "children": []
+            }
+           ]
+          },
+          {
+           "type": "mirror",
+           "params": {
+            "origin": [
+             0.0,
+             0.0,
+             0.0
+            ],
+            "normal": [
+             0.0,
+             0.0,
+             1.0
+            ]
+           },
+           "id": "n26",
+           "children": [
+            {
+             "type": "translate",
+             "params": {
+              "offset": [
+               0.0,
+               0.0,
+               0.5
+              ]
+             },
+             "id": "n24",
+             "children": [
+              {
+               "type": "sphere",
+               "params": {
+                "radius": 0.30000001192092896
+               },
+               "id": "n25",
+               "free": {
+                "radius": "radius"
+               },
+               "material": {
+                "color": [
+                 0.800000011920929,
+                 0.20000000298023224,
+                 0.10000000149011612
+                ],
+                "roughness": 0.6000000238418579,
+                "metallic": 0.0,
+                "opacity": 1.0,
+                "ior": 1.0,
+                "reflectivity": 0.03999999910593033
+               },
+               "children": []
+              }
+             ]
+            }
+           ]
+          }
+         ]
+        },
+        {
+         "type": "box",
+         "params": {
+          "size": [
+           1.2000000476837158,
+           1.2000000476837158,
+           0.800000011920929
+          ]
+         },
+         "id": "n27",
+         "material": {
+          "color": [
+           1.0,
+           1.0,
+           1.0
+          ],
+          "roughness": 0.5,
+          "metallic": 0.0,
+          "opacity": 1.0,
+          "ior": 1.0,
+          "reflectivity": 0.0
+         },
+         "children": []
+        }
+       ]
+      },
+      {
+       "type": "translate",
+       "params": {
+        "offset": [
+         0.0,
+         0.0,
+         0.699999988079071
+        ]
+       },
+       "id": "n28",
+       "children": [
+        {
+         "type": "sphere",
+         "params": {
+          "radius": 0.20000000298023224
+         },
+         "id": "n29",
+         "material": {
+          "color": [
+           1.0,
+           1.0,
+           1.0
+          ],
+          "roughness": 0.5,
+          "metallic": 0.0,
+          "opacity": 1.0,
+          "ior": 1.0,
+          "reflectivity": 0.0
+         },
+         "children": []
+        }
+       ]
+      }
+     ]
+    }
+   },
+   "uniforms": false,
+   "culling": false,
+   "wgsl": "@group(1) @binding(0) var<storage, read> profile_vertices: array<vec2<f32>>;\n\nfn prim_sphere(p: vec3<f32>, radius: f32) -> f32 {\n    return length(p) - radius;\n}\n\nfn node4(p: vec3<f32>) -> f32 {\n    return prim_sphere(p, 0.300000012);\n}\n\nfn node3(p: vec3<f32>) -> f32 {\n    return node4(p - vec3<f32>(1, 0, 0));\n}\n\nfn prim_box(p: vec3<f32>, size: vec3<f32>) -> f32 {\n    let q = abs(p) - size;\n    let max_q = max(q.x, max(q.y, q.z));\n    let clamped = max(q, vec3<f32>(0.0));\n    let squared = dot(clamped, clamped);\n    if (max_q <= 0.0) { return max_q; }\n    return sqrt(squared);\n}\n\nfn node6(p: vec3<f32>) -> f32 {\n    return prim_box(p, vec3<f32>(0.300000012, 0.200000003, 0.25));\n}\n\nfn node5(p: vec3<f32>) -> f32 {\n    return node6(mat3x3<f32>(vec3<f32>(0.921060979, 0, 0.389418334), vec3<f32>(0, 1, 0), vec3<f32>(-0.389418334, 0, 0.921060979)) * p);\n}\n\nfn prim_cylinder(p: vec3<f32>, radius: f32, height: f32) -> f32 {\n    let d_xy = sqrt(p.x * p.x + p.y * p.y + 1e-20) - radius;\n    let d_z = abs(p.z) - height;\n    let max_d = max(d_xy, d_z);\n    if (max_d <= 0.0) { return max_d; }\n    let a = max(d_xy, 0.0);\n    let b = max(d_z, 0.0);\n    return sqrt(a * a + b * b);\n}\n\nfn node8(p: vec3<f32>) -> f32 {\n    return prim_cylinder(p, 0.200000003, 0.5);\n}\n\nfn node7(p: vec3<f32>) -> f32 {\n    return node8(mat3x3<f32>(vec3<f32>(0.715033352, 0.446375608, -0.53802985), vec3<f32>(0.0764989406, 0.715033352, 0.694892228), vec3<f32>(0.694892228, -0.53802985, 0.477125436)) * p);\n}\n\nfn prim_capsule(p: vec3<f32>, radius: f32, height: f32) -> f32 {\n    let z = clamp(p.z, -height, height);\n    return length(vec3<f32>(p.x, p.y, p.z - z)) - radius;\n}\n\nfn node9(p: vec3<f32>) -> f32 {\n    return prim_capsule(p, 0.150000006, 0.400000006);\n}\n\nfn prim_torus(p: vec3<f32>, major_radius: f32, minor_radius: f32) -> f32 {\n    let q_xy = length(p.xy) - major_radius;\n    return length(vec2<f32>(q_xy, p.z)) - minor_radius;\n}\n\nfn node12(p: vec3<f32>) -> f32 {\n    return prim_torus(p, 0.300000012, 0.0799999982);\n}\n\nfn node11(p: vec3<f32>) -> f32 {\n    return node12(p - vec3<f32>(0.5, 0.5, 0));\n}\n\nfn node10(p: vec3<f32>) -> f32 {\n    let n = vec3<f32>(1, 0, 0);\n    return node11(p - 2.0 * dot(p - vec3<f32>(0, 0, 0), n) * n);\n}\n\nfn profile_vertex(i: u32) -> vec2<f32> {\n    return profile_vertices[i];\n}\n\nfn profile_distance(p: vec2<f32>, offset: u32, count: u32) -> f32 {\n    var d = dot(p - profile_vertex(offset), p - profile_vertex(offset));\n    var s = 1.0;\n    // The previous vertex is carried rather than re-read: one buffer load per\n    // edge instead of two, and no modulo. Edge for edge the same arithmetic.\n    var vj = profile_vertex(offset + count - 1u);\n    for (var i: u32 = 0u; i < count; i = i + 1u) {\n        let vi = profile_vertex(offset + i);\n        let e = vj - vi;\n        let w = p - vi;\n        let t = clamp(dot(w, e) / dot(e, e), 0.0, 1.0);\n        let b = w - e * t;\n        d = min(d, dot(b, b));\n        let c1 = p.y >= vi.y;\n        let c2 = p.y < vj.y;\n        let c3 = (e.x * w.y) > (e.y * w.x);\n        if ((c1 == c2) && (c2 == c3)) { s = -s; }\n        vj = vi;\n    }\n    return s * sqrt(d);\n}\n\nfn prim_extrudedpolygon(\n    p: vec3<f32>, offset: u32, count: u32, depth: f32, slope: f32, twist: f32\n) -> f32 {\n    // `slope` is tan(draft) and `twist` is radians over the full depth, both\n    // folded by the caller; zero is the plain extrusion and both terms\n    // vanish, matching the Python's static skips.\n    let theta = twist * p.z / depth;\n    let c = cos(theta);\n    let s = sin(theta);\n    let xy = vec2<f32>(p.x * c + p.y * s, p.y * c - p.x * s);\n    let d2 = profile_distance(xy, offset, count) + slope * (p.z + depth * 0.5);\n    let dz = abs(p.z) - depth * 0.5;\n    let max_d = max(d2, dz);\n    if (max_d <= 0.0) { return max_d; }\n    let a = max(d2, 0.0);\n    let b = max(dz, 0.0);\n    return sqrt(a * a + b * b);\n}\n\nfn node14(p: vec3<f32>) -> f32 {\n    return prim_extrudedpolygon(p, 0u, 6u, 0.300000012, 0, 0);\n}\n\nfn node13(p: vec3<f32>) -> f32 {\n    return node14(p) - 0.0199999996;\n}\n\nfn node16(p: vec3<f32>) -> f32 {\n    return prim_extrudedpolygon(p, 6u, 7u, 0.300000012, 0.0874886635, 0.523598776);\n}\n\nfn node15(p: vec3<f32>) -> f32 {\n    return abs(node16(p)) - 0.0250000004;\n}\n\nfn on_axis(x: f32, axis: f32) -> bool {\n    return abs(x - axis) <= 1e-6 * (1.0 + abs(x) + abs(axis));\n}\n\nfn profile_distance_revolved(p: vec2<f32>, offset: u32, count: u32, axis: f32) -> f32 {\n    var d = 1e30;\n    var s = 1.0;\n    // The previous vertex is carried rather than re-read: one buffer load per\n    // edge instead of two, and no modulo. Edge for edge the same arithmetic.\n    var vj = profile_vertex(offset + count - 1u);\n    for (var i: u32 = 0u; i < count; i = i + 1u) {\n        let vi = profile_vertex(offset + i);\n        let e = vj - vi;\n        let w = p - vi;\n        if (!(on_axis(vi.x, axis) && on_axis(vj.x, axis))) {\n            let t = clamp(dot(w, e) / dot(e, e), 0.0, 1.0);\n            let b = w - e * t;\n            d = min(d, dot(b, b));\n        }\n        let c1 = p.y >= vi.y;\n        let c2 = p.y < vj.y;\n        let c3 = (e.x * w.y) > (e.y * w.x);\n        if ((c1 == c2) && (c2 == c3)) { s = -s; }\n        vj = vi;\n    }\n    return s * sqrt(d);\n}\n\nfn prim_revolvedpolygon(p: vec3<f32>, offset: u32, count: u32, radial: f32) -> f32 {\n    let r = sqrt(p.x * p.x + p.z * p.z + 1e-20) - radial;\n    return profile_distance_revolved(vec2<f32>(r, p.y), offset, count, -radial);\n}\n\nfn node17(p: vec3<f32>) -> f32 {\n    return prim_revolvedpolygon(p, 13u, 4u, 0.100000001);\n}\n\nfn profile_distance_lerped(\n    p: vec2<f32>, a: u32, b: u32, count: u32, t: f32\n) -> f32 {\n    let first = mix(profile_vertex(a), profile_vertex(b), t);\n    var d = dot(p - first, p - first);\n    var s = 1.0;\n    var vj = mix(profile_vertex(a + count - 1u), profile_vertex(b + count - 1u), t);\n    for (var i: u32 = 0u; i < count; i = i + 1u) {\n        let vi = mix(profile_vertex(a + i), profile_vertex(b + i), t);\n        let e = vj - vi;\n        let w = p - vi;\n        let u = clamp(dot(w, e) / dot(e, e), 0.0, 1.0);\n        let q = w - e * u;\n        d = min(d, dot(q, q));\n        let c1 = p.y >= vi.y;\n        let c2 = p.y < vj.y;\n        let c3 = (e.x * w.y) > (e.y * w.x);\n        if ((c1 == c2) && (c2 == c3)) { s = -s; }\n        vj = vi;\n    }\n    return s * sqrt(d);\n}\n\nfn prim_loftedpolygon(\n    p: vec3<f32>, a: u32, b: u32, count: u32, height: f32\n) -> f32 {\n    let t = clamp(p.z / height + 0.5, 0.0, 1.0);\n    let d2 = profile_distance_lerped(p.xy, a, b, count, t);\n    let dz = abs(p.z) - height * 0.5;\n    let max_d = max(d2, dz);\n    if (max_d <= 0.0) { return max_d; }\n    let ea = max(d2, 0.0);\n    let eb = max(dz, 0.0);\n    return sqrt(ea * ea + eb * eb);\n}\n\nfn node18(p: vec3<f32>) -> f32 {\n    return prim_loftedpolygon(p, 17u, 21u, 4u, 0.600000024);\n}\n\nfn node20(p: vec3<f32>) -> f32 {\n    return prim_sphere(p, 0.100000001);\n}\n\nfn node19(p: vec3<f32>) -> f32 {\n    var d = node20(p);\n    let instances = array<i32, 3>(1, 3, 4);\n    for (var k = 0; k < 3; k = k + 1) {\n        let i = f32(instances[k]);\n        let q = p - vec3<f32>(0.707106781, 0.707106781, 0) * (0.300000012 * i);\n        d = min(d, node20(q));\n    }\n    return d;\n}\n\nfn node23(p: vec3<f32>) -> f32 {\n    return prim_box(p, vec3<f32>(0.0500000007, 0.0500000007, 0.300000012));\n}\n\nfn node22(p: vec3<f32>) -> f32 {\n    return node23(p - vec3<f32>(0.600000024, 0, 0));\n}\n\nfn rotate_about(p: vec3<f32>, origin: vec3<f32>, axis: vec3<f32>, angle: f32) -> vec3<f32> {\n    let v = p - origin;\n    let c = cos(angle);\n    let s = sin(angle);\n    let parallel = axis * dot(v, axis);\n    return origin + v * c + cross(axis, v) * s + parallel * (1.0 - c);\n}\n\nfn node21(p: vec3<f32>) -> f32 {\n    var d = node22(p);\n    let instances = array<i32, 4>(1, 2, 3, 5);\n    for (var k = 0; k < 4; k = k + 1) {\n        let i = f32(instances[k]);\n        let theta = -6.283185307179586 * i / 6;\n        let q = rotate_about(p, vec3<f32>(0, 0, 0), vec3<f32>(0, 0, 1), theta);\n        d = min(d, node22(q));\n    }\n    return d;\n}\n\nfn node25(p: vec3<f32>) -> f32 {\n    return prim_sphere(p, 0.300000012);\n}\n\nfn node24(p: vec3<f32>) -> f32 {\n    return node25(p - vec3<f32>(0, 0, 0.5));\n}\n\nfn node26(p: vec3<f32>) -> f32 {\n    let n = vec3<f32>(0, 0, 1);\n    return node24(p - 2.0 * dot(p - vec3<f32>(0, 0, 0), n) * n);\n}\n\nfn node2(p: vec3<f32>) -> f32 {\n    var d = node3(p);\n    let e1 = node5(p);\n    let h1 = max(0.200000003 - abs(d - e1), 0.0);\n    d = min(d, e1) - h1 * h1 * 0.25 / 0.200000003;\n    let e2 = node7(p);\n    let h2 = max(0.200000003 - abs(d - e2), 0.0);\n    d = min(d, e2) - h2 * h2 * 0.25 / 0.200000003;\n    let e3 = node9(p);\n    let h3 = max(0.200000003 - abs(d - e3), 0.0);\n    d = min(d, e3) - h3 * h3 * 0.25 / 0.200000003;\n    let e4 = node10(p);\n    let h4 = max(0.200000003 - abs(d - e4), 0.0);\n    d = min(d, e4) - h4 * h4 * 0.25 / 0.200000003;\n    let e5 = node13(p);\n    let h5 = max(0.200000003 - abs(d - e5), 0.0);\n    d = min(d, e5) - h5 * h5 * 0.25 / 0.200000003;\n    let e6 = node15(p);\n    let h6 = max(0.200000003 - abs(d - e6), 0.0);\n    d = min(d, e6) - h6 * h6 * 0.25 / 0.200000003;\n    let e7 = node17(p);\n    let h7 = max(0.200000003 - abs(d - e7), 0.0);\n    d = min(d, e7) - h7 * h7 * 0.25 / 0.200000003;\n    let e8 = node18(p);\n    let h8 = max(0.200000003 - abs(d - e8), 0.0);\n    d = min(d, e8) - h8 * h8 * 0.25 / 0.200000003;\n    let e9 = node19(p);\n    let h9 = max(0.200000003 - abs(d - e9), 0.0);\n    d = min(d, e9) - h9 * h9 * 0.25 / 0.200000003;\n    let e10 = node21(p);\n    let h10 = max(0.200000003 - abs(d - e10), 0.0);\n    d = min(d, e10) - h10 * h10 * 0.25 / 0.200000003;\n    let e11 = node24(p);\n    let h11 = max(0.200000003 - abs(d - e11), 0.0);\n    d = min(d, e11) - h11 * h11 * 0.25 / 0.200000003;\n    let e12 = node26(p);\n    let h12 = max(0.200000003 - abs(d - e12), 0.0);\n    d = min(d, e12) - h12 * h12 * 0.25 / 0.200000003;\n    return d;\n}\n\nfn node27(p: vec3<f32>) -> f32 {\n    return prim_box(p, vec3<f32>(1.20000005, 1.20000005, 0.800000012));\n}\n\nfn node1(p: vec3<f32>) -> f32 {\n    var d = node2(p);\n    let e1 = node27(p);\n    let h1 = max(1e-10 - abs(d - e1), 0.0);\n    d = max(d, e1) + h1 * h1 * 0.25 / 1e-10;\n    return d;\n}\n\nfn node29(p: vec3<f32>) -> f32 {\n    return prim_sphere(p, 0.200000003);\n}\n\nfn node28(p: vec3<f32>) -> f32 {\n    return node29(p - vec3<f32>(0, 0, 0.699999988));\n}\n\nfn node0(p: vec3<f32>) -> f32 {\n    var d = node1(p);\n    let e1 = (-node28(p));\n    let h1 = max(0.0799999982 - abs(d - e1), 0.0);\n    d = max(d, e1) + h1 * h1 * 0.25 / 0.0799999982;\n    return d;\n}\n\nfn mat4(p: vec3<f32>) -> mat4x2<f32> {\n    return mat4x2<f32>(vec2<f32>(1, 0), vec2<f32>(1, 1), vec2<f32>(1, 1), vec2<f32>(0.5, 0));\n}\n\nfn mat3(p: vec3<f32>) -> mat4x2<f32> {\n    return mat4(p - vec3<f32>(1, 0, 0));\n}\n\nfn mat6(p: vec3<f32>) -> mat4x2<f32> {\n    return mat4x2<f32>(vec2<f32>(0.600000024, 1), vec2<f32>(0.620000005, 1), vec2<f32>(0.649999976, 1), vec2<f32>(0.300000012, 0));\n}\n\nfn mat5(p: vec3<f32>) -> mat4x2<f32> {\n    return mat6(mat3x3<f32>(vec3<f32>(0.921060979, 0, 0.389418334), vec3<f32>(0, 1, 0), vec3<f32>(-0.389418334, 0, 0.921060979)) * p);\n}\n\nfn mat8(p: vec3<f32>) -> mat4x2<f32> {\n    return mat4x2<f32>(vec2<f32>(1, 0), vec2<f32>(1, 1), vec2<f32>(1, 1), vec2<f32>(0.5, 0));\n}\n\nfn mat7(p: vec3<f32>) -> mat4x2<f32> {\n    return mat8(mat3x3<f32>(vec3<f32>(0.715033352, 0.446375608, -0.53802985), vec3<f32>(0.0764989406, 0.715033352, 0.694892228), vec3<f32>(0.694892228, -0.53802985, 0.477125436)) * p);\n}\n\nfn mat9(p: vec3<f32>) -> mat4x2<f32> {\n    return mat4x2<f32>(vec2<f32>(1, 0), vec2<f32>(1, 1), vec2<f32>(1, 1), vec2<f32>(0.5, 0));\n}\n\nfn mat12(p: vec3<f32>) -> mat4x2<f32> {\n    return mat4x2<f32>(vec2<f32>(1, 0), vec2<f32>(1, 1), vec2<f32>(1, 1), vec2<f32>(0.5, 0));\n}\n\nfn mat11(p: vec3<f32>) -> mat4x2<f32> {\n    return mat12(p - vec3<f32>(0.5, 0.5, 0));\n}\n\nfn mat10(p: vec3<f32>) -> mat4x2<f32> {\n    return mat11(p - 2.0 * dot(p - vec3<f32>(0, 0, 0), vec3<f32>(1, 0, 0)) * vec3<f32>(1, 0, 0));\n}\n\nfn mat14(p: vec3<f32>) -> mat4x2<f32> {\n    return mat4x2<f32>(vec2<f32>(1, 0), vec2<f32>(1, 1), vec2<f32>(1, 1), vec2<f32>(0.5, 0));\n}\n\nfn mat13(p: vec3<f32>) -> mat4x2<f32> {\n    return mat14(p);\n}\n\nfn mat16(p: vec3<f32>) -> mat4x2<f32> {\n    return mat4x2<f32>(vec2<f32>(1, 0), vec2<f32>(1, 1), vec2<f32>(1, 1), vec2<f32>(0.5, 0));\n}\n\nfn mat15(p: vec3<f32>) -> mat4x2<f32> {\n    return mat16(p);\n}\n\nfn mat17(p: vec3<f32>) -> mat4x2<f32> {\n    return mat4x2<f32>(vec2<f32>(1, 0), vec2<f32>(1, 1), vec2<f32>(1, 1), vec2<f32>(0.5, 0));\n}\n\nfn mat18(p: vec3<f32>) -> mat4x2<f32> {\n    return mat4x2<f32>(vec2<f32>(1, 0), vec2<f32>(1, 1), vec2<f32>(1, 1), vec2<f32>(0.5, 0));\n}\n\nfn mat20(p: vec3<f32>) -> mat4x2<f32> {\n    return mat4x2<f32>(vec2<f32>(1, 0), vec2<f32>(1, 1), vec2<f32>(1, 1), vec2<f32>(0.5, 0));\n}\n\nfn mat19(p: vec3<f32>) -> mat4x2<f32> {\n    return mat20(p);\n}\n\nfn mat23(p: vec3<f32>) -> mat4x2<f32> {\n    return mat4x2<f32>(vec2<f32>(1, 0), vec2<f32>(1, 1), vec2<f32>(1, 1), vec2<f32>(0.5, 0));\n}\n\nfn mat22(p: vec3<f32>) -> mat4x2<f32> {\n    return mat23(p - vec3<f32>(0.600000024, 0, 0));\n}\n\nfn mat21(p: vec3<f32>) -> mat4x2<f32> {\n    return mat22(p);\n}\n\nfn mat25(p: vec3<f32>) -> mat4x2<f32> {\n    return mat4x2<f32>(vec2<f32>(0.800000012, 0), vec2<f32>(0.200000003, 1), vec2<f32>(0.100000001, 1), vec2<f32>(0.600000024, 0.0399999991));\n}\n\nfn mat24(p: vec3<f32>) -> mat4x2<f32> {\n    return mat25(p - vec3<f32>(0, 0, 0.5));\n}\n\nfn mat26(p: vec3<f32>) -> mat4x2<f32> {\n    return mat24(p - 2.0 * dot(p - vec3<f32>(0, 0, 0), vec3<f32>(0, 0, 1)) * vec3<f32>(0, 0, 1));\n}\n\nfn mat2(p: vec3<f32>) -> mat4x2<f32> {\n    var acc = node3(p);\n    var m = mat3(p);\n    let d0 = node5(p);\n    let n0 = mat5(p);\n    let t0 = clamp(0.5 + 0.5 * (d0 - acc) / 0.200000003, 0.0, 1.0);\n    m = m * t0 + n0 * (1.0 - t0);\n    let h0 = max(0.200000003 - abs(acc - d0), 0.0);\n    acc = min(acc, d0) - h0 * h0 * 0.25 / 0.200000003;\n    let d1 = node7(p);\n    let n1 = mat7(p);\n    let t1 = clamp(0.5 + 0.5 * (d1 - acc) / 0.200000003, 0.0, 1.0);\n    m = m * t1 + n1 * (1.0 - t1);\n    let h1 = max(0.200000003 - abs(acc - d1), 0.0);\n    acc = min(acc, d1) - h1 * h1 * 0.25 / 0.200000003;\n    let d2 = node9(p);\n    let n2 = mat9(p);\n    let t2 = clamp(0.5 + 0.5 * (d2 - acc) / 0.200000003, 0.0, 1.0);\n    m = m * t2 + n2 * (1.0 - t2);\n    let h2 = max(0.200000003 - abs(acc - d2), 0.0);\n    acc = min(acc, d2) - h2 * h2 * 0.25 / 0.200000003;\n    let d3 = node10(p);\n    let n3 = mat10(p);\n    let t3 = clamp(0.5 + 0.5 * (d3 - acc) / 0.200000003, 0.0, 1.0);\n    m = m * t3 + n3 * (1.0 - t3);\n    let h3 = max(0.200000003 - abs(acc - d3), 0.0);\n    acc = min(acc, d3) - h3 * h3 * 0.25 / 0.200000003;\n    let d4 = node13(p);\n    let n4 = mat13(p);\n    let t4 = clamp(0.5 + 0.5 * (d4 - acc) / 0.200000003, 0.0, 1.0);\n    m = m * t4 + n4 * (1.0 - t4);\n    let h4 = max(0.200000003 - abs(acc - d4), 0.0);\n    acc = min(acc, d4) - h4 * h4 * 0.25 / 0.200000003;\n    let d5 = node15(p);\n    let n5 = mat15(p);\n    let t5 = clamp(0.5 + 0.5 * (d5 - acc) / 0.200000003, 0.0, 1.0);\n    m = m * t5 + n5 * (1.0 - t5);\n    let h5 = max(0.200000003 - abs(acc - d5), 0.0);\n    acc = min(acc, d5) - h5 * h5 * 0.25 / 0.200000003;\n    let d6 = node17(p);\n    let n6 = mat17(p);\n    let t6 = clamp(0.5 + 0.5 * (d6 - acc) / 0.200000003, 0.0, 1.0);\n    m = m * t6 + n6 * (1.0 - t6);\n    let h6 = max(0.200000003 - abs(acc - d6), 0.0);\n    acc = min(acc, d6) - h6 * h6 * 0.25 / 0.200000003;\n    let d7 = node18(p);\n    let n7 = mat18(p);\n    let t7 = clamp(0.5 + 0.5 * (d7 - acc) / 0.200000003, 0.0, 1.0);\n    m = m * t7 + n7 * (1.0 - t7);\n    let h7 = max(0.200000003 - abs(acc - d7), 0.0);\n    acc = min(acc, d7) - h7 * h7 * 0.25 / 0.200000003;\n    let d8 = node19(p);\n    let n8 = mat19(p);\n    let t8 = clamp(0.5 + 0.5 * (d8 - acc) / 0.200000003, 0.0, 1.0);\n    m = m * t8 + n8 * (1.0 - t8);\n    let h8 = max(0.200000003 - abs(acc - d8), 0.0);\n    acc = min(acc, d8) - h8 * h8 * 0.25 / 0.200000003;\n    let d9 = node21(p);\n    let n9 = mat21(p);\n    let t9 = clamp(0.5 + 0.5 * (d9 - acc) / 0.200000003, 0.0, 1.0);\n    m = m * t9 + n9 * (1.0 - t9);\n    let h9 = max(0.200000003 - abs(acc - d9), 0.0);\n    acc = min(acc, d9) - h9 * h9 * 0.25 / 0.200000003;\n    let d10 = node24(p);\n    let n10 = mat24(p);\n    let t10 = clamp(0.5 + 0.5 * (d10 - acc) / 0.200000003, 0.0, 1.0);\n    m = m * t10 + n10 * (1.0 - t10);\n    let h10 = max(0.200000003 - abs(acc - d10), 0.0);\n    acc = min(acc, d10) - h10 * h10 * 0.25 / 0.200000003;\n    let d11 = node26(p);\n    let n11 = mat26(p);\n    let t11 = clamp(0.5 + 0.5 * (d11 - acc) / 0.200000003, 0.0, 1.0);\n    m = m * t11 + n11 * (1.0 - t11);\n    let h11 = max(0.200000003 - abs(acc - d11), 0.0);\n    acc = min(acc, d11) - h11 * h11 * 0.25 / 0.200000003;\n    return m;\n}\n\nfn mat27(p: vec3<f32>) -> mat4x2<f32> {\n    return mat4x2<f32>(vec2<f32>(1, 0), vec2<f32>(1, 1), vec2<f32>(1, 1), vec2<f32>(0.5, 0));\n}\n\nfn mat1(p: vec3<f32>) -> mat4x2<f32> {\n    var acc = node2(p);\n    var m = mat2(p);\n    let d0 = node27(p);\n    let n0 = mat27(p);\n    let t0 = clamp(0.5 + 0.5 * (d0 - acc) / 1e-10, 0.0, 1.0);\n    m = m * t0 + n0 * (1.0 - t0);\n    let h0 = max(1e-10 - abs(acc - d0), 0.0);\n    acc = min(acc, d0) - h0 * h0 * 0.25 / 1e-10;\n    return m;\n}\n\nfn mat29(p: vec3<f32>) -> mat4x2<f32> {\n    return mat4x2<f32>(vec2<f32>(1, 0), vec2<f32>(1, 1), vec2<f32>(1, 1), vec2<f32>(0.5, 0));\n}\n\nfn mat28(p: vec3<f32>) -> mat4x2<f32> {\n    return mat29(p - vec3<f32>(0, 0, 0.699999988));\n}\n\nfn mat0(p: vec3<f32>) -> mat4x2<f32> {\n    var acc = node1(p);\n    var m = mat1(p);\n    let d0 = node28(p);\n    let n0 = mat28(p);\n    let t0 = clamp(0.5 + 0.5 * (d0 - acc) / 0.0799999982, 0.0, 1.0);\n    m = m * t0 + n0 * (1.0 - t0);\n    let h0 = max(0.0799999982 - abs(acc - d0), 0.0);\n    acc = min(acc, d0) - h0 * h0 * 0.25 / 0.0799999982;\n    return m;\n}\n\nfn sdf(p: vec3<f32>) -> f32 {\n    return node0(p);\n}\n\nfn material_block_impl(p: vec3<f32>) -> mat4x2<f32> {\n    return mat0(p);\n}\n\nfn material_base(p: vec3<f32>) -> vec4<f32> {\n    let m = material_block_impl(p);\n    return vec4<f32>(m[0].x, m[1].x, m[2].x, m[3].x);\n}\n\nfn material_optics(p: vec3<f32>) -> vec4<f32> {\n    let m = material_block_impl(p);\n    return vec4<f32>(m[0].y, m[1].y, m[2].y, m[3].y);\n}",
+   "parameters": [],
+   "derived": [],
+   "depends": {}
+  },
+  {
+   "label": "bracket",
+   "graph": {
+    "format": "cadjoint-scene",
+    "version": 2,
+    "root": {
+     "type": "union",
+     "params": {
+      "smoothness": 0.019999999552965164
+     },
+     "id": "n0",
+     "children": [
+      {
+       "type": "difference",
+       "params": {
+        "smoothness": 0.019999999552965164
+       },
+       "id": "n1",
+       "children": [
+        {
+         "type": "union",
+         "params": {
+          "smoothness": 0.05000000074505806
+         },
+         "id": "n2",
+         "children": [
+          {
+           "type": "translate",
+           "params": {
+            "offset": [
+             0.0,
+             0.0,
+             0.10000000149011612
+            ]
+           },
+           "id": "n3",
+           "children": [
+            {
+             "type": "extruded_polygon",
+             "params": {
+              "depth": 0.20000000298023224,
+              "draft": 0.0,
+              "twist": 0.0,
+              "vertices": [
+               [
+                -1.2000000476837158,
+                -0.800000011920929
+               ],
+               [
+                1.2000000476837158,
+                -0.800000011920929
+               ],
+               [
+                1.2000000476837158,
+                0.800000011920929
+               ],
+               [
+                -1.2000000476837158,
+                0.800000011920929
+               ]
+              ]
+             },
+             "id": "n4",
+             "free": {
+              "vertices": [
+               "plate_bl",
+               "plate_br",
+               "plate_tr",
+               "plate_tl"
+              ],
+              "depth": "plate_thickness"
+             },
+             "implicit": [
+              "draft",
+              "twist"
+             ],
+             "material": {
+              "color": [
+               0.6200000047683716,
+               0.6600000262260437,
+               0.7200000286102295
+              ],
+              "roughness": 0.3499999940395355,
+              "metallic": 0.8500000238418579,
+              "opacity": 1.0,
+              "ior": 1.0,
+              "reflectivity": 0.0
+             },
+             "children": []
+            }
+           ]
+          },
+          {
+           "type": "translate",
+           "params": {
+            "offset": [
+             0.0,
+             -0.699999988079071,
+             0.0
+            ]
+           },
+           "id": "n5",
+           "children": [
+            {
+             "type": "rotate",
+             "params": {
+              "axis": [
+               0.0,
+               0.7071067690849304,
+               0.7071067690849304
+              ],
+              "angle": 3.1415927410125732
+             },
+             "id": "n6",
+             "children": [
+              {
+               "type": "extruded_polygon",
+               "params": {
+                "depth": 0.1599999964237213,
+                "draft": 0.0,
+                "twist": 0.0,
+                "vertices": [
+                 [
+                  -1.100000023841858,
+                  0.0
+                 ],
+                 [
+                  1.100000023841858,
+                  0.0
+                 ],
+                 [
+                  0.8500000238418579,
+                  1.2000000476837158
+                 ],
+                 [
+                  -0.8500000238418579,
+                  1.2000000476837158
+                 ]
+                ]
+               },
+               "id": "n7",
+               "free": {
+                "vertices": [
+                 "web_root_right",
+                 "web_root_left",
+                 "web_top_left",
+                 "web_top_right"
+                ],
+                "depth": "web_thickness"
+               },
+               "implicit": [
+                "draft",
+                "twist"
+               ],
+               "material": {
+                "color": [
+                 0.6200000047683716,
+                 0.6600000262260437,
+                 0.7200000286102295
+                ],
+                "roughness": 0.3499999940395355,
+                "metallic": 0.8500000238418579,
+                "opacity": 1.0,
+                "ior": 1.0,
+                "reflectivity": 0.0
+               },
+               "children": []
+              }
+             ]
+            }
+           ]
+          },
+          {
+           "type": "translate",
+           "params": {
+            "offset": [
+             0.0,
+             0.0,
+             0.0
+            ]
+           },
+           "id": "n8",
+           "children": [
+            {
+             "type": "rotate",
+             "params": {
+              "axis": [
+               0.0,
+               1.0,
+               0.0
+              ],
+              "angle": 1.5707963705062866
+             },
+             "id": "n9",
+             "children": [
+              {
+               "type": "extruded_polygon",
+               "params": {
+                "depth": 0.11999999731779099,
+                "draft": 0.0,
+                "twist": 0.0,
+                "vertices": [
+                 [
+                  -0.019999999552965164,
+                  0.550000011920929
+                 ],
+                 [
+                  -0.019999999552965164,
+                  -0.6200000047683716
+                 ],
+                 [
+                  -0.8999999761581421,
+                  -0.6200000047683716
+                 ]
+                ]
+               },
+               "id": "n10",
+               "free": {
+                "vertices": [
+                 "rib_plate_corner",
+                 "rib_web_corner",
+                 "rib_tip"
+                ]
+               },
+               "implicit": [
+                "draft",
+                "twist"
+               ],
+               "material": {
+                "color": [
+                 0.6200000047683716,
+                 0.6600000262260437,
+                 0.7200000286102295
+                ],
+                "roughness": 0.3499999940395355,
+                "metallic": 0.8500000238418579,
+                "opacity": 1.0,
+                "ior": 1.0,
+                "reflectivity": 0.0
+               },
+               "children": []
+              }
+             ]
+            }
+           ]
+          }
+         ]
+        },
+        {
+         "type": "translate",
+         "params": {
+          "offset": [
+           -0.699999988079071,
+           0.3499999940395355,
+           0.10000000149011612
+          ]
+         },
+         "id": "n11",
+         "free": {
+          "offset": "bolt_left"
+         },
+         "children": [
+          {
+           "type": "cylinder",
+           "params": {
+            "radius": 0.1599999964237213,
+            "height": 0.4000000059604645
+           },
+           "id": "n12",
+           "free": {
+            "radius": "hole_left_radius",
+            "height": "hole_left_height"
+           },
+           "material": {
+            "color": [
+             1.0,
+             1.0,
+             1.0
+            ],
+            "roughness": 0.5,
+            "metallic": 0.0,
+            "opacity": 1.0,
+            "ior": 1.0,
+            "reflectivity": 0.0
+           },
+           "children": []
+          }
+         ]
+        },
+        {
+         "type": "translate",
+         "params": {
+          "offset": [
+           0.699999988079071,
+           0.3499999940395355,
+           0.10000000149011612
+          ]
+         },
+         "id": "n13",
+         "free": {
+          "offset": "bolt_right"
+         },
+         "children": [
+          {
+           "type": "cylinder",
+           "params": {
+            "radius": 0.1599999964237213,
+            "height": 0.4000000059604645
+           },
+           "id": "n14",
+           "free": {
+            "radius": "hole_right_radius",
+            "height": "hole_right_height"
+           },
+           "material": {
+            "color": [
+             1.0,
+             1.0,
+             1.0
+            ],
+            "roughness": 0.5,
+            "metallic": 0.0,
+            "opacity": 1.0,
+            "ior": 1.0,
+            "reflectivity": 0.0
+           },
+           "children": []
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "type": "translate",
+       "params": {
+        "offset": [
+         0.0,
+         0.0,
+         -0.09000000357627869
+        ]
+       },
+       "id": "n15",
+       "free": {
+        "offset": "mount_position"
+       },
+       "children": [
+        {
+         "type": "box",
+         "params": {
+          "size": [
+           1.2999999523162842,
+           0.8999999761581421,
+           0.10999999940395355
+          ]
+         },
+         "id": "n16",
+         "free": {
+          "size": "mount_size"
+         },
+         "material": {
+          "color": [
+           0.3499999940395355,
+           0.3700000047683716,
+           0.4000000059604645
+          ],
+          "roughness": 0.699999988079071,
+          "metallic": 0.20000000298023224,
+          "opacity": 1.0,
+          "ior": 1.0,
+          "reflectivity": 0.0
+         },
+         "children": []
+        }
+       ]
+      }
+     ]
+    }
+   },
+   "uniforms": true,
+   "culling": true,
+   "wgsl": "// 31 free parameters, one vec4<f32> slot each.\n//      0  2f  free   plate_bl\n//     16  2f  free   plate_br\n//     32  2f  free   plate_tr\n//     48  2f  free   plate_tl\n//     64  1f  free   plate_thickness\n//     80  2f  free   web_root_right\n//     96  2f  free   web_root_left\n//    112  2f  free   web_top_left\n//    128  2f  free   web_top_right\n//    144  1f  free   web_thickness\n//    160  2f  free   rib_plate_corner\n//    176  2f  free   rib_web_corner\n//    192  2f  free   rib_tip\n//    208  3f  free   __cull0.center\n//    224  3f  free   __cull0.half\n//    240  3f  free   __cull1.center\n//    256  3f  free   __cull1.half\n//    272  3f  free   bolt_left\n//    288  1f  free   hole_left_radius\n//    304  1f  free   hole_left_height\n//    320  3f  free   bolt_right\n//    336  1f  free   hole_right_radius\n//    352  1f  free   hole_right_height\n//    368  3f  free   __cull2.center\n//    384  3f  free   __cull2.half\n//    400  3f  free   __cull3.center\n//    416  3f  free   __cull3.half\n//    432  3f  free   mount_position\n//    448  3f  free   mount_size\n//    464  3f  free   __cull4.center\n//    480  3f  free   __cull4.half\n//    496  1f  reserved  NaN (unread)\n//    512  1f  reserved  cull margin\nstruct SdfParameters {\n    values: array<vec4<f32>, 33>,\n};\n@group(3) @binding(0) var<storage, read> sdf_parameters: SdfParameters;\n\nfn profile_vertex(i: u32) -> vec2<f32> {\n    return sdf_parameters.values[i].xy;\n}\n\nfn profile_distance(p: vec2<f32>, offset: u32, count: u32) -> f32 {\n    var d = dot(p - profile_vertex(offset), p - profile_vertex(offset));\n    var s = 1.0;\n    // The previous vertex is carried rather than re-read: one buffer load per\n    // edge instead of two, and no modulo. Edge for edge the same arithmetic.\n    var vj = profile_vertex(offset + count - 1u);\n    for (var i: u32 = 0u; i < count; i = i + 1u) {\n        let vi = profile_vertex(offset + i);\n        let e = vj - vi;\n        let w = p - vi;\n        let t = clamp(dot(w, e) / dot(e, e), 0.0, 1.0);\n        let b = w - e * t;\n        d = min(d, dot(b, b));\n        let c1 = p.y >= vi.y;\n        let c2 = p.y < vj.y;\n        let c3 = (e.x * w.y) > (e.y * w.x);\n        if ((c1 == c2) && (c2 == c3)) { s = -s; }\n        vj = vi;\n    }\n    return s * sqrt(d);\n}\n\nfn prim_extrudedpolygon(\n    p: vec3<f32>, offset: u32, count: u32, depth: f32, slope: f32, twist: f32\n) -> f32 {\n    // `slope` is tan(draft) and `twist` is radians over the full depth, both\n    // folded by the caller; zero is the plain extrusion and both terms\n    // vanish, matching the Python's static skips.\n    let theta = twist * p.z / depth;\n    let c = cos(theta);\n    let s = sin(theta);\n    let xy = vec2<f32>(p.x * c + p.y * s, p.y * c - p.x * s);\n    let d2 = profile_distance(xy, offset, count) + slope * (p.z + depth * 0.5);\n    let dz = abs(p.z) - depth * 0.5;\n    let max_d = max(d2, dz);\n    if (max_d <= 0.0) { return max_d; }\n    let a = max(d2, 0.0);\n    let b = max(dz, 0.0);\n    return sqrt(a * a + b * b);\n}\n\nfn node4(p: vec3<f32>) -> f32 {\n    return prim_extrudedpolygon(p, 0u, 4u, sdf_parameters.values[4].x, 0, 0);\n}\n\nfn node3(p: vec3<f32>) -> f32 {\n    return node4(p - vec3<f32>(0, 0, 0.100000001));\n}\n\nfn node7(p: vec3<f32>) -> f32 {\n    return prim_extrudedpolygon(p, 5u, 4u, sdf_parameters.values[9].x, 0, 0);\n}\n\nfn node6(p: vec3<f32>) -> f32 {\n    return node7(mat3x3<f32>(vec3<f32>(-1, 6.18172393e-08, -6.18172393e-08), vec3<f32>(-6.18172393e-08, 1.1920929e-07, 1.00000012), vec3<f32>(6.18172393e-08, 1.00000012, 1.1920929e-07)) * p);\n}\n\nfn node5(p: vec3<f32>) -> f32 {\n    return node6(p - vec3<f32>(0, -0.699999988, 0));\n}\n\nfn node10(p: vec3<f32>) -> f32 {\n    return prim_extrudedpolygon(p, 10u, 3u, 0.119999997, 0, 0);\n}\n\nfn node9(p: vec3<f32>) -> f32 {\n    return node10(mat3x3<f32>(vec3<f32>(-4.37113883e-08, 0, 1), vec3<f32>(0, 0.99999994, 0), vec3<f32>(-1, 0, -4.37113883e-08)) * p);\n}\n\nfn node8(p: vec3<f32>) -> f32 {\n    return node9(p - vec3<f32>(0, 0, 0));\n}\n\nfn cull_box(p: vec3<f32>, center: vec3<f32>, half_size: vec3<f32>) -> f32 {\n    let q = max(abs(p - center) - half_size, vec3<f32>(0.0));\n    return sqrt(dot(q, q));\n}\n\nfn node2(p: vec3<f32>) -> f32 {\n    var d = node3(p);\n    if (!(cull_box(p, sdf_parameters.values[13].xyz, sdf_parameters.values[14].xyz) >= max(d + 0.200000003, 0.0) + sdf_parameters.values[32].x)) {\n        let e1 = node5(p);\n        let h1 = max(0.200000003 - abs(d - e1), 0.0);\n        d = min(d, e1) - h1 * h1 * 0.25 / 0.200000003;\n    }\n    if (!(cull_box(p, sdf_parameters.values[15].xyz, sdf_parameters.values[16].xyz) >= max(d + 0.200000003, 0.0) + sdf_parameters.values[32].x)) {\n        let e2 = node8(p);\n        let h2 = max(0.200000003 - abs(d - e2), 0.0);\n        d = min(d, e2) - h2 * h2 * 0.25 / 0.200000003;\n    }\n    return d;\n}\n\nfn prim_cylinder(p: vec3<f32>, radius: f32, height: f32) -> f32 {\n    let d_xy = sqrt(p.x * p.x + p.y * p.y + 1e-20) - radius;\n    let d_z = abs(p.z) - height;\n    let max_d = max(d_xy, d_z);\n    if (max_d <= 0.0) { return max_d; }\n    let a = max(d_xy, 0.0);\n    let b = max(d_z, 0.0);\n    return sqrt(a * a + b * b);\n}\n\nfn node12(p: vec3<f32>) -> f32 {\n    return prim_cylinder(p, sdf_parameters.values[18].x, sdf_parameters.values[19].x);\n}\n\nfn node11(p: vec3<f32>) -> f32 {\n    return node12(p - sdf_parameters.values[17].xyz);\n}\n\nfn node14(p: vec3<f32>) -> f32 {\n    return prim_cylinder(p, sdf_parameters.values[21].x, sdf_parameters.values[22].x);\n}\n\nfn node13(p: vec3<f32>) -> f32 {\n    return node14(p - sdf_parameters.values[20].xyz);\n}\n\nfn node1(p: vec3<f32>) -> f32 {\n    var d = node2(p);\n    if (!(cull_box(p, sdf_parameters.values[23].xyz, sdf_parameters.values[24].xyz) >= max(0.0799999982 - d, 0.0) + sdf_parameters.values[32].x)) {\n        let e1 = (-node11(p));\n        let h1 = max(0.0799999982 - abs(d - e1), 0.0);\n        d = max(d, e1) + h1 * h1 * 0.25 / 0.0799999982;\n    }\n    if (!(cull_box(p, sdf_parameters.values[25].xyz, sdf_parameters.values[26].xyz) >= max(0.0799999982 - d, 0.0) + sdf_parameters.values[32].x)) {\n        let e2 = (-node13(p));\n        let h2 = max(0.0799999982 - abs(d - e2), 0.0);\n        d = max(d, e2) + h2 * h2 * 0.25 / 0.0799999982;\n    }\n    return d;\n}\n\nfn prim_box(p: vec3<f32>, size: vec3<f32>) -> f32 {\n    let q = abs(p) - size;\n    let max_q = max(q.x, max(q.y, q.z));\n    let clamped = max(q, vec3<f32>(0.0));\n    let squared = dot(clamped, clamped);\n    if (max_q <= 0.0) { return max_q; }\n    return sqrt(squared);\n}\n\nfn node16(p: vec3<f32>) -> f32 {\n    return prim_box(p, sdf_parameters.values[28].xyz);\n}\n\nfn node15(p: vec3<f32>) -> f32 {\n    return node16(p - sdf_parameters.values[27].xyz);\n}\n\nfn node0(p: vec3<f32>) -> f32 {\n    var d = node1(p);\n    if (!(cull_box(p, sdf_parameters.values[29].xyz, sdf_parameters.values[30].xyz) >= max(d + 0.0799999982, 0.0) + sdf_parameters.values[32].x)) {\n        let e1 = node15(p);\n        let h1 = max(0.0799999982 - abs(d - e1), 0.0);\n        d = min(d, e1) - h1 * h1 * 0.25 / 0.0799999982;\n    }\n    return d;\n}\n\nfn mat4(p: vec3<f32>) -> mat4x2<f32> {\n    return mat4x2<f32>(vec2<f32>(0.620000005, 0.850000024), vec2<f32>(0.660000026, 1), vec2<f32>(0.720000029, 1), vec2<f32>(0.349999994, 0));\n}\n\nfn mat3(p: vec3<f32>) -> mat4x2<f32> {\n    return mat4(p - vec3<f32>(0, 0, 0.100000001));\n}\n\nfn mat7(p: vec3<f32>) -> mat4x2<f32> {\n    return mat4x2<f32>(vec2<f32>(0.620000005, 0.850000024), vec2<f32>(0.660000026, 1), vec2<f32>(0.720000029, 1), vec2<f32>(0.349999994, 0));\n}\n\nfn mat6(p: vec3<f32>) -> mat4x2<f32> {\n    return mat7(mat3x3<f32>(vec3<f32>(-1, 6.18172393e-08, -6.18172393e-08), vec3<f32>(-6.18172393e-08, 1.1920929e-07, 1.00000012), vec3<f32>(6.18172393e-08, 1.00000012, 1.1920929e-07)) * p);\n}\n\nfn mat5(p: vec3<f32>) -> mat4x2<f32> {\n    return mat6(p - vec3<f32>(0, -0.699999988, 0));\n}\n\nfn mat10(p: vec3<f32>) -> mat4x2<f32> {\n    return mat4x2<f32>(vec2<f32>(0.620000005, 0.850000024), vec2<f32>(0.660000026, 1), vec2<f32>(0.720000029, 1), vec2<f32>(0.349999994, 0));\n}\n\nfn mat9(p: vec3<f32>) -> mat4x2<f32> {\n    return mat10(mat3x3<f32>(vec3<f32>(-4.37113883e-08, 0, 1), vec3<f32>(0, 0.99999994, 0), vec3<f32>(-1, 0, -4.37113883e-08)) * p);\n}\n\nfn mat8(p: vec3<f32>) -> mat4x2<f32> {\n    return mat9(p - vec3<f32>(0, 0, 0));\n}\n\nfn mat2(p: vec3<f32>) -> mat4x2<f32> {\n    var acc = node3(p);\n    var m = mat3(p);\n    let d0 = node5(p);\n    let n0 = mat5(p);\n    let t0 = clamp(0.5 + 0.5 * (d0 - acc) / 0.200000003, 0.0, 1.0);\n    m = m * t0 + n0 * (1.0 - t0);\n    let h0 = max(0.200000003 - abs(acc - d0), 0.0);\n    acc = min(acc, d0) - h0 * h0 * 0.25 / 0.200000003;\n    let d1 = node8(p);\n    let n1 = mat8(p);\n    let t1 = clamp(0.5 + 0.5 * (d1 - acc) / 0.200000003, 0.0, 1.0);\n    m = m * t1 + n1 * (1.0 - t1);\n    let h1 = max(0.200000003 - abs(acc - d1), 0.0);\n    acc = min(acc, d1) - h1 * h1 * 0.25 / 0.200000003;\n    return m;\n}\n\nfn mat12(p: vec3<f32>) -> mat4x2<f32> {\n    return mat4x2<f32>(vec2<f32>(1, 0), vec2<f32>(1, 1), vec2<f32>(1, 1), vec2<f32>(0.5, 0));\n}\n\nfn mat11(p: vec3<f32>) -> mat4x2<f32> {\n    return mat12(p - sdf_parameters.values[17].xyz);\n}\n\nfn mat14(p: vec3<f32>) -> mat4x2<f32> {\n    return mat4x2<f32>(vec2<f32>(1, 0), vec2<f32>(1, 1), vec2<f32>(1, 1), vec2<f32>(0.5, 0));\n}\n\nfn mat13(p: vec3<f32>) -> mat4x2<f32> {\n    return mat14(p - sdf_parameters.values[20].xyz);\n}\n\nfn mat1(p: vec3<f32>) -> mat4x2<f32> {\n    var acc = node2(p);\n    var m = mat2(p);\n    let d0 = node11(p);\n    let n0 = mat11(p);\n    let t0 = clamp(0.5 + 0.5 * (d0 - acc) / 0.0799999982, 0.0, 1.0);\n    m = m * t0 + n0 * (1.0 - t0);\n    let h0 = max(0.0799999982 - abs(acc - d0), 0.0);\n    acc = min(acc, d0) - h0 * h0 * 0.25 / 0.0799999982;\n    let d1 = node13(p);\n    let n1 = mat13(p);\n    let t1 = clamp(0.5 + 0.5 * (d1 - acc) / 0.0799999982, 0.0, 1.0);\n    m = m * t1 + n1 * (1.0 - t1);\n    let h1 = max(0.0799999982 - abs(acc - d1), 0.0);\n    acc = min(acc, d1) - h1 * h1 * 0.25 / 0.0799999982;\n    return m;\n}\n\nfn mat16(p: vec3<f32>) -> mat4x2<f32> {\n    return mat4x2<f32>(vec2<f32>(0.349999994, 0.200000003), vec2<f32>(0.370000005, 1), vec2<f32>(0.400000006, 1), vec2<f32>(0.699999988, 0));\n}\n\nfn mat15(p: vec3<f32>) -> mat4x2<f32> {\n    return mat16(p - sdf_parameters.values[27].xyz);\n}\n\nfn mat0(p: vec3<f32>) -> mat4x2<f32> {\n    var acc = node1(p);\n    var m = mat1(p);\n    let d0 = node15(p);\n    let n0 = mat15(p);\n    let t0 = clamp(0.5 + 0.5 * (d0 - acc) / 0.0799999982, 0.0, 1.0);\n    m = m * t0 + n0 * (1.0 - t0);\n    let h0 = max(0.0799999982 - abs(acc - d0), 0.0);\n    acc = min(acc, d0) - h0 * h0 * 0.25 / 0.0799999982;\n    return m;\n}\n\nfn sdf(p: vec3<f32>) -> f32 {\n    return node0(p);\n}\n\nfn material_block_impl(p: vec3<f32>) -> mat4x2<f32> {\n    return mat0(p);\n}\n\nfn material_base(p: vec3<f32>) -> vec4<f32> {\n    let m = material_block_impl(p);\n    return vec4<f32>(m[0].x, m[1].x, m[2].x, m[3].x);\n}\n\nfn material_optics(p: vec3<f32>) -> vec4<f32> {\n    let m = material_block_impl(p);\n    return vec4<f32>(m[0].y, m[1].y, m[2].y, m[3].y);\n}",
+   "parameters": [
+    [
+     "plate_bl",
+     2,
+     [
+      -1.2000000476837158,
+      -0.800000011920929
+     ]
+    ],
+    [
+     "plate_br",
+     2,
+     [
+      1.2000000476837158,
+      -0.800000011920929
+     ]
+    ],
+    [
+     "plate_tr",
+     2,
+     [
+      1.2000000476837158,
+      0.800000011920929
+     ]
+    ],
+    [
+     "plate_tl",
+     2,
+     [
+      -1.2000000476837158,
+      0.800000011920929
+     ]
+    ],
+    [
+     "plate_thickness",
+     1,
+     [
+      0.20000000298023224
+     ]
+    ],
+    [
+     "web_root_right",
+     2,
+     [
+      -1.100000023841858,
+      0.0
+     ]
+    ],
+    [
+     "web_root_left",
+     2,
+     [
+      1.100000023841858,
+      0.0
+     ]
+    ],
+    [
+     "web_top_left",
+     2,
+     [
+      0.8500000238418579,
+      1.2000000476837158
+     ]
+    ],
+    [
+     "web_top_right",
+     2,
+     [
+      -0.8500000238418579,
+      1.2000000476837158
+     ]
+    ],
+    [
+     "web_thickness",
+     1,
+     [
+      0.1599999964237213
+     ]
+    ],
+    [
+     "rib_plate_corner",
+     2,
+     [
+      -0.019999999552965164,
+      0.550000011920929
+     ]
+    ],
+    [
+     "rib_web_corner",
+     2,
+     [
+      -0.019999999552965164,
+      -0.6200000047683716
+     ]
+    ],
+    [
+     "rib_tip",
+     2,
+     [
+      -0.8999999761581421,
+      -0.6200000047683716
+     ]
+    ],
+    [
+     "__cull0.center",
+     3,
+     [
+      3.7090345017531945e-08,
+      -0.6999999165534945,
+      0.6000000834465027
+     ]
+    ],
+    [
+     "__cull0.half",
+     3,
+     [
+      1.100000023841858,
+      0.0800001472234726,
+      0.6000001430511475
+     ]
+    ],
+    [
+     "__cull1.center",
+     3,
+     [
+      2.0107238540845174e-08,
+      -0.034999992698431015,
+      0.4599999785423279
+     ]
+    ],
+    [
+     "__cull1.half",
+     3,
+     [
+      0.060000017285346985,
+      0.5849999785423279,
+      0.4399999976158142
+     ]
+    ],
+    [
+     "bolt_left",
+     3,
+     [
+      -0.699999988079071,
+      0.3499999940395355,
+      0.10000000149011612
+     ]
+    ],
+    [
+     "hole_left_radius",
+     1,
+     [
+      0.1599999964237213
+     ]
+    ],
+    [
+     "hole_left_height",
+     1,
+     [
+      0.4000000059604645
+     ]
+    ],
+    [
+     "bolt_right",
+     3,
+     [
+      0.699999988079071,
+      0.3499999940395355,
+      0.10000000149011612
+     ]
+    ],
+    [
+     "hole_right_radius",
+     1,
+     [
+      0.1599999964237213
+     ]
+    ],
+    [
+     "hole_right_height",
+     1,
+     [
+      0.4000000059604645
+     ]
+    ],
+    [
+     "__cull2.center",
+     3,
+     [
+      -0.699999988079071,
+      0.3499999940395355,
+      0.10000000149011612
+     ]
+    ],
+    [
+     "__cull2.half",
+     3,
+     [
+      0.1599999964237213,
+      0.1599999964237213,
+      0.4000000059604645
+     ]
+    ],
+    [
+     "__cull3.center",
+     3,
+     [
+      0.699999988079071,
+      0.3499999940395355,
+      0.10000000149011612
+     ]
+    ],
+    [
+     "__cull3.half",
+     3,
+     [
+      0.1599999964237213,
+      0.1599999964237213,
+      0.4000000059604645
+     ]
+    ],
+    [
+     "mount_position",
+     3,
+     [
+      0.0,
+      0.0,
+      -0.09000000357627869
+     ]
+    ],
+    [
+     "mount_size",
+     3,
+     [
+      1.2999999523162842,
+      0.8999999761581421,
+      0.10999999940395355
+     ]
+    ],
+    [
+     "__cull4.center",
+     3,
+     [
+      0.0,
+      0.0,
+      -0.09000000357627869
+     ]
+    ],
+    [
+     "__cull4.half",
+     3,
+     [
+      1.2999999523162842,
+      0.8999999761581421,
+      0.10999999940395355
+     ]
+    ]
+   ],
+   "derived": [
+    "__cull0.center",
+    "__cull0.half",
+    "__cull1.center",
+    "__cull1.half",
+    "__cull2.center",
+    "__cull2.half",
+    "__cull3.center",
+    "__cull3.half",
+    "__cull4.center",
+    "__cull4.half"
+   ],
+   "depends": {
+    "__cull0.center": [
+     "web_root_left",
+     "web_root_right",
+     "web_thickness",
+     "web_top_left",
+     "web_top_right"
+    ],
+    "__cull0.half": [
+     "web_root_left",
+     "web_root_right",
+     "web_thickness",
+     "web_top_left",
+     "web_top_right"
+    ],
+    "__cull1.center": [
+     "rib_plate_corner",
+     "rib_tip",
+     "rib_web_corner"
+    ],
+    "__cull1.half": [
+     "rib_plate_corner",
+     "rib_tip",
+     "rib_web_corner"
+    ],
+    "__cull2.center": [
+     "bolt_left",
+     "hole_left_height",
+     "hole_left_radius"
+    ],
+    "__cull2.half": [
+     "bolt_left",
+     "hole_left_height",
+     "hole_left_radius"
+    ],
+    "__cull3.center": [
+     "bolt_right",
+     "hole_right_height",
+     "hole_right_radius"
+    ],
+    "__cull3.half": [
+     "bolt_right",
+     "hole_right_height",
+     "hole_right_radius"
+    ],
+    "__cull4.center": [
+     "mount_position",
+     "mount_size"
+    ],
+    "__cull4.half": [
+     "mount_position",
+     "mount_size"
+    ]
+   }
+  },
+  {
+   "label": "bracket",
+   "graph": {
+    "format": "cadjoint-scene",
+    "version": 2,
+    "root": {
+     "type": "union",
+     "params": {
+      "smoothness": 0.019999999552965164
+     },
+     "id": "n0",
+     "children": [
+      {
+       "type": "difference",
+       "params": {
+        "smoothness": 0.019999999552965164
+       },
+       "id": "n1",
+       "children": [
+        {
+         "type": "union",
+         "params": {
+          "smoothness": 0.05000000074505806
+         },
+         "id": "n2",
+         "children": [
+          {
+           "type": "translate",
+           "params": {
+            "offset": [
+             0.0,
+             0.0,
+             0.10000000149011612
+            ]
+           },
+           "id": "n3",
+           "children": [
+            {
+             "type": "extruded_polygon",
+             "params": {
+              "depth": 0.20000000298023224,
+              "draft": 0.0,
+              "twist": 0.0,
+              "vertices": [
+               [
+                -1.2000000476837158,
+                -0.800000011920929
+               ],
+               [
+                1.2000000476837158,
+                -0.800000011920929
+               ],
+               [
+                1.2000000476837158,
+                0.800000011920929
+               ],
+               [
+                -1.2000000476837158,
+                0.800000011920929
+               ]
+              ]
+             },
+             "id": "n4",
+             "free": {
+              "vertices": [
+               "plate_bl",
+               "plate_br",
+               "plate_tr",
+               "plate_tl"
+              ],
+              "depth": "plate_thickness"
+             },
+             "implicit": [
+              "draft",
+              "twist"
+             ],
+             "material": {
+              "color": [
+               0.6200000047683716,
+               0.6600000262260437,
+               0.7200000286102295
+              ],
+              "roughness": 0.3499999940395355,
+              "metallic": 0.8500000238418579,
+              "opacity": 1.0,
+              "ior": 1.0,
+              "reflectivity": 0.0
+             },
+             "children": []
+            }
+           ]
+          },
+          {
+           "type": "translate",
+           "params": {
+            "offset": [
+             0.0,
+             -0.699999988079071,
+             0.0
+            ]
+           },
+           "id": "n5",
+           "children": [
+            {
+             "type": "rotate",
+             "params": {
+              "axis": [
+               0.0,
+               0.7071067690849304,
+               0.7071067690849304
+              ],
+              "angle": 3.1415927410125732
+             },
+             "id": "n6",
+             "children": [
+              {
+               "type": "extruded_polygon",
+               "params": {
+                "depth": 0.1599999964237213,
+                "draft": 0.0,
+                "twist": 0.0,
+                "vertices": [
+                 [
+                  -1.100000023841858,
+                  0.0
+                 ],
+                 [
+                  1.100000023841858,
+                  0.0
+                 ],
+                 [
+                  0.8500000238418579,
+                  1.2000000476837158
+                 ],
+                 [
+                  -0.8500000238418579,
+                  1.2000000476837158
+                 ]
+                ]
+               },
+               "id": "n7",
+               "free": {
+                "vertices": [
+                 "web_root_right",
+                 "web_root_left",
+                 "web_top_left",
+                 "web_top_right"
+                ],
+                "depth": "web_thickness"
+               },
+               "implicit": [
+                "draft",
+                "twist"
+               ],
+               "material": {
+                "color": [
+                 0.6200000047683716,
+                 0.6600000262260437,
+                 0.7200000286102295
+                ],
+                "roughness": 0.3499999940395355,
+                "metallic": 0.8500000238418579,
+                "opacity": 1.0,
+                "ior": 1.0,
+                "reflectivity": 0.0
+               },
+               "children": []
+              }
+             ]
+            }
+           ]
+          },
+          {
+           "type": "translate",
+           "params": {
+            "offset": [
+             0.0,
+             0.0,
+             0.0
+            ]
+           },
+           "id": "n8",
+           "children": [
+            {
+             "type": "rotate",
+             "params": {
+              "axis": [
+               0.0,
+               1.0,
+               0.0
+              ],
+              "angle": 1.5707963705062866
+             },
+             "id": "n9",
+             "children": [
+              {
+               "type": "extruded_polygon",
+               "params": {
+                "depth": 0.11999999731779099,
+                "draft": 0.0,
+                "twist": 0.0,
+                "vertices": [
+                 [
+                  -0.019999999552965164,
+                  0.550000011920929
+                 ],
+                 [
+                  -0.019999999552965164,
+                  -0.6200000047683716
+                 ],
+                 [
+                  -0.8999999761581421,
+                  -0.6200000047683716
+                 ]
+                ]
+               },
+               "id": "n10",
+               "free": {
+                "vertices": [
+                 "rib_plate_corner",
+                 "rib_web_corner",
+                 "rib_tip"
+                ]
+               },
+               "implicit": [
+                "draft",
+                "twist"
+               ],
+               "material": {
+                "color": [
+                 0.6200000047683716,
+                 0.6600000262260437,
+                 0.7200000286102295
+                ],
+                "roughness": 0.3499999940395355,
+                "metallic": 0.8500000238418579,
+                "opacity": 1.0,
+                "ior": 1.0,
+                "reflectivity": 0.0
+               },
+               "children": []
+              }
+             ]
+            }
+           ]
+          }
+         ]
+        },
+        {
+         "type": "translate",
+         "params": {
+          "offset": [
+           -0.699999988079071,
+           0.3499999940395355,
+           0.10000000149011612
+          ]
+         },
+         "id": "n11",
+         "free": {
+          "offset": "bolt_left"
+         },
+         "children": [
+          {
+           "type": "cylinder",
+           "params": {
+            "radius": 0.1599999964237213,
+            "height": 0.4000000059604645
+           },
+           "id": "n12",
+           "free": {
+            "radius": "hole_left_radius",
+            "height": "hole_left_height"
+           },
+           "material": {
+            "color": [
+             1.0,
+             1.0,
+             1.0
+            ],
+            "roughness": 0.5,
+            "metallic": 0.0,
+            "opacity": 1.0,
+            "ior": 1.0,
+            "reflectivity": 0.0
+           },
+           "children": []
+          }
+         ]
+        },
+        {
+         "type": "translate",
+         "params": {
+          "offset": [
+           0.699999988079071,
+           0.3499999940395355,
+           0.10000000149011612
+          ]
+         },
+         "id": "n13",
+         "free": {
+          "offset": "bolt_right"
+         },
+         "children": [
+          {
+           "type": "cylinder",
+           "params": {
+            "radius": 0.1599999964237213,
+            "height": 0.4000000059604645
+           },
+           "id": "n14",
+           "free": {
+            "radius": "hole_right_radius",
+            "height": "hole_right_height"
+           },
+           "material": {
+            "color": [
+             1.0,
+             1.0,
+             1.0
+            ],
+            "roughness": 0.5,
+            "metallic": 0.0,
+            "opacity": 1.0,
+            "ior": 1.0,
+            "reflectivity": 0.0
+           },
+           "children": []
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "type": "translate",
+       "params": {
+        "offset": [
+         0.0,
+         0.0,
+         -0.09000000357627869
+        ]
+       },
+       "id": "n15",
+       "free": {
+        "offset": "mount_position"
+       },
+       "children": [
+        {
+         "type": "box",
+         "params": {
+          "size": [
+           1.2999999523162842,
+           0.8999999761581421,
+           0.10999999940395355
+          ]
+         },
+         "id": "n16",
+         "free": {
+          "size": "mount_size"
+         },
+         "material": {
+          "color": [
+           0.3499999940395355,
+           0.3700000047683716,
+           0.4000000059604645
+          ],
+          "roughness": 0.699999988079071,
+          "metallic": 0.20000000298023224,
+          "opacity": 1.0,
+          "ior": 1.0,
+          "reflectivity": 0.0
+         },
+         "children": []
+        }
+       ]
+      }
+     ]
+    }
+   },
+   "uniforms": false,
+   "culling": false,
+   "wgsl": "@group(1) @binding(0) var<storage, read> profile_vertices: array<vec2<f32>>;\n\nfn profile_vertex(i: u32) -> vec2<f32> {\n    return profile_vertices[i];\n}\n\nfn profile_distance(p: vec2<f32>, offset: u32, count: u32) -> f32 {\n    var d = dot(p - profile_vertex(offset), p - profile_vertex(offset));\n    var s = 1.0;\n    // The previous vertex is carried rather than re-read: one buffer load per\n    // edge instead of two, and no modulo. Edge for edge the same arithmetic.\n    var vj = profile_vertex(offset + count - 1u);\n    for (var i: u32 = 0u; i < count; i = i + 1u) {\n        let vi = profile_vertex(offset + i);\n        let e = vj - vi;\n        let w = p - vi;\n        let t = clamp(dot(w, e) / dot(e, e), 0.0, 1.0);\n        let b = w - e * t;\n        d = min(d, dot(b, b));\n        let c1 = p.y >= vi.y;\n        let c2 = p.y < vj.y;\n        let c3 = (e.x * w.y) > (e.y * w.x);\n        if ((c1 == c2) && (c2 == c3)) { s = -s; }\n        vj = vi;\n    }\n    return s * sqrt(d);\n}\n\nfn prim_extrudedpolygon(\n    p: vec3<f32>, offset: u32, count: u32, depth: f32, slope: f32, twist: f32\n) -> f32 {\n    // `slope` is tan(draft) and `twist` is radians over the full depth, both\n    // folded by the caller; zero is the plain extrusion and both terms\n    // vanish, matching the Python's static skips.\n    let theta = twist * p.z / depth;\n    let c = cos(theta);\n    let s = sin(theta);\n    let xy = vec2<f32>(p.x * c + p.y * s, p.y * c - p.x * s);\n    let d2 = profile_distance(xy, offset, count) + slope * (p.z + depth * 0.5);\n    let dz = abs(p.z) - depth * 0.5;\n    let max_d = max(d2, dz);\n    if (max_d <= 0.0) { return max_d; }\n    let a = max(d2, 0.0);\n    let b = max(dz, 0.0);\n    return sqrt(a * a + b * b);\n}\n\nfn node4(p: vec3<f32>) -> f32 {\n    return prim_extrudedpolygon(p, 0u, 4u, 0.200000003, 0, 0);\n}\n\nfn node3(p: vec3<f32>) -> f32 {\n    return node4(p - vec3<f32>(0, 0, 0.100000001));\n}\n\nfn node7(p: vec3<f32>) -> f32 {\n    return prim_extrudedpolygon(p, 4u, 4u, 0.159999996, 0, 0);\n}\n\nfn node6(p: vec3<f32>) -> f32 {\n    return node7(mat3x3<f32>(vec3<f32>(-1, 6.18172393e-08, -6.18172393e-08), vec3<f32>(-6.18172393e-08, 1.1920929e-07, 1.00000012), vec3<f32>(6.18172393e-08, 1.00000012, 1.1920929e-07)) * p);\n}\n\nfn node5(p: vec3<f32>) -> f32 {\n    return node6(p - vec3<f32>(0, -0.699999988, 0));\n}\n\nfn node10(p: vec3<f32>) -> f32 {\n    return prim_extrudedpolygon(p, 8u, 3u, 0.119999997, 0, 0);\n}\n\nfn node9(p: vec3<f32>) -> f32 {\n    return node10(mat3x3<f32>(vec3<f32>(-4.37113883e-08, 0, 1), vec3<f32>(0, 0.99999994, 0), vec3<f32>(-1, 0, -4.37113883e-08)) * p);\n}\n\nfn node8(p: vec3<f32>) -> f32 {\n    return node9(p - vec3<f32>(0, 0, 0));\n}\n\nfn node2(p: vec3<f32>) -> f32 {\n    var d = node3(p);\n    let e1 = node5(p);\n    let h1 = max(0.200000003 - abs(d - e1), 0.0);\n    d = min(d, e1) - h1 * h1 * 0.25 / 0.200000003;\n    let e2 = node8(p);\n    let h2 = max(0.200000003 - abs(d - e2), 0.0);\n    d = min(d, e2) - h2 * h2 * 0.25 / 0.200000003;\n    return d;\n}\n\nfn prim_cylinder(p: vec3<f32>, radius: f32, height: f32) -> f32 {\n    let d_xy = sqrt(p.x * p.x + p.y * p.y + 1e-20) - radius;\n    let d_z = abs(p.z) - height;\n    let max_d = max(d_xy, d_z);\n    if (max_d <= 0.0) { return max_d; }\n    let a = max(d_xy, 0.0);\n    let b = max(d_z, 0.0);\n    return sqrt(a * a + b * b);\n}\n\nfn node12(p: vec3<f32>) -> f32 {\n    return prim_cylinder(p, 0.159999996, 0.400000006);\n}\n\nfn node11(p: vec3<f32>) -> f32 {\n    return node12(p - vec3<f32>(-0.699999988, 0.349999994, 0.100000001));\n}\n\nfn node14(p: vec3<f32>) -> f32 {\n    return prim_cylinder(p, 0.159999996, 0.400000006);\n}\n\nfn node13(p: vec3<f32>) -> f32 {\n    return node14(p - vec3<f32>(0.699999988, 0.349999994, 0.100000001));\n}\n\nfn node1(p: vec3<f32>) -> f32 {\n    var d = node2(p);\n    let e1 = (-node11(p));\n    let h1 = max(0.0799999982 - abs(d - e1), 0.0);\n    d = max(d, e1) + h1 * h1 * 0.25 / 0.0799999982;\n    let e2 = (-node13(p));\n    let h2 = max(0.0799999982 - abs(d - e2), 0.0);\n    d = max(d, e2) + h2 * h2 * 0.25 / 0.0799999982;\n    return d;\n}\n\nfn prim_box(p: vec3<f32>, size: vec3<f32>) -> f32 {\n    let q = abs(p) - size;\n    let max_q = max(q.x, max(q.y, q.z));\n    let clamped = max(q, vec3<f32>(0.0));\n    let squared = dot(clamped, clamped);\n    if (max_q <= 0.0) { return max_q; }\n    return sqrt(squared);\n}\n\nfn node16(p: vec3<f32>) -> f32 {\n    return prim_box(p, vec3<f32>(1.29999995, 0.899999976, 0.109999999));\n}\n\nfn node15(p: vec3<f32>) -> f32 {\n    return node16(p - vec3<f32>(0, 0, -0.0900000036));\n}\n\nfn node0(p: vec3<f32>) -> f32 {\n    var d = node1(p);\n    let e1 = node15(p);\n    let h1 = max(0.0799999982 - abs(d - e1), 0.0);\n    d = min(d, e1) - h1 * h1 * 0.25 / 0.0799999982;\n    return d;\n}\n\nfn mat4(p: vec3<f32>) -> mat4x2<f32> {\n    return mat4x2<f32>(vec2<f32>(0.620000005, 0.850000024), vec2<f32>(0.660000026, 1), vec2<f32>(0.720000029, 1), vec2<f32>(0.349999994, 0));\n}\n\nfn mat3(p: vec3<f32>) -> mat4x2<f32> {\n    return mat4(p - vec3<f32>(0, 0, 0.100000001));\n}\n\nfn mat7(p: vec3<f32>) -> mat4x2<f32> {\n    return mat4x2<f32>(vec2<f32>(0.620000005, 0.850000024), vec2<f32>(0.660000026, 1), vec2<f32>(0.720000029, 1), vec2<f32>(0.349999994, 0));\n}\n\nfn mat6(p: vec3<f32>) -> mat4x2<f32> {\n    return mat7(mat3x3<f32>(vec3<f32>(-1, 6.18172393e-08, -6.18172393e-08), vec3<f32>(-6.18172393e-08, 1.1920929e-07, 1.00000012), vec3<f32>(6.18172393e-08, 1.00000012, 1.1920929e-07)) * p);\n}\n\nfn mat5(p: vec3<f32>) -> mat4x2<f32> {\n    return mat6(p - vec3<f32>(0, -0.699999988, 0));\n}\n\nfn mat10(p: vec3<f32>) -> mat4x2<f32> {\n    return mat4x2<f32>(vec2<f32>(0.620000005, 0.850000024), vec2<f32>(0.660000026, 1), vec2<f32>(0.720000029, 1), vec2<f32>(0.349999994, 0));\n}\n\nfn mat9(p: vec3<f32>) -> mat4x2<f32> {\n    return mat10(mat3x3<f32>(vec3<f32>(-4.37113883e-08, 0, 1), vec3<f32>(0, 0.99999994, 0), vec3<f32>(-1, 0, -4.37113883e-08)) * p);\n}\n\nfn mat8(p: vec3<f32>) -> mat4x2<f32> {\n    return mat9(p - vec3<f32>(0, 0, 0));\n}\n\nfn mat2(p: vec3<f32>) -> mat4x2<f32> {\n    var acc = node3(p);\n    var m = mat3(p);\n    let d0 = node5(p);\n    let n0 = mat5(p);\n    let t0 = clamp(0.5 + 0.5 * (d0 - acc) / 0.200000003, 0.0, 1.0);\n    m = m * t0 + n0 * (1.0 - t0);\n    let h0 = max(0.200000003 - abs(acc - d0), 0.0);\n    acc = min(acc, d0) - h0 * h0 * 0.25 / 0.200000003;\n    let d1 = node8(p);\n    let n1 = mat8(p);\n    let t1 = clamp(0.5 + 0.5 * (d1 - acc) / 0.200000003, 0.0, 1.0);\n    m = m * t1 + n1 * (1.0 - t1);\n    let h1 = max(0.200000003 - abs(acc - d1), 0.0);\n    acc = min(acc, d1) - h1 * h1 * 0.25 / 0.200000003;\n    return m;\n}\n\nfn mat12(p: vec3<f32>) -> mat4x2<f32> {\n    return mat4x2<f32>(vec2<f32>(1, 0), vec2<f32>(1, 1), vec2<f32>(1, 1), vec2<f32>(0.5, 0));\n}\n\nfn mat11(p: vec3<f32>) -> mat4x2<f32> {\n    return mat12(p - vec3<f32>(-0.699999988, 0.349999994, 0.100000001));\n}\n\nfn mat14(p: vec3<f32>) -> mat4x2<f32> {\n    return mat4x2<f32>(vec2<f32>(1, 0), vec2<f32>(1, 1), vec2<f32>(1, 1), vec2<f32>(0.5, 0));\n}\n\nfn mat13(p: vec3<f32>) -> mat4x2<f32> {\n    return mat14(p - vec3<f32>(0.699999988, 0.349999994, 0.100000001));\n}\n\nfn mat1(p: vec3<f32>) -> mat4x2<f32> {\n    var acc = node2(p);\n    var m = mat2(p);\n    let d0 = node11(p);\n    let n0 = mat11(p);\n    let t0 = clamp(0.5 + 0.5 * (d0 - acc) / 0.0799999982, 0.0, 1.0);\n    m = m * t0 + n0 * (1.0 - t0);\n    let h0 = max(0.0799999982 - abs(acc - d0), 0.0);\n    acc = min(acc, d0) - h0 * h0 * 0.25 / 0.0799999982;\n    let d1 = node13(p);\n    let n1 = mat13(p);\n    let t1 = clamp(0.5 + 0.5 * (d1 - acc) / 0.0799999982, 0.0, 1.0);\n    m = m * t1 + n1 * (1.0 - t1);\n    let h1 = max(0.0799999982 - abs(acc - d1), 0.0);\n    acc = min(acc, d1) - h1 * h1 * 0.25 / 0.0799999982;\n    return m;\n}\n\nfn mat16(p: vec3<f32>) -> mat4x2<f32> {\n    return mat4x2<f32>(vec2<f32>(0.349999994, 0.200000003), vec2<f32>(0.370000005, 1), vec2<f32>(0.400000006, 1), vec2<f32>(0.699999988, 0));\n}\n\nfn mat15(p: vec3<f32>) -> mat4x2<f32> {\n    return mat16(p - vec3<f32>(0, 0, -0.0900000036));\n}\n\nfn mat0(p: vec3<f32>) -> mat4x2<f32> {\n    var acc = node1(p);\n    var m = mat1(p);\n    let d0 = node15(p);\n    let n0 = mat15(p);\n    let t0 = clamp(0.5 + 0.5 * (d0 - acc) / 0.0799999982, 0.0, 1.0);\n    m = m * t0 + n0 * (1.0 - t0);\n    let h0 = max(0.0799999982 - abs(acc - d0), 0.0);\n    acc = min(acc, d0) - h0 * h0 * 0.25 / 0.0799999982;\n    return m;\n}\n\nfn sdf(p: vec3<f32>) -> f32 {\n    return node0(p);\n}\n\nfn material_block_impl(p: vec3<f32>) -> mat4x2<f32> {\n    return mat0(p);\n}\n\nfn material_base(p: vec3<f32>) -> vec4<f32> {\n    let m = material_block_impl(p);\n    return vec4<f32>(m[0].x, m[1].x, m[2].x, m[3].x);\n}\n\nfn material_optics(p: vec3<f32>) -> vec4<f32> {\n    let m = material_block_impl(p);\n    return vec4<f32>(m[0].y, m[1].y, m[2].y, m[3].y);\n}",
+   "parameters": [],
+   "derived": [],
+   "depends": {}
+  }
+ ]
+}

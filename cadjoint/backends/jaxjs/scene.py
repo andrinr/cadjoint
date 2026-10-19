@@ -13,6 +13,12 @@ kernels, and nothing else::
 and profiles store their vertices as one ``vertices`` list of ``[x, y]``
 pairs.  A browser-side scene API builds the same JSON, so this format, not
 either language's classes, is what both sides test against.
+
+Version 2 is a superset of version 1 that also carries what a renderer needs
+and an evaluator does not: a stable id per node, the declared names of free
+parameters, and each primitive's material.  It is written only on request
+(``scene_graph(sdf, version=2)``), and :func:`graph_sdf` reads both.  The
+format is specified in ``SCENE_FORMAT.md`` next to this module.
 """
 
 from __future__ import annotations
@@ -27,10 +33,25 @@ from cadjoint.sdf.primitives.polygon import ExtrudedPolygon, RevolvedPolygon
 
 from .kernels import NODE_TYPES, POLYGON_BUCKETS
 
-__all__ = ["SCENE_FORMAT", "SCENE_VERSION", "UnsupportedNode", "graph_sdf", "scene_graph"]
+__all__ = [
+    "SCENE_FORMAT",
+    "SCENE_VERSION",
+    "SCENE_VERSIONS",
+    "UnsupportedNode",
+    "graph_sdf",
+    "scene_graph",
+]
 
 SCENE_FORMAT = "cadjoint-scene"
+#: The version :func:`scene_graph` writes by default, and the one the
+#: generated jax-js runtime checks for.
 SCENE_VERSION = 1
+#: Every version :func:`graph_sdf` reads.  Each adds fields and changes none.
+SCENE_VERSIONS = (1, 2)
+
+#: The material properties a version 2 primitive carries: the two rows a
+#: shader's material block holds.
+MATERIAL_KEYS = ("color", "roughness", "metallic", "opacity", "ior", "reflectivity")
 
 _BY_CLASS = {node.cls: node for node in NODE_TYPES.values()}
 
@@ -74,10 +95,7 @@ def _vertices(params: dict, prefix: str) -> list[list[float]]:
     return [_plain(params[k]) for k in names]
 
 
-def _node(sdf) -> dict:
-    node = _BY_CLASS.get(type(sdf))
-    if node is None:
-        raise UnsupportedNode(f"no jax-js kernels for {type(sdf).__name__}")
+def _params(sdf, node) -> dict:
     params = sdf.params
     if isinstance(sdf, ExtrudedPolygon):
         out = {
@@ -102,14 +120,87 @@ def _node(sdf) -> dict:
             out[name] = _plain(params[name])
         for name in node.static:
             out[name] = int(round(out[name]))
-    return {"type": node.name, "params": out, "children": [_node(c) for c in _children(sdf)]}
+    return out
 
 
-def scene_graph(sdf) -> dict:
+def _free(params: dict) -> dict:
+    """``{graph parameter: declared name}`` for the free parameters of a node.
+
+    A profile's vertices map to a list with one entry per vertex, ``None``
+    for a fixed one.
+    """
+
+    def declared(parameter):
+        if getattr(parameter, "free", False) and getattr(parameter, "name", None):
+            return str(parameter.name)
+        return None
+
+    out: dict = {}
+    for prefix, key in (("v", "vertices"), ("w", "vertices_b")):
+        names = sorted(
+            (k for k in params if k.startswith(prefix) and k[len(prefix) :].isdigit()),
+            key=lambda k: int(k[len(prefix) :]),
+        )
+        names_free = [declared(params[k]) for k in names]
+        if any(names_free):
+            out[key] = names_free
+    for name, parameter in params.items():
+        if name[:1] in "vw" and name[1:].isdigit():
+            continue
+        if declared(parameter) is not None:
+            out[name] = declared(parameter)
+    return out
+
+
+def _material(sdf) -> dict:
+    values = sdf.material_at(np.zeros(3, dtype=np.float64))
+    out = {}
+    for key in MATERIAL_KEYS:
+        array = np.asarray(values[key], dtype=np.float64).reshape(-1)
+        # JSON has no NaN; a reader turns null back into one.
+        items = [float(v) if np.isfinite(v) else None for v in array]
+        out[key] = items if key == "color" else items[0]
+    return out
+
+
+class _Writer:
+    """Writes the nodes of one graph, numbering them in first-visit order."""
+
+    def __init__(self, version: int) -> None:
+        self.version = version
+        self.ids: dict[int, str] = {}
+
+    def node(self, sdf) -> dict:
+        node = _BY_CLASS.get(type(sdf))
+        if node is None:
+            raise UnsupportedNode(f"no jax-js kernels for {type(sdf).__name__}")
+        out = {"type": node.name, "params": _params(sdf, node)}
+        if self.version >= 2:
+            # A node reached twice keeps its first id, so a reader can tell a
+            # shared subtree from two equal ones and emit it once.
+            out["id"] = self.ids.setdefault(id(sdf), f"n{len(self.ids)}")
+            free = _free(sdf.params)
+            if free:
+                out["free"] = free
+            implicit = [
+                name
+                for name in ("draft", "twist")
+                if isinstance(sdf, ExtrudedPolygon) and name not in sdf.params
+            ]
+            if implicit:
+                out["implicit"] = implicit
+            if node.kind == "primitive":
+                out["material"] = _material(sdf)
+        out["children"] = [self.node(c) for c in _children(sdf)]
+        return out
+
+
+def scene_graph(sdf, version: int = SCENE_VERSION) -> dict:
     """The scene graph of a cadjoint SDF tree.
 
     Args:
         sdf: The root node.
+        version: The format version to write, one of :data:`SCENE_VERSIONS`.
 
     Returns:
         ``{"format", "version", "root"}``, JSON-serialisable.
@@ -118,7 +209,9 @@ def scene_graph(sdf) -> dict:
         UnsupportedNode: If a node has no jax-js kernels, or a child is a
             plain callable rather than an SDF node.
     """
-    return {"format": SCENE_FORMAT, "version": SCENE_VERSION, "root": _node(sdf)}
+    if version not in SCENE_VERSIONS:
+        raise ValueError(f"{SCENE_FORMAT} has versions {SCENE_VERSIONS}, not {version}")
+    return {"format": SCENE_FORMAT, "version": version, "root": _Writer(version).node(sdf)}
 
 
 def graph_sdf(graph: dict):
@@ -138,8 +231,8 @@ def graph_sdf(graph: dict):
     """
     import jax.numpy as jnp
 
-    if graph.get("format") != SCENE_FORMAT or graph.get("version") != SCENE_VERSION:
-        raise ValueError(f"not a {SCENE_FORMAT} v{SCENE_VERSION} graph")
+    if graph.get("format") != SCENE_FORMAT or graph.get("version") not in SCENE_VERSIONS:
+        raise ValueError(f"not a {SCENE_FORMAT} graph of a version in {SCENE_VERSIONS}")
 
     def build(node: dict):
         spec = NODE_TYPES[node["type"]]

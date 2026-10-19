@@ -1,4 +1,4 @@
-"""``python -m cadjoint.backends.jaxjs kernels OUT.ts`` / ``scene SCENE.py OUT.json``."""
+"""``python -m cadjoint.backends.jaxjs kernels OUT.ts`` / ``scene SCENE.py OUT.json [--version 2]``."""
 
 from __future__ import annotations
 
@@ -18,6 +18,7 @@ def main(argv=None) -> None:
     scene = sub.add_parser("scene", help="export a scene file's `scene` as a JSON scene graph")
     scene.add_argument("scene", type=Path)
     scene.add_argument("out", type=Path)
+    scene.add_argument("--version", type=int, default=1, help="scene graph format version")
     args = parser.parse_args(argv)
 
     if args.command == "kernels":
@@ -26,7 +27,7 @@ def main(argv=None) -> None:
         print(f"wrote {args.out} ({source.count(chr(10))} lines)")
     else:
         sdf = runpy.run_path(str(args.scene), run_name="__export__")["scene"]
-        args.out.write_text(json.dumps(scene_graph(sdf)))
+        args.out.write_text(json.dumps(scene_graph(sdf, version=args.version)))
         print(f"wrote {args.out}")
 
 
