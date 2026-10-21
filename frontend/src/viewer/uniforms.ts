@@ -76,8 +76,14 @@ export function packSceneUniforms(frame: {
 }
 
 /**
- * The overlay block: the view-projection, the eye, the stroke metrics, and
- * the depth nudge and casing that tell construction strokes from mesh edges.
+ * The overlay block: the view-projection, the eye, the stroke metrics, the
+ * depth nudge and casing that tell construction strokes from mesh edges, and
+ * the view direction.
+ *
+ * The direction is the camera's forward axis, with `w` 1 under an
+ * orthographic projection: there every ray is parallel to it, and a surface
+ * shaded by the vector from the eye *point* instead got a radial gradient
+ * across a flat plane, brightest where the plane passes nearest the eye.
  */
 export function packOverlayUniforms(
   matrix: Float32Array,
@@ -85,14 +91,19 @@ export function packOverlayUniforms(
   size: FrameSize,
   depthNudge: number,
   casing: number,
+  view: { forward: Vec3; orthographic: boolean },
 ): Float32Array<ArrayBuffer> {
-  const overlay = new Float32Array(28);
+  const overlay = new Float32Array(OVERLAY_UNIFORM_FLOATS);
   overlay.set(matrix, 0);
   overlay.set([position[0], position[1], position[2], 0], 16);
   overlay.set([size.width, size.height, LINE_WIDTH_PX, HANDLE_RADIUS_PX], 20);
   overlay.set([depthNudge, casing, 0, 0], 24);
+  overlay.set([view.forward[0], view.forward[1], view.forward[2], view.orthographic ? 1 : 0], 28);
   return overlay;
 }
+
+/** The overlay block's size: view-projection, then four vec4s. */
+export const OVERLAY_UNIFORM_FLOATS = 32;
 
 /**
  * The FEM surface block: the view-projection, the clip plane, the field

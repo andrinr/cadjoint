@@ -40,10 +40,20 @@ describe("uniform blocks", () => {
   });
 
   it("packs the overlay block with its nudge and casing last", () => {
-    const overlay = packOverlayUniforms(matrix, position, size, 0.5, 0.25);
-    expect(overlay.byteLength).toBe(112);
+    const overlay = packOverlayUniforms(matrix, position, size, 0.5, 0.25, {
+      forward: [0, 0, -1],
+      orthographic: true,
+    });
+    expect(overlay.byteLength).toBe(128);
     expect(Array.from(overlay.slice(0, 16))).toEqual(Array.from(matrix));
-    expect(Array.from(overlay.slice(24))).toEqual([0.5, 0.25, 0, 0]);
+    expect(Array.from(overlay.slice(24, 28))).toEqual([0.5, 0.25, 0, 0]);
+    // The view direction last, flagged orthographic: a flat face shades flat.
+    expect(Array.from(overlay.slice(28))).toEqual([0, 0, -1, 1]);
+    const perspective = packOverlayUniforms(matrix, position, size, 0.5, 0.25, {
+      forward: [0, 0, -1],
+      orthographic: false,
+    });
+    expect(perspective[31]).toBe(0);
   });
 
   it("packs the simulation block, differing between passes only in params.z", () => {

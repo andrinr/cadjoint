@@ -26,6 +26,9 @@ from cadjoint.viewer._pathtracer import (  # noqa: E402
 from cadjoint.viewer._webgpu import build_viewer_shader  # noqa: E402
 
 OVERLAY_WGSL = Path(__file__).resolve().parents[2] / "frontend/src/viewer/overlay.wgsl"
+#: The overlay uniform block (``struct Overlay``; ``packOverlayUniforms``):
+#: the view-projection and four vec4s.
+OVERLAY_UNIFORM_BYTES = 128
 SIMULATION_WGSL = Path(__file__).resolve().parents[2] / "frontend/src/viewer/simulation.wgsl"
 GRATICULE_WGSL = Path(__file__).resolve().parents[2] / "frontend/src/viewer/graticule.wgsl"
 # The design tokens the frontend prepends to every module (pipelines.ts
@@ -265,11 +268,20 @@ def test_overlay_pipelines_match_the_renderer(
             "depth_compare": "less-equal",
         },
     )
-    overlay_uniforms = device.create_buffer(size=112, usage=wgpu.BufferUsage.UNIFORM)
+    overlay_uniforms = device.create_buffer(
+        size=OVERLAY_UNIFORM_BYTES, usage=wgpu.BufferUsage.UNIFORM
+    )
     device.create_bind_group(
         layout=pipeline.get_bind_group_layout(0),
         entries=[
-            {"binding": 0, "resource": {"buffer": overlay_uniforms, "offset": 0, "size": 112}}
+            {
+                "binding": 0,
+                "resource": {
+                    "buffer": overlay_uniforms,
+                    "offset": 0,
+                    "size": OVERLAY_UNIFORM_BYTES,
+                },
+            }
         ],
     )
 
@@ -457,9 +469,11 @@ def test_preview_and_overlay_draw_in_one_pass(device, scene_code):
             {
                 "binding": 0,
                 "resource": {
-                    "buffer": device.create_buffer(size=112, usage=wgpu.BufferUsage.UNIFORM),
+                    "buffer": device.create_buffer(
+                        size=OVERLAY_UNIFORM_BYTES, usage=wgpu.BufferUsage.UNIFORM
+                    ),
                     "offset": 0,
-                    "size": 112,
+                    "size": OVERLAY_UNIFORM_BYTES,
                 },
             }
         ],
