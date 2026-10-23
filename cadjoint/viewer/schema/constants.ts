@@ -42,3 +42,9 @@ export const SCENE_GRAPH = {
   format: "cadjoint-scene",
   versions: [1, 2],
 } as const;
+
+/** The static demo's scene files (`python -m cadjoint.viewer.demo`). */
+export const DEMO_BUNDLE = {
+  format: "cadjoint-demo",
+  version: 1,
+} as const;

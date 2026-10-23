@@ -79,7 +79,7 @@ import { buildPlaneMarks } from "./viewer/planeMarks";
 import { PlaneLabels } from "./viewer/PlaneLabels";
 import { PerfReadout } from "./viewer/PerfReadout";
 import { Graticule } from "./viewer/Graticule";
-import { createGizmoDrag } from "./viewer/gizmoDrag";
+import { createGizmoDrag, draggedArgument } from "./viewer/gizmoDrag";
 import { createSimInteraction } from "./viewer/simInteraction";
 import { createViewerKeyboard } from "./viewer/keyboard";
 import { createViewerTools } from "./viewer/tools";
@@ -263,7 +263,11 @@ export function ViewerPane(props: ViewerPaneProps) {
     if (!at || at.vertexIndex === null) return null;
     const vertex = nodeById(at.nodeId)?.vertices[at.vertexIndex];
     if (!vertex) return null;
-    return { name: vertex.name, state: vertexState(vertex, renderer.parameterProgram) };
+    return {
+      name: vertex.name,
+      state: vertexState(vertex, renderer.parameterProgram),
+      locked: props.lockedHandle?.(at.nodeId, at.vertexIndex) ?? null,
+    };
   });
 
   /**
@@ -412,6 +416,14 @@ export function ViewerPane(props: ViewerPaneProps) {
     // The gizmo sits on top of everything it can move, so it gets first refusal.
     if (event.button === 0) {
       const grabbed = gizmo.begin(x, y);
+      const argument = grabbed && draggedArgument(grabbed, nodeById(grabbed.nodeId), grabbed)?.argument;
+      const locked = argument ? props.lockedHandle?.(grabbed.nodeId, argument) : null;
+      if (grabbed !== null && locked) {
+        const name = nodeById(grabbed.nodeId)?.name ?? "This object";
+        setStatus({ kind: "", text: `${name} · ${argument} · ${locked}` });
+        gesture = { kind: "none" };
+        return;
+      }
       if (grabbed !== null) {
         gesture = grabbed;
         renderer.gizmoAxis = grabbed.axis;
@@ -428,7 +440,12 @@ export function ViewerPane(props: ViewerPaneProps) {
     if (hit) {
       const profile = nodeById(hit.nodeId);
       setSelection({ nodeId: hit.nodeId, vertexIndex: hit.vertexIndex });
-      if (profile?.editable) {
+      const locked = props.lockedHandle?.(hit.nodeId, hit.vertexIndex) ?? null;
+      if (locked) {
+        const name = profile?.vertices[hit.vertexIndex]?.name ?? "This point";
+        setStatus({ kind: "", text: `${name} · ${locked}` });
+      }
+      if (profile?.editable && !locked) {
         gesture = {
           kind: "drag",
           nodeId: hit.nodeId,
