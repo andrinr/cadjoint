@@ -10,6 +10,7 @@ const STRINGS: [string, string, string, JSX.CSSProperties?][] = [
     { "text-transform": "uppercase", "letter-spacing": "var(--tracking-xs)", "font-size": "var(--text-xs)" },
   ],
   ["commands in a list", "Save as… · Show generated WGSL", "mono, sentence case, one line"],
+  ["navigation", "Getting started · Meshing · Quick start", "mono, as written; a list's section heads are furniture"],
   ["program strings", "fin comb · sink-conduction · base_l", "verbatim mono"],
   ["sentences", "Drag a swatch onto an object", "sans, sentence case, no period on one clause", { "font-family": "var(--font-sans)" }],
   ["quantities", "1.00 m · 412.8 K · 2700 kg/m³", "SI, unit as a symbol after the value"],
@@ -24,7 +25,7 @@ export const language: SectionDef = {
       id="W1"
       why="Voice and case follow A8 and T2; what this rule adds is quantities and the empty value."
       examples={
-        <Plate label="six kinds of string">
+        <Plate label="seven kinds of string">
           <table class="dl-table">
             <thead>
               <tr>

@@ -17,6 +17,15 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   });
 
+  // A reference entry is one identifier with no space in it; let it break
+  // after a "." or "_", where a reader splits it, rather than mid-word.
+  sidebar.querySelectorAll(".sidebar-link .menu-text").forEach((text) => {
+    if (text.childElementCount || text.textContent.includes(" ")) return;
+    const parts = text.textContent.split(/(?<=[._])/);
+    if (parts.length < 2) return;
+    text.replaceChildren(...parts.flatMap((part, i) => (i ? [document.createElement("wbr"), part] : [part])));
+  });
+
   const toc = document.querySelector("nav#TOC");
   const list = toc && toc.querySelector(":scope > ul");
   const active = sidebar.querySelector(".sidebar-link.active");
