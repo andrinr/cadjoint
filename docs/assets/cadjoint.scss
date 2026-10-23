@@ -73,7 +73,17 @@ h2 {
   border-bottom: $cj-hairline solid $cj-rule-strong;
 }
 
-// Navigation is furniture: tracked uppercase mono.
+// Navigation is the instrument's voice (A8, W1): one family, mono, for the
+// navbar, the sidebar, the page outline and the footer. Levels differ by size, weight and case, never by family: section
+// heads are furniture (caps, tracked), page names are set as written.
+.navbar,
+#quarto-sidebar,
+#TOC,
+.nav-footer {
+  font-family: $font-family-monospace;
+}
+
+// The navbar itself is furniture: tracked uppercase.
 .navbar {
   border-bottom: $cj-hairline solid $cj-rule-strong;
   font-family: $font-family-monospace;
@@ -121,16 +131,25 @@ h2 {
   color: $cj-ink !important;
 }
 
-// Site sidebar (guides, reference): three levels, each one step quieter.
-//   section head  caps, ink-3            "GUIDES", "SOLIDS"
-//   page          body 13px, ink-2       "Meshing"; current: semibold ink
+// Site sidebar (guides, reference): three levels, each one step quieter,
+// all in the one navigation family.
+//   section head  caps 11px, ink-3       "GUIDES", "SOLIDS"
+//   page          13px, ink-2            "Meshing"; current: semibold on the accent
 //   page outline  body 12px, ink-2, on a hairline rail under its page
 // The current page and the current section carry the 2px ink line.
 #quarto-sidebar .sidebar-item .sidebar-link {
   border-left: 2px solid transparent;
   padding: 2px 0 2px $cj-inset;
   font-size: $cj-text-md;
+  font-weight: $cj-weight-regular;
   color: $cj-ink-2;
+}
+// A reference entry is one long identifier (meshing.manifold_cell_incidence).
+// nav.html gives it break points after "." and "_"; anything still too long
+// wraps inside the column rather than running out of it and its accent block.
+#quarto-sidebar .sidebar-link .menu-text {
+  min-width: 0;
+  overflow-wrap: break-word;
 }
 #quarto-sidebar .sidebar-item-section > .sidebar-item-container .sidebar-item-text,
 #quarto-sidebar .sidebar-item-section > .sidebar-item-container .sidebar-link,
@@ -373,4 +392,10 @@ h3 {
     flex-direction: column;
     align-items: flex-start;
   }
+}
+
+// The footer is navigation too: small, ink-2.
+.nav-footer {
+  font-size: $cj-text-sm;
+  color: $cj-ink-2;
 }

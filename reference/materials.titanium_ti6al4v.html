@@ -46,7 +46,7 @@ ul.task-list li input[type="checkbox"] {
 <link href="../site_libs/quarto-html/quarto-syntax-highlighting-e5d05eddbe2c608fb9c90784db6be0b0.css" rel="stylesheet" id="quarto-text-highlighting-styles">
 <script src="../site_libs/bootstrap/bootstrap.min.js"></script>
 <link href="../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
-<link href="../site_libs/bootstrap/bootstrap-2d29fe66a6166a69d4b5b3160947c50b.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<link href="../site_libs/bootstrap/bootstrap-788557a3d45adbcd1ece18b8b5af5c9c.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
 <script id="quarto-search-options" type="application/json">{
   "location": "navbar",
   "copy-button": false,
@@ -3133,6 +3133,15 @@ document.addEventListener("DOMContentLoaded", () => {
     section.querySelectorAll(":scope > ul > li > .sidebar-item-container > a.sidebar-link").forEach((a) => {
       if (a.getAttribute("href") === head.getAttribute("href")) a.closest("li").remove();
     });
+  });
+
+  // A reference entry is one identifier with no space in it; let it break
+  // after a "." or "_", where a reader splits it, rather than mid-word.
+  sidebar.querySelectorAll(".sidebar-link .menu-text").forEach((text) => {
+    if (text.childElementCount || text.textContent.includes(" ")) return;
+    const parts = text.textContent.split(/(?<=[._])/);
+    if (parts.length < 2) return;
+    text.replaceChildren(...parts.flatMap((part, i) => (i ? [document.createElement("wbr"), part] : [part])));
   });
 
   const toc = document.querySelector("nav#TOC");
