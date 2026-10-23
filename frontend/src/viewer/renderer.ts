@@ -48,6 +48,7 @@ import {
 } from "./frameConstants";
 import type { AxisIndex } from "./gizmo";
 import {
+  cameraBasis,
   cameraPosition,
   orthoHeightFor,
   viewProjection,
@@ -67,7 +68,12 @@ import {
 import type { ShaderProgramPayload } from "./shaderProgram";
 import { ScenePrograms } from "./scenePrograms";
 import { SimulationLayer, type IndexRange } from "./simulationLayer";
-import { packGraticuleUniforms, packOverlayUniforms, packSceneUniforms } from "./uniforms";
+import {
+  OVERLAY_UNIFORM_FLOATS,
+  packGraticuleUniforms,
+  packOverlayUniforms,
+  packSceneUniforms,
+} from "./uniforms";
 
 /** What the shader path has done this session. See `Renderer.shaderStats`. */
 export interface ShaderStats {
@@ -380,8 +386,8 @@ export class Renderer {
 
       this.uniformBuffer = this.createUniform(112);  // 7 x vec4, see Uniforms in _webgpu.py
       this.viewBuffer = this.createUniform(64);
-      this.overlayBuffer = this.createUniform(112);
-      this.meshOverlayBuffer = this.createUniform(112);
+      this.overlayBuffer = this.createUniform(OVERLAY_UNIFORM_FLOATS * 4);
+      this.meshOverlayBuffer = this.createUniform(OVERLAY_UNIFORM_FLOATS * 4);
       this.graticuleBuffer = this.createUniform(GRATICULE_UNIFORM_SIZE);
       this.buildPipelines();
 
@@ -775,10 +781,14 @@ export class Renderer {
 
     const matrix = viewProjection(this.view);
     device.queue.writeBuffer(this.viewBuffer, 0, matrix);
+    const looking = {
+      forward: cameraBasis(position, this.camera.target).forward,
+      orthographic: this.display.projection === "orthographic",
+    };
     device.queue.writeBuffer(
       this.overlayBuffer,
       0,
-      packOverlayUniforms(matrix, position, size, DEPTH_NUDGE, CASING_PX),
+      packOverlayUniforms(matrix, position, size, DEPTH_NUDGE, CASING_PX, looking),
     );
     // Mesh edges sit exactly on the surface creases the construction
     // wireframe also traces; a smaller nudge keeps them consistently behind
@@ -786,7 +796,7 @@ export class Renderer {
     device.queue.writeBuffer(
       this.meshOverlayBuffer,
       0,
-      packOverlayUniforms(matrix, position, size, DEPTH_NUDGE * 0.4, 0),
+      packOverlayUniforms(matrix, position, size, DEPTH_NUDGE * 0.4, 0, looking),
     );
 
     if (this.display.showGraticule) {
