@@ -310,6 +310,14 @@ body {
 
 /* Toolbar ------------------------------------------------------------- */
 
+/* Chrome is not text to select: a drag across the bars is a gesture. */
+.toolbar,
+.tool-rail,
+.view-controls {
+  user-select: none;
+  -webkit-user-select: none;
+}
+
 .toolbar {
   position: relative;
   display: flex;
@@ -645,6 +653,8 @@ input[type="checkbox"] {
 }
 
 .viewport-bar-button {
+  /* The row has the cube's width; a cell keeps its size rather than give way. */
+  flex: none;
   display: grid;
   place-items: center;
   width: var(--control-lg);

@@ -19,7 +19,7 @@ import { ObjectTree } from "../components/ObjectTree";
 import { ProjectionToggle, SkeletonToggle, ViewCube } from "../components/ViewCube";
 import { ViewerPane } from "../components/ViewerPane";
 import { RenderSettingsButton } from "../components/viewer/RenderSettingsButton";
-import { ObjectSelectIcon, VertexSelectIcon } from "../components/icons";
+import { MoveIcon, ObjectSelectIcon, ScaleIcon, VertexSelectIcon } from "../components/icons";
 import { Select, TierTag } from "../components/ui";
 import { graphBounds } from "../scene/bounds.ts";
 import { sceneShaders } from "../scene/shaders.ts";
@@ -156,11 +156,38 @@ export function DemoApp() {
     });
     return installing;
   };
+  // While a pointer is held (a slider, a handle) the buffer overrides carry
+  // the edit; building the shaders mid-drag would only stall the frames the
+  // drag is waiting for. The install waits for the release.
   let commitTimer: ReturnType<typeof setTimeout> | undefined;
+  let pointerHeld = false;
+  let commitPending = false;
   const scheduleCommit = () => {
     clearTimeout(commitTimer);
+    if (pointerHeld) {
+      commitPending = true;
+      return;
+    }
     commitTimer = setTimeout(() => void commit(), 120);
   };
+  const press = () => (pointerHeld = true);
+  const release = () => {
+    pointerHeld = false;
+    if (commitPending) {
+      commitPending = false;
+      scheduleCommit();
+    }
+  };
+  window.addEventListener("pointerdown", press, true);
+  window.addEventListener("pointerup", release, true);
+  window.addEventListener("pointercancel", release, true);
+  window.addEventListener("blur", release);
+  onCleanup(() => {
+    window.removeEventListener("blur", release);
+    window.removeEventListener("pointerdown", press, true);
+    window.removeEventListener("pointerup", release, true);
+    window.removeEventListener("pointercancel", release, true);
+  });
 
   /** Adopt proposed values: live in the buffer now, in the shaders shortly. */
   const propose = (proposed: Values) => {
@@ -398,7 +425,6 @@ export function DemoApp() {
           testId="scene-picker"
         />
         <TierTag kind="brep" testId="demo-tier" />
-        <div class="spacer" />
         <span class={`status ${status().kind}`} data-testid="status">
           <Show when={status().text}>
             <i class="dot" />
@@ -453,29 +479,52 @@ export function DemoApp() {
             onAssignMaterial={notHere("Assigning a material")}
             overlay={
               <>
-                <div class="view-controls" data-testid="view-controls">
+                {/* Selection and gizmo modes, in the playground's tool rail
+                    (top left); the view controls keep their three cells. */}
+                <nav class="tool-rail" aria-label="Tools" data-testid="demo-tool-rail">
                   <button
                     type="button"
-                    class="viewport-bar-button"
                     classList={{ active: selectionMode() === "vertex" }}
                     onClick={() => setSelectionMode("vertex")}
                     title="Drag sketch points  (V)"
+                    aria-label="Points"
                     data-testid="pick-points"
                   >
                     <VertexSelectIcon size={16} />
-                    <span class="rail-word">Points</span>
                   </button>
                   <button
                     type="button"
-                    class="viewport-bar-button"
                     classList={{ active: selectionMode() === "object" }}
                     onClick={() => setSelectionMode("object")}
                     title="Select solids and drag their gizmo  (O)"
+                    aria-label="Objects"
                     data-testid="pick-objects"
                   >
                     <ObjectSelectIcon size={16} />
-                    <span class="rail-word">Objects</span>
                   </button>
+                  <hr />
+                  <button
+                    type="button"
+                    classList={{ active: gizmoMode() === "translate" }}
+                    onClick={() => setGizmoMode("translate")}
+                    title="Gizmo moves the selected solid  (G)"
+                    aria-label="Move"
+                    data-testid="gizmo-translate"
+                  >
+                    <MoveIcon size={16} />
+                  </button>
+                  <button
+                    type="button"
+                    classList={{ active: gizmoMode() === "scale" }}
+                    onClick={() => setGizmoMode("scale")}
+                    title="Gizmo resizes the selected solid  (T)"
+                    aria-label="Scale"
+                    data-testid="gizmo-scale"
+                  >
+                    <ScaleIcon size={16} />
+                  </button>
+                </nav>
+                <div class="view-controls" data-testid="view-controls">
                   <SkeletonToggle
                     shown={render.display().showOverlays}
                     onToggle={(showOverlays) => render.applyDisplay({ showOverlays })}
@@ -537,9 +586,16 @@ export function DemoApp() {
           </Show>
           <ParameterPanel
             parameters={parameters()}
+            construction={scene()?.construction ?? []}
             values={values()}
             edited={edited()}
             onChange={(name, value) => propose({ [name]: value })}
+            onGesture={(active) => {
+              // A held slider draws like a handle drag: the preview at the
+              // scale the frame budget allows, full quality on release.
+              renderer.interacting = active;
+              renderer.invalidate();
+            }}
             onReset={() => {
               const current = scene();
               if (current) setValues(shippedValues(current.parameters));

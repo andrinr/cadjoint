@@ -5,10 +5,14 @@
 
 .app.demo {
   grid-template-rows: var(--control-xl) minmax(0, 1fr);
+  /* The column may be narrower than the toolbar's content; the status line
+     gives way instead of the page scrolling sideways. */
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .demo-toolbar {
   gap: var(--inset);
+  min-width: 0;
 }
 
 .demo-toolbar button {
@@ -16,11 +20,12 @@
   white-space: nowrap;
 }
 
-.demo-toolbar .select {
+.demo-toolbar .ui-select {
   min-width: calc(var(--unit) * 40);
 }
 
 .demo-toolbar .status {
+  flex: 1 1 0;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -211,4 +216,16 @@
   margin: 0;
   color: var(--danger-ink);
   font-size: var(--text-xs);
+}
+
+/* Narrow windows: slimmer side columns, and the toolbar drops the chip that
+   only says where meshing runs (the export's status line says it too). */
+@media (max-width: 1100px) {
+  .demo-desk {
+    grid-template-columns: calc(var(--unit) * 52) minmax(0, 1fr) calc(var(--unit) * 76);
+  }
+
+  .demo-device {
+    display: none;
+  }
 }

@@ -9,6 +9,7 @@
 
 import { For, Show, createMemo, createSignal, type JSX } from "solid-js";
 import { createDismiss } from "./dismiss";
+import "./select.css";
 
 export interface SelectOption {
   value: string;
