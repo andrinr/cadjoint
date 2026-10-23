@@ -180,6 +180,9 @@ The playground UI is a Solid + TypeScript app in `frontend/`, built into
 `cadjoint/viewer/static` and committed, so installing cadjoint needs no Node
 toolchain; its workflow is in
 [developing the UI](https://andrinr.github.io/cadjoint/docs/viewer.html#developing-the-ui).
+The same app also builds as a static public demo with no Python server
+(`npm run dev:static` in `frontend/`); see
+[`frontend/src/static/README.md`](frontend/src/static/README.md).
 Docs need [Quarto](https://quarto.org/docs/get-started/) and the `docs` extra:
 `uv run quartodoc build`, then `quarto preview`.
 `benchmarks/jax_compile_profile.py` splits a worker request into trace, lower,

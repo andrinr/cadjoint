@@ -560,6 +560,7 @@ input[type="checkbox"] {
    classes (thermal, elastic, mesh, opt) stay as hooks and add no hue. */
 .sim-kind,
 .object-tree-panel > header small,
+.demo-parameters > header small,
 .properties-panel > header small,
 .sketch-panel header small,
 .material-panel-title small,
@@ -1118,6 +1119,7 @@ input[type="checkbox"] {
 }
 
 .object-tree-panel > header,
+.demo-parameters > header,
 .material-panel > header,
 .sim-panel > header,
 .sketch-panel > header,
@@ -1129,6 +1131,7 @@ input[type="checkbox"] {
    <small>), then the section's name. The title stack takes the slack, so the
    head reads left to right instead of drifting to the right edge. */
 .object-tree-panel > header > span,
+.demo-parameters > header > span,
 .properties-panel > header > span,
 .sim-panel header span,
 .sketch-panel header > span,
@@ -1205,7 +1208,8 @@ input[type="checkbox"] {
    takes the title block's full height and draws its glyph in the kicker's
    line box, so it shares both the block's centre and its first baseline (the
    shared rule is next to .material-add). */
-.object-tree-panel > header {
+.object-tree-panel > header,
+.demo-parameters > header {
   position: sticky;
   top: 0;
   z-index: 2;

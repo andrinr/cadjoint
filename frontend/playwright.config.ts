@@ -35,6 +35,8 @@ function scenesWorkspace(): string {
  */
 export default defineConfig({
   testDir: "./e2e",
+  // The public demo's specs run against its static build (playwright.static.config.ts).
+  testIgnore: ["static/**"],
   timeout: 60_000,
   expect: { timeout: 15_000 },
   fullyParallel: false,
