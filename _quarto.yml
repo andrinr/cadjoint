@@ -10,6 +10,9 @@ project:
     - reference/*.qmd
   resources:
     - docs/assets/**
+    # The public demo, built by docs.yml (`npm run build:static` in
+    # frontend/, copied to demo/); served as files, never rendered.
+    - demo/**
 
 # Written by `quartodoc build` (see `quartodoc.sidebar` below): the API
 # reference sidebar, one entry per section and object.
@@ -32,6 +35,8 @@ website:
     logo-alt: cadjoint
     title: CADJOINT
     right:
+      - text: Demo
+        href: demo/index.html
       - icon: github
         href: https://github.com/andrinr/cadjoint
   page-footer:
