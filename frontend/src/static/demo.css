@@ -16,7 +16,7 @@
   white-space: nowrap;
 }
 
-.demo-toolbar .select {
+.demo-toolbar .ui-select {
   min-width: calc(var(--unit) * 40);
 }
 

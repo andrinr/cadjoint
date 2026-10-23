@@ -310,6 +310,14 @@ body {
 
 /* Toolbar ------------------------------------------------------------- */
 
+/* Chrome is not text to select: a drag across the bars is a gesture. */
+.toolbar,
+.tool-rail,
+.view-controls {
+  user-select: none;
+  -webkit-user-select: none;
+}
+
 .toolbar {
   position: relative;
   display: flex;

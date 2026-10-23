@@ -75,3 +75,40 @@ test("the STL export meshes the edited values in the browser", async ({ page }) 
   await expect(page.getByTestId("status")).toContainText("bracket-edited.stl");
   expect(["webgpu", "wasm"]).toContain((await demo(page)).device);
 });
+
+test("the scene picker is a closed dropdown that opens, switches the scene and closes", async ({ page }) => {
+  await open(page, "bracket");
+  const field = page.getByTestId("scene-picker");
+  const list = page.getByRole("listbox");
+  await expect(field).toHaveAttribute("aria-expanded", "false");
+  await expect(list).toHaveCount(0);
+
+  await field.click();
+  await expect(field).toHaveAttribute("aria-expanded", "true");
+  await expect(list).toBeVisible();
+  // Drawn as a menu below the field, not as a bulleted list in the flow.
+  const fieldBox = (await field.boundingBox())!;
+  const listBox = (await list.boundingBox())!;
+  expect(listBox.y).toBeGreaterThanOrEqual(fieldBox.y + fieldBox.height);
+  expect(await list.evaluate((el) => [getComputedStyle(el).position, getComputedStyle(el).listStyleType])).toEqual([
+    "absolute",
+    "none",
+  ]);
+
+  await page.getByTestId("scene-picker-option-end_cap").click();
+  await expect(list).toHaveCount(0);
+  await expect(field).toHaveAttribute("aria-expanded", "false");
+  await expect.poll(async () => (await demo(page)).scene).toBe("end_cap");
+  await expect(field).toHaveText("end cap");
+  await expect(page.getByTestId("status")).toContainText("free parameters");
+
+  // Escape and a click elsewhere both close it without switching.
+  await field.click();
+  await expect(list).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(list).toHaveCount(0);
+  await field.click();
+  await page.getByTestId("parameter-panel").click({ position: { x: 10, y: 200 } });
+  await expect(list).toHaveCount(0);
+  expect((await demo(page)).scene).toBe("end_cap");
+});
