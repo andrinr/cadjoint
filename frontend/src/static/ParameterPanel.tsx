@@ -8,17 +8,25 @@
  * move such a value without breaking the constraint.
  */
 import { For, Index, Show, createMemo } from "solid-js";
-import { hover, nodes, selection, setHover, setSelection } from "../state";
+import { hover, selection, setHover, setSelection } from "../state";
 import { PanelHeader, Section } from "../components/ui";
-import type { DemoParameter } from "../types";
+import type { ConstructionNode, DemoParameter } from "../types";
 import { clampComponent, editable, type Values } from "./parameters";
 
 export interface ParameterPanelProps {
   parameters: readonly DemoParameter[];
+  /**
+   * The scene's construction tree as shipped: the groups' names and order.
+   * Not the live tree, which every edit replaces: groups keyed on it would
+   * remount every row, the slider under the pointer included, mid-drag.
+   */
+  construction: readonly ConstructionNode[];
   values: Values;
   /** How many parameters differ from the shipped scene. */
   edited: number;
   onChange: (name: string, value: number[]) => void;
+  /** A slider is held (true) or let go (false). */
+  onGesture: (active: boolean) => void;
   onReset: () => void;
 }
 
@@ -39,6 +47,7 @@ function ParameterRow(props: {
   value: readonly number[];
   owned: boolean;
   onChange: (value: number[]) => void;
+  onGesture: (active: boolean) => void;
 }) {
   const locked = () => !editable(props.parameter);
   const set = (index: number, component: number) => {
@@ -79,6 +88,10 @@ function ParameterRow(props: {
               aria-label={`${props.parameter.name} ${axisLabel(props.parameter, index) ?? ""}`.trim()}
               data-testid={`slider-${props.parameter.name}-${index}`}
               onInput={(event) => set(index, Number(event.currentTarget.value))}
+              onPointerDown={() => props.onGesture(true)}
+              onPointerUp={() => props.onGesture(false)}
+              onPointerCancel={() => props.onGesture(false)}
+              onLostPointerCapture={() => props.onGesture(false)}
             />
             <input
               type="number"
@@ -110,8 +123,8 @@ function ParameterRow(props: {
 export function ParameterPanel(props: ParameterPanelProps) {
   /** Parameters grouped by the object whose handle moves them, in scene order. */
   const groups = createMemo(() => {
-    const names = new Map(nodes().map((node) => [node.id, node.name ?? node.id]));
-    const order = new Map(nodes().map((node, index) => [node.id, index]));
+    const names = new Map(props.construction.map((node) => [node.id, node.name ?? node.id]));
+    const order = new Map(props.construction.map((node, index) => [node.id, index]));
     // A parameter no handle moves is grouped by its name's stem, so
     // `sketch0.v0` … `sketch0.v15` sit together rather than in one long list.
     const keyOf = (p: DemoParameter) => p.owner ?? `stem-${p.name.includes(".") ? p.name.split(".")[0] : "scene"}`;
@@ -179,6 +192,7 @@ export function ParameterPanel(props: ParameterPanelProps) {
                     value={props.values[parameter.name] ?? parameter.value}
                     owned={active(group.owner)}
                     onChange={(value) => props.onChange(parameter.name, value)}
+                    onGesture={props.onGesture}
                   />
                 )}
               </For>

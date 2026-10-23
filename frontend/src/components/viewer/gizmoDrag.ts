@@ -114,7 +114,11 @@ export function createGizmoDrag(context: GizmoDragContext) {
     // alone entirely. Half a transform written live would draw a solid that
     // is not the one the release is about to produce.
     if (!overrides) return false;
-    return context.renderer.setParameterOverrides(overrides);
+    const live = context.renderer.setParameterOverrides(overrides);
+    // As a vertex drag does: whatever follows the values (the mesh-edge
+    // overlay, the demo's parameter panel) follows the gizmo too.
+    if (live) context.props.onLiveParameters?.(overrides);
+    return live;
   };
 
   /**

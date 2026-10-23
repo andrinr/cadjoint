@@ -653,6 +653,8 @@ input[type="checkbox"] {
 }
 
 .viewport-bar-button {
+  /* The row has the cube's width; a cell keeps its size rather than give way. */
+  flex: none;
   display: grid;
   place-items: center;
   width: var(--control-lg);

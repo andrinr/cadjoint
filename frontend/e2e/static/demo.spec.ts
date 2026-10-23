@@ -112,3 +112,86 @@ test("the scene picker is a closed dropdown that opens, switches the scene and c
   await expect(list).toHaveCount(0);
   expect((await demo(page)).scene).toBe("end_cap");
 });
+
+/** Where a named sketch handle is: sweep pointer moves and read the hint. */
+async function findHandle(page: Page, name: string): Promise<{ x: number; y: number; hint: string } | null> {
+  return page.evaluate((wanted) => {
+    const canvas = document.querySelector("[data-testid=viewer-canvas]")!;
+    const r = canvas.getBoundingClientRect();
+    for (let y = r.top; y < r.bottom; y += 4)
+      for (let x = r.left; x < r.right; x += 4) {
+        canvas.dispatchEvent(new PointerEvent("pointermove", { clientX: x, clientY: y, bubbles: true }));
+        const hint = document.querySelector("[data-testid=viewer-hint]")?.textContent ?? "";
+        if (hint.startsWith(`${wanted} ·`)) return { x, y, hint };
+      }
+    return null;
+  }, name);
+}
+
+test("a slider follows the pointer and the render changes mid-drag", async ({ page }) => {
+  await open(page, "bracket");
+  test.skip(!(await hasWebGpu(page)), "No WebGPU adapter in this browser build");
+  await expect.poll(async () => (await demo(page)).pipelineBuilds).toBeGreaterThan(0);
+  await page.waitForTimeout(1000);
+  const canvas = page.getByTestId("viewer-canvas");
+  const before = await canvas.screenshot();
+  const slider = page.getByTestId("slider-plate_thickness-0");
+  const element = await slider.elementHandle();
+  const box = (await slider.boundingBox())!;
+  const y = box.y + box.height / 2;
+  await page.mouse.move(box.x + box.width / 2, y);
+  await page.mouse.down();
+  const seen: number[] = [];
+  for (let i = 1; i <= 12; i++) {
+    await page.mouse.move(box.x + box.width / 2 + i * 8, y);
+    seen.push((await demo(page)).values.plate_thickness[0]);
+  }
+  await page.waitForTimeout(500);
+  const during = await canvas.screenshot();
+  // Still the same slider: the panel did not remount it under the pointer.
+  expect(await page.evaluate((el) => el?.isConnected, element)).toBe(true);
+  await page.mouse.up();
+  expect(new Set(seen).size, "the value moved on every step, not once").toBeGreaterThan(8);
+  expect(during.equals(before), "the render changed while the slider was held").toBe(false);
+});
+
+test("dragging a free handle moves its parameter while the pointer is down", async ({ page }) => {
+  await open(page, "bracket");
+  test.skip(!(await hasWebGpu(page)), "No WebGPU adapter in this browser build");
+  await expect.poll(async () => (await demo(page)).pipelineBuilds).toBeGreaterThan(0);
+  const handle = (await findHandle(page, "plate_tr"))!;
+  expect(handle.hint).toContain("free parameter");
+  const start = (await demo(page)).values.plate_tr;
+  await page.mouse.move(handle.x, handle.y);
+  await page.mouse.down();
+  const seen: string[] = [];
+  for (let i = 1; i <= 10; i++) {
+    await page.mouse.move(handle.x + i * 6, handle.y + i * 2);
+    seen.push((await demo(page)).values.plate_tr.join(","));
+  }
+  await page.mouse.up();
+  expect(new Set(seen).size, "the parameter followed the drag").toBeGreaterThan(5);
+  const end = (await demo(page)).values.plate_tr;
+  expect(end).not.toEqual(start);
+  await expect(page.getByTestId("field-plate_tr-0")).toHaveValue(end[0].toFixed(2));
+
+  // A constraint-held handle says why it stays.
+  const held = (await findHandle(page, "rib_tip"))!;
+  expect(held.hint).toContain("held by DistanceConstraint");
+});
+
+test("the viewport's controls keep their size, at desktop and narrow widths", async ({ page }) => {
+  for (const width of [1440, 900]) {
+    await page.setViewportSize({ width, height: 900 });
+    await open(page, "bracket");
+    for (const bar of ["view-controls", "demo-tool-rail"]) {
+      const sizes = await page
+        .getByTestId(bar)
+        .locator("button")
+        .evaluateAll((buttons) => buttons.map((b) => [b.getBoundingClientRect().width, b.getBoundingClientRect().height]));
+      expect(sizes.length).toBeGreaterThan(2);
+      for (const [w, h] of sizes) expect([w, h], `${bar} at ${width}px`).toEqual([32, 32]);
+    }
+    expect(await page.evaluate(() => document.documentElement.scrollWidth), "no sideways scroll").toBe(width);
+  }
+});
