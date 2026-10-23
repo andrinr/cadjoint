@@ -19,6 +19,7 @@ import {
   exportRequest,
   exportTargets,
   formatInfo,
+  stepContentsLine,
 } from "../src/export";
 
 const PROGRAM = `"""A part."""
@@ -197,5 +198,29 @@ describe("errorSummary", () => {
     );
     expect(errorSummary("one\n\ntwo\n")).toBe("one two");
     expect(errorSummary("  \n")).toBe("Export failed.");
+  });
+});
+
+describe("stepContentsLine", () => {
+  it("names analytic, spline and faceted faces, with the bar the splines meet", () => {
+    expect(
+      stepContentsLine({
+        faces: 30,
+        surfaces: { plane: 20, cylinder: 2, bspline: 5, faceted: 3 },
+        fit_tolerance: 1.04e-4,
+      }),
+    ).toBe("30 faces: 22 analytic · 5 spline (≤ 1.0e−4) · 3 faceted");
+  });
+
+  it("says zero rather than leaving a kind out, and drops the bar without a spline", () => {
+    expect(stepContentsLine({ faces: 7, surfaces: { plane: 6, cylinder: 1 }, fit_tolerance: 1e-4 })).toBe(
+      "7 faces: 7 analytic · 0 spline · 0 faceted",
+    );
+  });
+
+  it("counts a face the lattice path dropped", () => {
+    expect(stepContentsLine({ faces: 3, surfaces: { plane: 2, dropped: 1 } })).toBe(
+      "3 faces: 2 analytic · 0 spline · 0 faceted · 1 dropped",
+    );
   });
 });

@@ -633,6 +633,51 @@ class MeshEdgePayload(Strict):
 # a schema change.
 
 
+StepSurface = Literal["plane", "cylinder", "sphere", "cone", "bspline", "faceted", "dropped"]
+"""What a B-rep face is written on in the analytic STEP: an exact surface, one
+fitted B-spline, its own triangles, or — on the lattice path — nothing."""
+
+
+class StepFaceExport(Strict):
+    """How one B-rep face goes to STEP, as the ``step_export`` kind decides it."""
+
+    surface: StepSurface
+    # For a fitted face (a found plane or a B-spline): the largest distance
+    # from a tessellation vertex to the surface, and the largest ``|f|`` of
+    # the scene over the certificate's probes, both in model units.
+    fit_error: float | None = None
+    field_error: float | None = None
+    control_points: int = 0
+    # For a faceted face: why no surface took it.
+    reason: str = ""
+
+
+class StepContents(Strict):
+    """What an analytic STEP file holds: faces per surface kind, and the fit bar."""
+
+    faces: int
+    surfaces: dict[StepSurface, int]
+    # The bar every fitted face is certified to, model units; ``None`` when
+    # nothing was fitted (the lattice path).
+    fit_tolerance: float | None = None
+    # The largest fit error over the fitted faces, or ``None`` without one.
+    fit_error_max: float | None = None
+    length_unit: Literal["metre"] = "metre"
+
+    @classmethod
+    def from_report(cls, report: dict[str, Any]) -> StepContents:
+        """The summary of a ``step_export`` report (or plan): ``surfaces``, ``faces``, ``fit_tolerance``."""
+        records = report.get("faces") or []
+        errors = [r["fit_error"] for r in records if r.get("fit_error") is not None]
+        return cls(
+            faces=len(records),
+            surfaces={kind: count for kind, count in report["surfaces"].items() if count},
+            fit_tolerance=report.get("fit_tolerance"),
+            fit_error_max=max(errors) if errors else None,
+            length_unit=report.get("length_unit", "metre"),
+        )
+
+
 class BRepFacePayload(Strict):
     """One face of the derived B-rep, for the inspector's readout."""
 
@@ -647,6 +692,9 @@ class BRepFacePayload(Strict):
     leaf: int
     leaf_type: str | None = None
     area: float | None = None
+    # How the analytic STEP export writes this face; absent without the
+    # ``step_export`` kind.
+    export: StepFaceExport | None = None
 
 
 class BRepEdgePayload(Strict):
@@ -699,6 +747,10 @@ class BRepDiagnostics(Strict):
     resolution: int
     stats: dict[str, float | int | str | bool]
     timings: dict[str, float]
+    # What an analytic STEP export of this B-rep holds; absent without the
+    # ``step_export`` kind or when its plan failed (see ``step_note``).
+    step: StepContents | None = None
+    step_note: str | None = None
 
 
 class BRepInspectionPayload(Strict):

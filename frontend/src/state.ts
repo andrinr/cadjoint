@@ -191,6 +191,8 @@ export const [meshEdges, setMeshEdges] = createSignal<MeshEdgePayload | null>(nu
  */
 export type BrepStatus = "idle" | "loading" | "ready" | "error" | "unavailable";
 export const [brepPayload, setBrepPayload] = createSignal<BRepInspectionPayload | null>(null);
+/** The program `brepPayload` was derived from, so a reader can tell it is current. */
+export const [brepSource, setBrepSource] = createSignal<string | null>(null);
 export const [brepStatus, setBrepStatus] = createSignal<BrepStatus>("idle");
 /** The failure or the missing-tier sentence, for the panel. */
 export const [brepMessage, setBrepMessage] = createSignal<string | null>(null);

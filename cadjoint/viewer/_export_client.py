@@ -47,7 +47,8 @@ def export_source(request: dict[str, Any], timeout: float | None = None) -> dict
 
     Returns:
         On success ``{"ok": True, "format", "name", "filename",
-        "content_type", "size", "data": bytes, "report", "output"}``; on
+        "content_type", "size", "data": bytes, "report", "step", "output"}``
+        (``step`` the analytic STEP's contents, else ``None``); on
         failure the worker's ``{"ok": False, "error"}`` (with
         ``error_kind="fem_unavailable"`` when a VTK export has no solver).
     """
@@ -80,5 +81,6 @@ def export_source(request: dict[str, Any], timeout: float | None = None) -> dict
         "size": len(data),
         "data": data,
         "report": result.get("report") or {},
+        "step": (result.get("report") or {}).get("step"),
         "output": result.get("output", ""),
     }

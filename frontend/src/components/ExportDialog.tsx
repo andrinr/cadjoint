@@ -11,9 +11,16 @@
  * mode switcher counts the seconds and can cancel it; the dialog only says
  * that it is working, and disables the button so the same file is not
  * requested twice.
+ *
+ * For an analytic STEP of the scene, the dialog says what the file will
+ * hold before it is written — how many faces go out on an exact surface, on
+ * a fitted B-spline and as facets — read off the derived B-rep: the
+ * inspector's, when it describes this program, else one the dialog derives
+ * itself (a job like the export). Once written, the status line repeats the
+ * file's own count.
  */
 
-import { For, Show, createMemo, createSignal } from "solid-js";
+import { For, Show, createEffect, createMemo, createSignal, onCleanup } from "solid-js";
 import * as api from "../api";
 import {
   EXPORT_FORMATS,
@@ -25,9 +32,19 @@ import {
   exportRequest,
   exportTargets,
   formatInfo,
+  stepContentsLine,
 } from "../export";
-import { formatBytes } from "../jobs";
-import { sceneName, setStatus, source, studies } from "../state";
+import { cancelClientJob, formatBytes, nextRequestId } from "../jobs";
+import {
+  brepPayload,
+  brepSource,
+  sceneName,
+  setBrepPayload,
+  setBrepSource,
+  setStatus,
+  source,
+  studies,
+} from "../state";
 import type { ExportFormat } from "../types";
 import { tierMissing } from "../tier";
 import { DialogHeader, Select, TierReason, TierTag, ToggleSwitch } from "./ui";
@@ -68,6 +85,45 @@ export function ExportDialog(props: ExportDialogProps) {
   /** A study format with nothing to write is the one case the form refuses. */
   const nothingToExport = () => info().takes === "study" && targets().length === 0;
 
+  /** An analytic STEP of the scene: the one export whose contents can be said in advance. */
+  const previewsContents = () =>
+    format() === "step" && analytic() && !facetedStep() && name().trim() === "scene";
+  const contents = createMemo(() => {
+    const payload = brepPayload();
+    return payload && brepSource() === source() ? (payload.diagnostics?.step ?? null) : null;
+  });
+  const [deriving, setDeriving] = createSignal(false);
+  let derivation: string | null = null;
+  /** The program last asked for: a refusal is not asked again until it changes. */
+  let asked: string | null = null;
+  const stopDeriving = () => {
+    if (derivation) void cancelClientJob(derivation);
+    derivation = null;
+    setDeriving(false);
+  };
+  createEffect(() => {
+    const program = source();
+    if (!previewsContents() || contents() || derivation || asked === program) return;
+    asked = program;
+    const clientId = nextRequestId();
+    derivation = clientId;
+    setDeriving(true);
+    void api
+      .brep(program, { clientId })
+      .then((result) => {
+        if (derivation !== clientId || !result.ok || !result.brep?.available) return;
+        setBrepPayload(result.brep);
+        setBrepSource(program);
+      })
+      .finally(() => {
+        if (derivation === clientId) {
+          derivation = null;
+          setDeriving(false);
+        }
+      });
+  });
+  onCleanup(stopDeriving);
+
   const pickFormat = (next: ExportFormat) => {
     const before = info().takes;
     setFormat(next);
@@ -104,7 +160,11 @@ export function ExportDialog(props: ExportDialogProps) {
       }
       const filename = downloadName(outcome.filename, sceneName());
       saveBlob(outcome.blob, filename);
-      setStatus({ kind: "ready", text: `Exported ${filename} · ${formatBytes(outcome.blob.size)}` });
+      const held = outcome.report?.step ? ` · ${stepContentsLine(outcome.report.step)}` : "";
+      setStatus({
+        kind: "ready",
+        text: `Exported ${filename} · ${formatBytes(outcome.blob.size)}${held}`,
+      });
       props.onClose();
     } catch (failure) {
       const message = failure instanceof Error ? failure.message : String(failure);
@@ -244,6 +304,17 @@ export function ExportDialog(props: ExportDialogProps) {
               <TierReason kind="step_export" testId="export-tier-reason" />
             </Show>
           </p>
+
+          <Show when={previewsContents()}>
+            <p class="dialog-note export-contents" data-testid="export-step-contents">
+              <Show
+                when={contents()}
+                fallback={deriving() ? "Deriving the B-rep to count its faces…" : null}
+              >
+                {(held) => <>Will hold {stepContentsLine(held())}.</>}
+              </Show>
+            </p>
+          </Show>
 
           <Show when={error()}>
             <p class="dialog-error" data-testid="export-error">

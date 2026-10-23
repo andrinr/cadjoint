@@ -20,6 +20,7 @@ import type {
   BRepEdgePayload,
   BRepInspectionPayload,
   BRepVertexPayload,
+  StepFaceExport,
 } from "./types";
 import {
   BREP_EDGE_TONES,
@@ -67,6 +68,34 @@ export function brepModel(payload: BrepPayload | null | undefined): BrepModel | 
     vertices,
     diagnostics,
   };
+}
+
+// ── STEP export ─────────────────────────────────────────────────────────────
+
+/** A model-unit error as the readout prints it. */
+const error = (value: number | null | undefined): string =>
+  value == null || !Number.isFinite(value) ? "—" : value.toExponential(1).replace("e-", "e−");
+
+/**
+ * What the analytic STEP export writes a face on, as the readout names it:
+ * the exact surface, `B-spline fit`, a `plane (found)` a flat blend turned
+ * out to lie in, or `faceted`.
+ */
+export function exportLabel(entry: StepFaceExport): string {
+  if (entry.surface === "bspline") return "B-spline fit";
+  if (entry.surface === "faceted" || entry.surface === "dropped") return entry.surface;
+  return entry.fit_error != null ? `${entry.surface} (found)` : entry.surface;
+}
+
+/**
+ * The line under it: a fitted face's errors and net, or why a face is faceted.
+ * Empty for a face that keeps its own exact surface.
+ */
+export function exportDetail(entry: StepFaceExport): string {
+  if (entry.surface === "faceted" || entry.surface === "dropped") return entry.reason ?? "";
+  if (entry.fit_error == null) return "";
+  const net = entry.control_points ? ` · ${entry.control_points.toLocaleString("en-US")} control points` : "";
+  return `fit ${error(entry.fit_error)} · |f| ${error(entry.field_error)}${net}`;
 }
 
 // ── colour ──────────────────────────────────────────────────────────────────
