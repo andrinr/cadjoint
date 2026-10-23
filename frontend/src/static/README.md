@@ -53,13 +53,19 @@ without a pipeline rebuild, export an STL.
 
 ## Deploy
 
-`.github/workflows/demo.yml` builds the demo, regenerating the bundle from the
-scenes first. It runs only when started by hand (Actions, "demo", Run
-workflow), and publishes only with `deploy` ticked, into the `gh-pages`
-branch's `demo/` directory, beside the docs.
+The docs workflow (`.github/workflows/docs.yml`) builds the demo and copies
+it to `demo/` at the repository root (git-ignored), which `_quarto.yml` lists
+as a resource, so the docs site serves it at
+https://andrinr.github.io/cadjoint/demo/ and the home page and navbar link to
+it. The docs deploy on every push to main publishes it.
 
-The docs workflow publishes the same branch with Quarto, which replaces its
-contents, so the next docs deploy removes `demo/`. To keep the demo up for
-good, move the build into `docs.yml`: run `npm ci && npm run build:static` in
-`frontend/` and copy `frontend/dist-static` to `_site/demo` before the publish
-step.
+To check the site with the demo locally:
+
+```bash
+npm run build:static && rm -rf ../demo && cp -r dist-static ../demo
+cd .. && quartodoc build && quarto render    # _site/, with _site/demo/
+```
+
+The build keeps its relative base (`./`), so it works under `/cadjoint/demo/`
+or any other path. An absolute `--base` breaks the fonts: Quarto rewrites
+site-absolute `url(/…)` in the CSS it copies.

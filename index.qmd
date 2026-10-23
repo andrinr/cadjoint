@@ -6,6 +6,15 @@ cadjoint is differentiable code-first CAD. Sketches, constraints, SDF geometry,
 meshing and finite-element simulation compose into one function JAX can
 differentiate end to end.
 
+::: {.demo-launch}
+[Try it in the browser](demo/index.html){.btn .btn-primary}
+
+The shipped scenes with their free parameters, construction handles,
+wireframe and STL export. It runs entirely in the browser, with nothing to
+install: WebGPU draws the model, and meshing falls back to WebAssembly
+without it.
+:::
+
 ::: {.callout-warning}
 The API is not stable. Expect breaking changes.
 :::

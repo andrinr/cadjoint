@@ -318,3 +318,59 @@ h2 {
 h3 {
   font-size: 1rem;
 }
+
+// The primary button: the accent as a solid block with near-black type,
+// in the control voice (mono caps, tracked), on the one 1px line — the
+// playground's `button.primary` (frontend/src/styles.css).
+.btn-primary {
+  --bs-btn-bg: #{$cj-accent};
+  --bs-btn-border-color: #{$cj-accent};
+  --bs-btn-color: #{$cj-ink-on-accent};
+  --bs-btn-hover-bg: #{$cj-accent};
+  --bs-btn-hover-border-color: #{$cj-ink};
+  --bs-btn-hover-color: #{$cj-ink-on-accent};
+  --bs-btn-active-bg: #{$cj-accent};
+  --bs-btn-active-border-color: #{$cj-ink};
+  --bs-btn-active-color: #{$cj-ink-on-accent};
+  --bs-btn-focus-shadow-rgb: 28, 24, 20;
+  border-width: $cj-hairline;
+  font-family: $font-family-monospace;
+  font-size: $cj-text-sm;
+  font-weight: $cj-weight-semibold;
+  letter-spacing: $cj-tracking-sm;
+  text-transform: uppercase;
+  text-decoration: none;
+}
+
+// The demo's launch block on the home page: the button, then one line on
+// what runs where, ruled off from the prose around it.
+.demo-launch {
+  display: flex;
+  align-items: center;
+  gap: $cj-section;
+  margin: $cj-section 0;
+  padding: $cj-inset 0;
+  border-top: $cj-hairline solid $cj-rule;
+  border-bottom: $cj-hairline solid $cj-rule;
+}
+.demo-launch p {
+  margin: 0;
+}
+.demo-launch .btn {
+  flex: 0 0 auto;
+  height: $cj-control-lg;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 $cj-section;
+  white-space: nowrap;
+}
+.demo-launch p:last-child {
+  color: $cj-ink-2;
+  font-size: $cj-text-md;
+}
+@media (max-width: 576px) {
+  .demo-launch {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}

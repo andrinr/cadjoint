@@ -33,6 +33,28 @@ jobs:
           pip install optax optimistix
           pip install "quartodoc>=0.7" "griffe<1.0"
 
+      # The public demo (frontend/static.html), served at <site>/demo/. Its
+      # scene bundle is committed and kept current by
+      # tests/viewer/test_demo_bundle.py, so this needs Node and not the
+      # scenes. It is built into demo/, which _quarto.yml lists as a
+      # resource, so every render copies it into _site — the publish step
+      # below renders again, and a copy made straight into _site would not
+      # survive that. The build keeps its relative base ("./"): it works
+      # under any path, and Quarto rewrites site-absolute url(/...) in the
+      # CSS it copies into a broken path.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Build the public demo
+        working-directory: frontend
+        run: |
+          npm ci --no-audit --no-fund
+          npm run build:static
+          rm -rf ../demo && cp -r dist-static ../demo
+
       - name: Build API reference
         run: quartodoc build
 
