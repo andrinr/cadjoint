@@ -9,6 +9,8 @@
     "dev:static": "vite --config vite.static.config.ts",
     "build": "vite build",
     "build:static": "vite build --config vite.static.config.ts",
+    "bundle:static": "cd .. && python -m cadjoint.viewer.demo",
+    "e2e:static": "playwright test -c playwright.static.config.ts",
     "preview": "vite preview",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",

@@ -3,24 +3,12 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>cadjoint static viewer</title>
-    <style>
-      body { margin: 0; height: 100vh; display: grid; grid-template-rows: auto 1fr; background: var(--surface-viewport); color: var(--ink); }
-      header { display: flex; gap: 12px; align-items: center; padding: 8px 16px; font: 13px var(--font-mono); background: var(--surface-bar); border-bottom: 1px solid var(--line); }
-      header a { color: var(--accent); }
-      header > * { flex: none; }
-      #status { flex: 1 1 0; min-width: 0; color: var(--ink-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-      #viewport { width: 100%; height: 100%; display: block; touch-action: none; }
-    </style>
+    <meta name="description" content="cadjoint's differentiable CAD models, edited live in the browser: parameters, construction handles, wireframe and STL export, with no server." />
+    <link rel="icon" href="data:," />
+    <title>cadjoint · public demo</title>
   </head>
   <body>
-    <header>
-      <select id="scene" aria-label="Scene"></select>
-      <button id="export" type="button">Export STL</button>
-      <a id="download" hidden></a>
-      <span id="status">starting …</span>
-    </header>
-    <canvas id="viewport"></canvas>
-    <script type="module" src="/src/static/main.ts"></script>
+    <div id="root"></div>
+    <script type="module" src="/src/static/main.tsx"></script>
   </body>
 </html>

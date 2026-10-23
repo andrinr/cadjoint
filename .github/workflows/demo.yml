@@ -1,0 +1,84 @@
+name: demo
+
+# The public demo (frontend/static.html) as plain files: no server, so GitHub
+# Pages can host it. Nothing triggers this on its own: it runs only when
+# someone starts it from the Actions tab, and it publishes only when that
+# run is started with `deploy` ticked.
+#
+# Where it publishes: this repository's Pages site is the docs, which
+# docs.yml renders with Quarto and pushes to the gh-pages branch on every
+# push to main. The demo goes into that branch's demo/ directory, so it is
+# served at <pages-url>/demo/ beside the docs. Quarto's gh-pages publish
+# replaces the branch's contents, so a later docs deploy removes demo/
+# again; to keep the demo up for good, build it in docs.yml and copy
+# frontend/dist-static into _site/demo before the publish step instead
+# (frontend/src/static/README.md).
+on:
+  workflow_dispatch:
+    inputs:
+      deploy:
+        description: "Publish the build to gh-pages/demo (otherwise it is only uploaded as an artifact)"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: demo
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install cadjoint
+        run: |
+          # The same jax cap as ci.yml, as a constraint so later installs keep it.
+          printf 'jax<0.9\njaxlib<0.9\n' > "$RUNNER_TEMP/jax-cap.txt"
+          export PIP_CONSTRAINT="$RUNNER_TEMP/jax-cap.txt"
+          pip install "jax[cpu]>=0.4.20,<0.9"
+          pip install -e ".[dev]" --no-deps
+          pip install scikit-image matplotlib optax optimistix pydantic
+
+      # The bundle is committed, but the deployed demo is rebuilt from the
+      # scenes on this ref so it can never show a stale scene.
+      - name: Write the scene bundle from the shipped scenes
+        run: python -m cadjoint.viewer.demo
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Build the demo
+        working-directory: frontend
+        run: |
+          npm ci --no-audit --no-fund
+          npm run build:static
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: demo
+          path: frontend/dist-static
+
+      - name: Publish to gh-pages/demo
+        if: inputs.deploy
+        run: |
+          git fetch --depth 1 origin gh-pages
+          git worktree add --detach "$RUNNER_TEMP/pages" origin/gh-pages
+          rm -rf "$RUNNER_TEMP/pages/demo"
+          cp -r frontend/dist-static "$RUNNER_TEMP/pages/demo"
+          cd "$RUNNER_TEMP/pages"
+          git add -A demo
+          git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+            commit -m "demo: build of ${GITHUB_SHA::7}" || { echo "No change to publish."; exit 0; }
+          git push origin HEAD:gh-pages

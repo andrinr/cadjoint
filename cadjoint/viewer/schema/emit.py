@@ -23,7 +23,7 @@ from pydantic import BaseModel
 from pydantic.json_schema import models_json_schema
 
 from cadjoint.enums import BoundaryConditionType
-from cadjoint.viewer.schema import api, payloads, requests
+from cadjoint.viewer.schema import api, demo, payloads, requests
 
 TYPESCRIPT_PATH = Path(__file__).with_name("payloads.d.ts")
 """The generated file the frontend imports."""
@@ -158,6 +158,9 @@ _MODELS: tuple[type[BaseModel], ...] = (
     requests.SidePlaneReference,
     requests.FacePlaneReference,
     requests.TangentPlaneReference,
+    # ── the static demo's bundle (demo.py) ──
+    demo.DemoScene,
+    demo.DemoParameter,
 )
 
 
@@ -414,6 +417,7 @@ def constants_source() -> str:
     what the server accepts.  The scene shader's parameter-buffer layout and
     the scene graph format, so that WGSL built in the browser
     (``frontend/src/scene``) lays out the buffer the worker's WGSL does.
+    The static demo's file format, so the page refuses a bundle it cannot read.
     """
     from cadjoint.backends import jaxjs
     from cadjoint.backends.wgsl import codegen
@@ -461,6 +465,11 @@ def constants_source() -> str:
         "export const SCENE_GRAPH = {\n"
         f'  format: "{jaxjs.SCENE_FORMAT}",\n'
         f"  versions: {list(jaxjs.SCENE_VERSIONS)},\n"
+        "} as const;\n\n"
+        "/** The static demo's scene files (`python -m cadjoint.viewer.demo`). */\n"
+        "export const DEMO_BUNDLE = {\n"
+        f'  format: "{demo.DEMO_FORMAT}",\n'
+        f"  version: {demo.DEMO_VERSION},\n"
         "} as const;\n"
     )
 
