@@ -16,6 +16,8 @@ struct Overlay {
   viewport   : vec4<f32>,
   // depth nudge fraction, casing (px per side; 0 = none), unused, unused
   params     : vec4<f32>,
+  // camera forward axis; w = 1 under an orthographic projection
+  view_dir   : vec4<f32>,
 };
 @group(0) @binding(0) var<uniform> o: Overlay;
 
@@ -444,7 +446,14 @@ fn fs_brep(input: BrepVertex) -> @location(0) vec4<f32> {
   let facet = normalize(cross(dpdx(input.world), dpdy(input.world)));
   // A zero normal means none was supplied: fall back to the facet's.
   let normal = select(facet, normalize(input.normal), dot(input.normal, input.normal) > 0.25);
-  let eye = normalize(o.camera_pos.xyz - input.world);
+  // Toward the eye: the eye point under perspective, and under an
+  // orthographic projection the one direction every ray shares — from the
+  // eye point a flat plane shaded as a radial glow.
+  let eye = select(
+    normalize(o.camera_pos.xyz - input.world),
+    -normalize(o.view_dir.xyz),
+    o.view_dir.w > 0.5,
+  );
   // Facing ratio, sign-free: a triangle wound either way shades the same,
   // so a face the tessellation turned inside out is still readable.
   let facing = abs(dot(normal, eye));

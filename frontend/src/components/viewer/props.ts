@@ -32,6 +32,18 @@ export interface ViewerPaneProps {
    * them: called on every move that has a slot in the shader's buffer.
    */
   onLiveParameters?: (overrides: Readonly<Record<string, readonly number[]>>) => void;
+  /**
+   * Why a handle cannot be dragged, or null when it can: a sketch vertex by
+   * its index, a gizmo by the argument its drag writes (`position`,
+   * `radius`, …). A locked handle refuses the press and says why in the hint
+   * and the status line.
+   *
+   * Absent in the playground, where every handle of an editable object
+   * drags — through the parameter buffer when it is free, through a
+   * recompile when it is not. The static demo has no compile, so it locks
+   * every handle that is not a free parameter it may move.
+   */
+  lockedHandle?: (nodeId: string, handle: number | string) => string | null;
   /** Rewrite a primitive's placement keyword. */
   onSetValue: (
     line: number,

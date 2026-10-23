@@ -38,7 +38,7 @@ export interface ViewerHintProps {
    * Null whenever nothing is hovered or the construction overlay is off —
    * the sentence describes a mark, so it goes away with the mark.
    */
-  handle: { name: string | null; state: BindingState } | null;
+  handle: { name: string | null; state: BindingState; locked?: string | null } | null;
   /** The sketch plane under the pointer, and whether it can be moved. */
   plane: PlaneHover | null;
 }
@@ -104,8 +104,9 @@ function faceSentence(): string {
  * follows the pointer; anything else is a literal in the program text, and
  * the solid only catches up when the rewritten source recompiles.
  */
-function handleSentence(handle: { name: string | null; state: BindingState }): string {
+function handleSentence(handle: NonNullable<ViewerHintProps["handle"]>): string {
   const label = handle.name ?? "This point";
+  if (handle.locked) return `${label} · ${handle.locked}`;
   return handle.state === "free"
     ? `${label} · free parameter: the solid follows the drag`
     : `${label} · fixed value: the solid follows on release, after a recompile`;

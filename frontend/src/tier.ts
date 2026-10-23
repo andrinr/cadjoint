@@ -34,8 +34,8 @@ export async function loadCapabilities(): Promise<void> {
   }
 }
 
-/** For tests and the design page: state the tier outright. */
-export function setTierForTesting(value: CapabilitiesResponse | null): void {
+/** State the tier outright: for the static demo, which has no server to ask, and for tests. */
+export function stateTier(value: CapabilitiesResponse | null): void {
   setCapabilities(value);
 }
 

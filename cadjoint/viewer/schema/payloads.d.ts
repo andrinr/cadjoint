@@ -1563,6 +1563,44 @@ export interface TangentPlaneReference {
   near: [number, number, number];
 }
 
+/** Everything the demo needs about one shipped scene. */
+export interface DemoScene {
+  format: "cadjoint-demo";
+  version: 1;
+  name: string;
+  title: string;
+  description: string;
+  scene_graph: SceneGraph;
+  parameters: DemoParameter[];
+  construction: ConstructionNode[];
+  elements: ConstructionElement[];
+  scene_tree: SceneTree | null;
+  relations: ConstructionRelation[];
+}
+
+/**
+ * One free design parameter, as the demo's parameter panel offers it.
+ *
+ * ``name``, ``components`` and ``value`` are the shader slot's
+ * (:class:`~cadjoint.viewer.schema.payloads.ShaderParameter`), so a value
+ * the panel sets is a buffer write under the same name.  ``lower`` and
+ * ``upper`` bound each component; ``bounded`` says whether they are the
+ * parameter's declared ``bounds`` or a range the exporter chose around the
+ * shipped value.
+ */
+export interface DemoParameter {
+  name: string;
+  components: number;
+  value: number[];
+  lower: number[];
+  upper: number[];
+  step: number;
+  bounded: boolean;
+  unit?: string | null;
+  owner: string | null;
+  drivenBy: string | null;
+}
+
 /**
  * The boundary conditions a study accepts, as the wire spells them.
  *

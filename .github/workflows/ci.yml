@@ -192,6 +192,11 @@ jobs:
       - name: Build
         run: npm run build
 
+      # The public demo is a second page built from the same source; it is
+      # not committed, so building it is the whole check.
+      - name: Build the static demo
+        run: npm run build:static
+
       # `pip install cadjoint` ships cadjoint/viewer/static as committed, and
       # the playground, the e2e specs and the design linter all serve it, so a
       # source change committed without its rebuilt bundle is a release that

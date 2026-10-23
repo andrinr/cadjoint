@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { setTierForTesting, tierKind, tierMissing } from "../src/tier";
+import { stateTier, tierKind, tierMissing } from "../src/tier";
 import type { CapabilitiesResponse, KindStatus } from "../src/types";
 
 const kind = (name: string, available: boolean): KindStatus => ({
@@ -24,7 +24,7 @@ const status = (available: boolean): CapabilitiesResponse => ({
   ),
 });
 
-afterEach(() => setTierForTesting(null));
+afterEach(() => stateTier(null));
 
 describe("the tier store", () => {
   it("tags nothing and refuses nothing before the server has answered", () => {
@@ -33,14 +33,14 @@ describe("the tier store", () => {
   });
 
   it("reports a missing kind with the server's label and sentence", () => {
-    setTierForTesting(status(false));
+    stateTier(status(false));
     expect(tierMissing("step_export")).toBe(true);
     expect(tierKind("brep")?.label).toBe("Dual contouring · public tier");
     expect(tierKind("brep")?.message).toMatch(/private tier/);
   });
 
   it("reports a filled kind as exact, with no sentence", () => {
-    setTierForTesting(status(true));
+    stateTier(status(true));
     expect(tierMissing("brep")).toBe(false);
     expect(tierKind("brep")?.message).toBeNull();
   });
