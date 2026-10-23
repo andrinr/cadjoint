@@ -22,6 +22,7 @@ import {
   setBrepHover,
   setBrepMessage,
   setBrepPayload,
+  setBrepSource,
   setBrepStatus,
 } from "../state";
 import type { DisplaySettings } from "../viewer/display";
@@ -107,6 +108,7 @@ export function createBrepCycle(options: BrepCycleOptions): void {
         }
         setBrepHover(null);
         setBrepPayload(payload);
+        setBrepSource(compiled);
         setBrepStatus("ready");
       })
       .catch((error: unknown) => {

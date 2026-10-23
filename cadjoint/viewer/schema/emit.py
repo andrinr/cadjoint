@@ -86,6 +86,8 @@ _MODELS: tuple[type[BaseModel], ...] = (
     payloads.BRepEdgePayload,
     payloads.BRepVertexPayload,
     payloads.BRepDiagnostics,
+    payloads.StepFaceExport,
+    payloads.StepContents,
     # ── every other route (api.py), in ROUTES order ──
     api.SessionResponse,
     api.KindStatus,

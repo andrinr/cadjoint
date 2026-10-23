@@ -211,6 +211,34 @@ class TestWorker:
         assert text.startswith("ISO-10303-21;")
         assert "MANIFOLD_SOLID_BREP(" in text
 
+    def test_an_analytic_step_reports_what_it_holds(self, tmp_path, monkeypatch):
+        """The ``step_export`` kind's report comes back as typed contents the dialog prints."""
+        from cadjoint import tier
+        from cadjoint.viewer.schema.payloads import StepContents
+
+        def step_export(scene, grid, path, **options):
+            Path(path).write_text("ISO-10303-21;\nEND-ISO-10303-21;\n")
+            return {
+                "length_unit": "metre",
+                "fit_tolerance": 1e-4,
+                "surfaces": {"plane": 4, "bspline": 2, "faceted": 0},
+                "faces": [{"face": i, "surface": "plane", "fit_error": None} for i in range(4)]
+                + [{"face": 4 + i, "surface": "bspline", "fit_error": 5e-5} for i in range(2)],
+            }
+
+        component = type("Exporter", (), {"step_export": staticmethod(step_export)})()
+        monkeypatch.setattr(
+            tier, "component", lambda kind: component if str(kind) == "step_export" else None
+        )
+        result, _path = _export(tmp_path, BOX_SOURCE, format="step")
+        assert result["ok"] is True, result
+        assert result["report"]["path"] == "brep"
+        step = StepContents.model_validate(result["report"]["step"])
+        assert step.faces == 6
+        assert step.surfaces == {"plane": 4, "bspline": 2}
+        assert step.fit_tolerance == 1e-4 and step.fit_error_max == 5e-5
+        assert step.length_unit == "metre"
+
     def test_step_facets_through_the_mesh_writer_when_asked(self, tmp_path):
         result, path = _export(tmp_path, BOX_SOURCE, format="step", analytic=False)
         assert result["ok"] is True, result

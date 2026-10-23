@@ -19,6 +19,10 @@ the whole of it:
   passed through as the private tier spells it, so a new edge state shows
   up in the viewer without a change here;
 * every **vertex** with its solved position;
+* per face, when the ``step_export`` kind is installed, how the analytic
+  STEP export writes it — its exact surface, one fitted B-spline with the
+  error it was certified to, or its own triangles and why — read off
+  ``brep.step_plan(scene)``, with the file's summary in the diagnostics;
 * a **diagnostics** block: counts, which path produced the B-rep (exact or
   the dual-contouring fallback, and the reason the exact one refused), and
   the per-edge ``off_surface`` distance — the largest ``|f|`` of the
@@ -32,7 +36,8 @@ process and nothing public builds one.  The inspector is the one public
 reader of it, and it reads only the attributes the private tier documents
 on its ``BRep`` — ``faces``, ``edges``, ``vertices``, ``points``,
 ``triangles`` / ``triangle_face`` (or ``mesh.quads`` / ``quad_face``),
-``patches``, ``decomposition`` and ``stats`` — each through ``getattr``
+``patches``, ``decomposition`` and ``stats``, and the methods
+``corner_normals`` and ``step_plan`` — each through ``getattr``
 with a default, so a B-rep that lacks one degrades the panel rather than
 the request.  ``import diff_brep`` is never written here.
 
@@ -56,6 +61,7 @@ from cadjoint.viewer._edge_overlay import (
     _PROJECTION_STEPS,
     _overlay_grid,
 )
+from cadjoint.viewer.schema.payloads import StepContents
 
 __all__ = ["brep_inspection"]
 
@@ -227,7 +233,29 @@ def _match_curves(edges: Sequence[Any], curves: Any, cell: float) -> dict[int, i
     return matched
 
 
-def _faces(brep: Any) -> list[dict[str, Any]]:
+def _step_plan(scene: Any, brep: Any) -> tuple[dict[str, Any] | None, str | None]:
+    """The analytic STEP export's plan for this B-rep, or ``None`` and why.
+
+    The plan is the ``step_export`` kind's: without it the export is the
+    public tier's faceted dual contouring and there is no per-face plan to
+    show.  It fits and certifies every blend face, so it is timed with the
+    rest of the inspection.
+    """
+    from cadjoint import tier
+
+    if tier.component(PluginKind.STEP_EXPORT) is None:
+        return None, tier.message(PluginKind.STEP_EXPORT)
+    method = getattr(brep, "step_plan", None)
+    if method is None:
+        return None, "this B-rep does not say how it exports"
+    try:
+        return dict(method(scene)), None
+    except Exception as error:  # noqa: BLE001 - the B-rep is still worth showing
+        return None, f"STEP plan failed: {_failure(error)}"
+
+
+def _faces(brep: Any, plan: dict[str, Any] | None) -> list[dict[str, Any]]:
+    exports = {int(record["face"]): record for record in (plan or {}).get("faces", [])}
     decomposition = getattr(brep, "decomposition", None)
     faces = []
     for position, face in enumerate(getattr(brep, "faces", [])):
@@ -244,9 +272,21 @@ def _faces(brep: Any) -> list[dict[str, Any]]:
                 "leaf": leaf,
                 "leaf_type": _leaf_name(decomposition, leaf),
                 "area": _finite(getattr(face, "area", None)),
+                **({"export": _export_record(exports[position])} if position in exports else {}),
             }
         )
     return faces
+
+
+def _export_record(record: dict[str, Any]) -> dict[str, Any]:
+    """One face's plan entry as the payload carries it: the face index dropped, numbers finite."""
+    return {
+        "surface": str(record["surface"]),
+        "fit_error": _finite(record.get("fit_error")),
+        "field_error": _finite(record.get("field_error")),
+        "control_points": int(record.get("control_points") or 0),
+        "reason": str(record.get("reason") or ""),
+    }
 
 
 def _vertices(brep: Any) -> list[dict[str, Any]]:
@@ -335,6 +375,8 @@ def _diagnostics(
     curves_note: str | None,
     cell: float,
     timings: dict[str, float],
+    plan: dict[str, Any] | None,
+    plan_note: str | None,
 ) -> dict[str, Any]:
     stats = dict(getattr(brep, "stats", {}) or {})
     source = str(stats.get("source", "unknown"))
@@ -365,6 +407,8 @@ def _diagnostics(
         "resolution": _MESH_EDGE_RESOLUTION,
         "stats": scalars,
         "timings": {key: round(value, 3) for key, value in timings.items()},
+        "step": None if plan is None else StepContents.from_report(plan).model_dump(mode="json"),
+        "step_note": plan_note,
     }
 
 
@@ -433,10 +477,15 @@ def brep_inspection(scene: Any) -> dict[str, Any]:
     started = time.perf_counter()
     points, triangles, owners = _tessellation(brep)
     normals = _corner_normals(scene, brep, triangles)
-    faces = _faces(brep)
+    timings["inspect"] = time.perf_counter() - started
+    started = time.perf_counter()
+    plan, plan_note = _step_plan(scene, brep)
+    timings["step_plan"] = time.perf_counter() - started
+    started = time.perf_counter()
+    faces = _faces(brep, plan)
     vertices = _vertices(brep)
     edges = _edges(scene, brep, curves, cell)
-    timings["inspect"] = time.perf_counter() - started
+    timings["inspect"] += time.perf_counter() - started
     return {
         "available": True,
         "positions": _round(points),
@@ -446,5 +495,7 @@ def brep_inspection(scene: Any) -> dict[str, Any]:
         "faces": faces,
         "edges": edges,
         "vertices": vertices,
-        "diagnostics": _diagnostics(brep, faces, edges, vertices, curves_note, cell, timings),
+        "diagnostics": _diagnostics(
+            brep, faces, edges, vertices, curves_note, cell, timings, plan, plan_note
+        ),
     }

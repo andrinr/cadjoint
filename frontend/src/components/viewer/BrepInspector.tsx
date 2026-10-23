@@ -5,7 +5,7 @@
  * A title block like the scale readout's — caps label, value, one hairline
  * between rows — pinned to the viewport's top-left while the inspector is
  * on. Three parts: the summary (counts, the path that produced the B-rep and
- * why the exact one refused), the edge legend (each kind a switch, so a
+ * why the exact one refused, what its STEP export will hold), the edge legend (each kind a switch, so a
  * kind can be taken out to see what is under it, plus the off-surface
  * highlight), and the readout of the face, edge or vertex the pointer is on.
  *
@@ -14,7 +14,15 @@
  */
 
 import { For, Show, createMemo, type JSX } from "solid-js";
-import { brepModel, edgeLegend, offSurface, type BrepModel } from "../../brep";
+import {
+  brepModel,
+  edgeLegend,
+  exportDetail,
+  exportLabel,
+  offSurface,
+  type BrepModel,
+} from "../../brep";
+import { stepContentsLine } from "../../export";
 import {
   brepHiddenKinds,
   brepHover,
@@ -76,6 +84,13 @@ function Summary(props: { model: BrepModel }) {
       </Row>
       <Show when={d().feature_curves}>
         <Row label="Curves">{d().feature_curves}</Row>
+      </Show>
+      <Show when={d().step ?? d().step_note}>
+        <Row label="STEP" testId="brep-step">
+          <Show when={d().step} fallback={<small title={d().step_note ?? undefined}>{d().step_note}</small>}>
+            {(step) => stepContentsLine(step())}
+          </Show>
+        </Row>
       </Show>
     </>
   );
@@ -189,6 +204,19 @@ function Readout(props: { model: BrepModel }) {
                   {face.leaf_type ? ` ${face.leaf_type}` : ""}
                 </small>
               </Row>
+              <Show when={face.export}>
+                {(entry) => (
+                  <Row label="STEP" testId="brep-readout-step">
+                    {exportLabel(entry())}
+                    <Show when={exportDetail(entry())}>
+                      <br />
+                      <small class="brep-step-detail" title={exportDetail(entry())}>
+                        {exportDetail(entry())}
+                      </small>
+                    </Show>
+                  </Row>
+                )}
+              </Show>
             </>
           );
         }

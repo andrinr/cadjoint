@@ -576,6 +576,7 @@ export interface BRepFacePayload {
   leaf: number;
   leaf_type?: string | null;
   area?: number | null;
+  export?: StepFaceExport | null;
 }
 
 /** One face-pair boundary chain, kinded by how it reached the screen. */
@@ -621,6 +622,26 @@ export interface BRepDiagnostics {
   resolution: number;
   stats: Record<string, number | string | boolean>;
   timings: Record<string, number>;
+  step?: StepContents | null;
+  step_note?: string | null;
+}
+
+/** How one B-rep face goes to STEP, as the ``step_export`` kind decides it. */
+export interface StepFaceExport {
+  surface: "plane" | "cylinder" | "sphere" | "cone" | "bspline" | "faceted" | "dropped";
+  fit_error?: number | null;
+  field_error?: number | null;
+  control_points?: number;
+  reason?: string;
+}
+
+/** What an analytic STEP file holds: faces per surface kind, and the fit bar. */
+export interface StepContents {
+  faces: number;
+  surfaces: Record<string, number>;
+  fit_tolerance?: number | null;
+  fit_error_max?: number | null;
+  length_unit?: "metre";
 }
 
 /** ``GET /api/session``: the write token, the starter program, the contract version. */
@@ -940,12 +961,14 @@ export interface OptimizeFailed {
  *
  * ``report`` is the writer's own: ``resolution``/``bounds``/``size`` of the
  * lattice for a geometry format, ``study``/``cached`` for ``vtk``.
+ * ``step`` is typed because the dialog reads it.
  */
 export interface ExportSummary {
   format: ExportFormat;
   name: string;
   size: number;
   report: Record<string, unknown>;
+  step?: StepContents | null;
 }
 
 export interface LintFixEdit {

@@ -23,10 +23,16 @@ every curved surface left as triangles.  The ``step_export`` plugin kind
 starts from the derived B-rep's ownership graph instead: a face there *is*
 one patch's zero set, so a plane is exact with its boundary loops (holes
 included) collapsed onto the real intersection curves, a full cylindrical
-band is a ``CYLINDRICAL_SURFACE`` with ``CIRCLE`` edges, and only what the
-graph cannot certify (blend faces) is faceted.  That writer's output reads
+band is a ``CYLINDRICAL_SURFACE`` with ``CIRCLE`` edges, a smooth blend is
+one B-spline fitted and certified against the scene, and only a face no
+surface can carry is faceted.  That writer's output reads
 back into OCCT as one valid closed solid with the analytic volume; the
 faceted writer's is approximate by construction.
+
+What the analytic writer produced rides back as ``report["step"]``, a
+:class:`~cadjoint.viewer.schema.payloads.StepContents`: faces per surface
+kind — exact, fitted B-spline (with the bar it was certified to), faceted —
+which the export dialog prints.
 
 The export asks for the ``step_export`` kind and takes the faceted writer
 when the kind is unfilled (no ``diff-brep``) or when the graph cannot be
@@ -47,6 +53,7 @@ from pydantic import ValidationError
 
 from cadjoint.enums import ExportFormat, PluginKind, listed
 from cadjoint.viewer._limits import OVERSIZED_SOURCE_ERROR, exceeds_source_limit
+from cadjoint.viewer.schema.payloads import StepContents
 from cadjoint.viewer.schema.requests import ExportRequest
 
 __all__ = [
@@ -209,7 +216,7 @@ def _write_geometry(obj: Any, request: ExportRequest, path: Path) -> dict[str, A
                 report["fallback"] = f"{type(error).__name__}: {error}"[:500]
             else:
                 report["path"] = "brep"
-                report["faces"] = written.get("faces", {})
+                report["step"] = StepContents.from_report(written).model_dump(mode="json")
                 return report
 
     with warnings.catch_warnings():

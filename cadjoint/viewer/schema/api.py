@@ -41,6 +41,7 @@ from cadjoint.viewer.schema.payloads import (
     CompilePayload,
     MeshEdgePayload,
     Open,
+    StepContents,
     Strict,
     StudyDescription,
     Vector3,
@@ -446,12 +447,15 @@ class ExportSummary(Strict):
 
     ``report`` is the writer's own: ``resolution``/``bounds``/``size`` of the
     lattice for a geometry format, ``study``/``cached`` for ``vtk``.
+    ``step`` is typed because the dialog reads it.
     """
 
     format: ExportFormat
     name: str
     size: int
     report: dict[str, Any]
+    # For an analytic STEP file: what it holds, face by surface kind.
+    step: StepContents | None = None
 
 
 # ── Editor intelligence ─────────────────────────────────────────────────────
