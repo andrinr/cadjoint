@@ -342,6 +342,33 @@ def dual_faces(
     return quad_array, triangle_array, skipped_boundary
 
 
+class Extraction(NamedTuple):
+    """One extraction's mesh with the stage data it was built from.
+
+    What :func:`extract_mesh` keeps internally and the front door
+    (:func:`cadjoint.meshing.extract_surface`) reads after it: the Hermite
+    samples and the incidence carry each vertex row's tangent planes, which
+    is where creases are known, and the lattice values say whether the part
+    reaches the grid's faces.  Rows of ``mesh.vertices`` are incidence rows.
+
+    Attributes:
+        mesh: The dual-contour mesh.
+        edges: Crossing edges; ``None`` when nothing crosses.
+        incidence: Cell-to-edge mapping (one row per vertex); ``None`` when
+            nothing crosses.
+        hermite: Per-edge crossing points and gradients; ``None`` when
+            nothing crosses.
+        values: The sampled lattice, ``grid.lattice_shape``; ``None`` on the
+            octree path, which samples only near the surface.
+    """
+
+    mesh: Mesh
+    edges: CrossingEdges | None
+    incidence: CellIncidence | None
+    hermite: HermiteData | None
+    values: np.ndarray | None
+
+
 def extract_mesh(
     sdf: Callable[[Array], Array],
     grid: GridSpec,
@@ -370,10 +397,41 @@ def extract_mesh(
     Warns when the surface crosses the grid boundary; the returned mesh is
     open there.
     """
+    return extraction(
+        sdf,
+        grid,
+        level=level,
+        bisection_iterations=bisection_iterations,
+        newton_steps=newton_steps,
+        regularization=regularization,
+        sharp=sharp,
+        lipschitz=lipschitz,
+        stacklevel=3,
+    ).mesh
+
+
+def extraction(
+    sdf: Callable[[Array], Array],
+    grid: GridSpec,
+    *,
+    level: float = 0.0,
+    bisection_iterations: int = 16,
+    newton_steps: int = 1,
+    regularization: float = 1e-3,
+    sharp: bool = True,
+    lipschitz: float | None = None,
+    stacklevel: int = 2,
+) -> Extraction:
+    """:func:`extract_mesh`, returning the stage data with the mesh.
+
+    Same arguments and the same mesh; see :class:`Extraction` for what
+    comes with it.  ``stacklevel`` places the open-boundary warning.
+    """
     if not regularization > 0:
         raise ValueError("regularization must be positive.")
+    values = None
     if lipschitz is None:
-        values = sample_grid(sdf, grid)
+        values = np.asarray(sample_grid(sdf, grid))
         edges = find_crossing_edges(values, level=level)
         inside = (values - level) < 0
     else:
@@ -385,13 +443,14 @@ def extract_mesh(
     incidence = manifold_cell_incidence(edges, grid, inside)
     if edges.count == 0:
         empty = np.empty((0, 3), dtype=np.float32)
-        return Mesh(
+        mesh = Mesh(
             vertices=jnp.asarray(empty),
             faces=np.empty((0, 3), dtype=np.int32),
             quads=np.empty((0, 4), dtype=np.int32),
             normals=jnp.asarray(empty.copy()),
             cells=np.empty((0, 3), dtype=np.int32),
         )
+        return Extraction(mesh, None, None, None, values)
     hermite = edge_hermite_data(
         sdf,
         grid,
@@ -412,12 +471,13 @@ def extract_mesh(
         warnings.warn(
             f"The isosurface crosses the extraction boundary on {skipped_boundary} "
             "grid edges; the returned mesh is open.",
-            stacklevel=2,
+            stacklevel=stacklevel,
         )
-    return Mesh(
+    mesh = Mesh(
         vertices=vertices,
         faces=faces,
         quads=quads,
         normals=normals,
         cells=incidence.cells.copy(),
     )
+    return Extraction(mesh, edges, incidence, hermite, values)

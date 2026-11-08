@@ -17,7 +17,7 @@ statistics, watertightness, and the Euler characteristic.
 from __future__ import annotations
 
 from collections.abc import Callable
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, NamedTuple
 
 import jax
 import jax.numpy as jnp
@@ -300,6 +300,67 @@ def triangle_quality(mesh: Mesh) -> dict[str, Any]:
     }
 
 
+class MeshTopology(NamedTuple):
+    """The index graph of a triangle mesh: is it closed, and in how many pieces.
+
+    Attributes:
+        open_edges: Undirected edges not shared by exactly two triangles —
+            a hole's rim (one) or a non-manifold edge (three or more).
+        bodies: Connected pieces, joined through shared vertices.
+        euler_characteristic: ``V - E + F`` over the vertices the faces use;
+            2 per closed sphere-like body, minus 2 per handle (a hole
+            through the part).
+    """
+
+    open_edges: int
+    bodies: int
+    euler_characteristic: int
+
+    @property
+    def watertight(self) -> bool:
+        """Closed and manifold: every edge shared by exactly two triangles."""
+        return self.open_edges == 0 and self.bodies > 0
+
+
+def mesh_topology(mesh: Mesh) -> MeshTopology:
+    """Count a mesh's open edges, bodies and Euler characteristic.
+
+    Indices only — positions are not read, so two coincident vertex rows
+    count as two points; weld first (a :class:`~cadjoint.meshing.Surface`'s
+    mesh is welded).
+
+    Args:
+        mesh: The mesh; anything with ``vertices`` and ``faces``.
+
+    Returns:
+        The :class:`MeshTopology`.
+    """
+    _, faces = _mesh_arrays(mesh)
+    if faces.shape[0] == 0:
+        return MeshTopology(0, 0, 0)
+    edges, counts = _undirected_edge_counts(faces)
+    used, compact = np.unique(faces, return_inverse=True)
+    compact = compact.reshape(faces.shape)
+    # Union-find over the faces' edges, all at once: hook every root onto
+    # the lowest root an edge reaches, then jump every vertex to its root.
+    parent = np.arange(used.size)
+    start = compact[:, [0, 1]].reshape(-1)
+    end = compact[:, [1, 2]].reshape(-1)
+    while True:
+        a, b = parent[start], parent[end]
+        apart = a != b
+        if not apart.any():
+            break
+        np.minimum.at(parent, np.maximum(a[apart], b[apart]), np.minimum(a[apart], b[apart]))
+        while not np.array_equal(jumped := parent[parent], parent):
+            parent = jumped
+    return MeshTopology(
+        open_edges=int(np.count_nonzero(counts != 2)),
+        bodies=int(np.unique(parent).size),
+        euler_characteristic=int(used.size - edges.shape[0] + faces.shape[0]),
+    )
+
+
 def mesh_report(
     sdf: Callable[[Array], Array],
     mesh: Mesh,
@@ -314,7 +375,7 @@ def mesh_report(
     :func:`triangle_quality`, and adds watertightness (every undirected
     edge shared by exactly two triangles) plus the Euler characteristic
     ``V - E + F`` over the vertices actually referenced by the faces
-    (2 for a closed sphere-like surface).
+    (2 for a closed sphere-like surface), both from :func:`mesh_topology`.
 
     Args:
         sdf: Implicit field the mesh was extracted from.
@@ -327,19 +388,11 @@ def mesh_report(
         Dict with keys ``surface_deviation``, ``self_intersections``,
         ``triangle_quality``, ``watertight``, and ``euler_characteristic``.
     """
-    _, faces = _mesh_arrays(mesh)
-    if faces.shape[0] == 0:
-        watertight = False
-        euler = 0
-    else:
-        _, counts = _undirected_edge_counts(faces)
-        watertight = bool(np.all(counts == 2))
-        vertex_count = int(np.unique(faces).size)
-        euler = vertex_count - int(counts.size) + int(faces.shape[0])
+    topology = mesh_topology(mesh)
     return {
         "surface_deviation": surface_deviation(sdf, mesh, samples=samples, seed=seed),
         "self_intersections": self_intersections(mesh, pairs=pairs, seed=seed),
         "triangle_quality": triangle_quality(mesh),
-        "watertight": watertight,
-        "euler_characteristic": euler,
+        "watertight": topology.watertight,
+        "euler_characteristic": topology.euler_characteristic,
     }
