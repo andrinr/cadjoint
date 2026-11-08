@@ -6,6 +6,9 @@ description: Dual contouring built bottom-up in JAX, so every continuous stage c
 `cadjoint.meshing` turns a signed distance field into a surface mesh by dual
 contouring, with an exact derivative through every continuous stage, and
 `SimMesh` turns that surface into a tet or hex volume mesh for the solvers.
+A program that meshes cadjoint parts for its own use, to draw, check or
+export them, starts from [Integrating the mesher](integrating.qmd). That page
+covers the calls it should build on.
 
 ## Example
 

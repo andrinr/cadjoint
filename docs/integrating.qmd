@@ -1,0 +1,168 @@
+---
+title: Integrating the mesher
+description: The meshing calls a program builds on to turn a cadjoint part into a mesh it can draw, check and export.
+---
+
+A program that takes cadjoint parts and needs meshes of them, a CAD tool's
+viewer or exporter for example, should need one grid, one extraction and two
+checks. This page lists those calls and what each one promises. The names
+listed here are the stable surface: a patch release does not change them, and
+a minor release that does says so in its notes. Everything else in
+`cadjoint.meshing` is the pipeline's own stages. Those stages are public for
+research and gradients, and they can change between minor releases.
+
+## Example
+
+```python
+from cadjoint.meshing import (
+    SurfaceOptions, extract_surface, mesh_topology, surface_grid, wall_thickness,
+)
+
+grid = surface_grid(part, cell=1.0)            # or bounds=((x0, y0, z0), (x1, y1, z1))
+surface = extract_surface(part, SurfaceOptions(feature_edges=True), grid=grid)
+
+if surface.clipped:
+    raise ValueError("the bounds cut the part")
+topology = mesh_topology(surface.mesh)
+if not topology.watertight or topology.bodies != 1:
+    raise ValueError(f"{topology.open_edges} open edges, {topology.bodies} bodies")
+walls = wall_thickness(part, surface.mesh, surface.cell)
+if not walls.resolved:
+    raise ValueError(f"thinnest wall {walls.cells:.1f} cells: use a cell of {walls.thinnest / 4:.3g}")
+
+shaded = surface.render_mesh()                 # vertices, normals, faces: a glTF primitive
+lines = surface.feature_edges                  # (E, 2, 3) segments: a glTF LINES primitive
+```
+
+## The grid
+
+`surface_grid(sdf, resolution=None, *, cell=None, bounds=None)` lays the
+lattice. Give it exactly one of these:
+
+- `cell`: the largest cell edge in model units. Each axis takes
+  `ceil(extent / cell)` cells, so the box is kept exactly and every spacing is
+  at most `cell`.
+- `resolution`: the number of cells along the longest axis.
+
+The box comes from `bounds` when the caller gives one. Otherwise
+`fit_bounds(sdf)` finds the part at whatever scale it is modelled, by
+scanning cubes of half-width 1 to 4096. An empty or unbounded field (a bare
+`Plane`, a missing `Intersection`) raises `ValueError`.
+
+The cell decides what the mesh can hold. A wall needs about four cells across
+(`WALL_CELLS`) to come out with flat faces at its true thickness. Under about
+two (`MIN_WALL_CELLS`) the wall's two faces share cells, so the mesh is
+scalloped there, closes through the wall, or falls apart. So the cell to model
+a part at is its thinnest wall divided by four. Memory grows with the cube of
+the cell count: 256 cells along each axis means 17 million samples.
+
+## The surface
+
+`extract_surface(sdf, options, grid=grid)` runs dual contouring on the
+lattice, welds coincident vertices, and returns a `Surface`:
+
+| field | what it is |
+|---|---|
+| `mesh` | The welded mesh: `vertices (V, 3)`, `faces (F, 3)` counterclockwise from outside, and `normals (V, 3)`, the field's own normal at each vertex. Each point is one vertex, so this is the mesh to index, export to STL, simplify or tet-mesh. |
+| `corner_normals` | `(F, 3, 3)`: the shading normal at each triangle corner. On a smooth surface it is the vertex's own normal. On a crease or corner it is the normal of the side that triangle lies on. |
+| `render_mesh()` | A `RenderMesh` of `vertices`, `normals`, `faces` and `rows`, with one vertex per smooth side. Crease and corner vertices are copied, and `rows` maps each copy back to `mesh`. This is what a renderer takes. |
+| `feature_edges` | `(E, 2, 3)` segments along the part's creases and CSG seams. Empty unless `SurfaceOptions(feature_edges=True)`. |
+| `clipped` | Whether the part reaches the lattice's faces, so the mesh is open there. When the whole lattice is inside the part, the mesh is also empty. |
+| `grid`, `cell` | The lattice and its finest spacing. Walls and errors are counted in `cell`. |
+
+`SurfaceOptions` has four knobs:
+
+- `resolution` (64): cells along the longest axis, used when no grid is given.
+- `sharp` (`True`): place crease and corner vertices exactly on the crease or
+  corner.
+- `simplify` (0): merge triangles while every changed triangle stays within
+  this fraction of a cell of the field. Creases are kept, and `0.05` is a good
+  value for a mesh you will turn into B-rep facets.
+- `feature_edges` (`False`): also return the feature edges.
+
+### Split normals at creases
+
+`mesh.normals` holds one normal per vertex. On a crease that normal is the mean
+of both sides, so a renderer that interpolates it shades a rim grainy.
+`corner_normals` and `render_mesh()` split the normal instead. The sharp QEF
+puts a crease cell's vertex on the crease, and the cell's Hermite normals, the
+field's exact normals where the surface crosses the cell's edges, fall into one
+cluster per smooth side. Normals within `CREASE_ANGLE` (30°) of each other are
+on the same side. Each triangle corner then takes the normal of the side its
+triangle faces.
+
+On the clevis bracket at a 1.5 mm cell, the corners at split vertices are a
+median 1° from their triangle's own normal, against 45° with the field
+normals. A smooth part, such as a sphere, is not split at all. STL ignores
+normals, and `save_obj` does not write them, so both export the welded `mesh`.
+
+### Feature edges
+
+The edges come from `lattice_feature_edges`, the same public classification the
+viewer's overlay draws. It finds crease cells from the spread of their normals
+and finds CSG seams where surface ownership flips between `min`/`max` operands.
+It projects seam points onto the operands' common zero set and links the
+feature cells along each curve. Every segment is a chord of the true curve,
+with its ends on the surface. It is not a mesh edge: a curve crosses the
+lattice diagonally, and mesh edges would trace a staircase around it.
+
+A seam where two operands meet flush on one smooth face, such as a lug's stem
+under its crown, is not drawn. Neither is a blended union, which has no edge.
+The mesh is the same with or without `feature_edges`. The segment ends that
+were projected onto a seam can sit a fraction of a cell off the facets, so
+draw them with a depth offset. With the private tier installed, the viewer
+draws exact B-rep edges instead; this call is the public lattice path.
+
+## The checks
+
+`mesh_topology(mesh)` reads the index graph and returns a `MeshTopology`:
+
+- `open_edges`: edges that are not shared by exactly two triangles.
+- `bodies`: connected pieces.
+- `euler_characteristic`: 2 for each closed body, minus 2 for each hole through
+  it.
+- `watertight`: true when the mesh is closed and every edge is shared by
+  exactly two triangles.
+
+The clevis bracket reads `watertight`, 1 body, and Euler characteristic −14,
+for its eight through-holes.
+
+`wall_thickness(sdf, mesh, cell)` measures, against the field, the wall under
+every vertex. From each vertex a ray runs into the material against the vertex
+normal, sphere-traced until it leaves, then bisected onto the far face. A ray
+counts only when it leaves through a face turned back at it, so a ray from
+beside a convex edge does not pass for a thin wall. The function returns
+`per_vertex` thicknesses (`nan` where a ray measured no wall), the `thinnest`
+of them and the vertex `at` which it lies, `cells` (the thinnest wall in
+cells), and `resolved` (the thinnest wall is at least `MIN_WALL_CELLS`). It
+takes about 60 field evaluations, a fraction of a second.
+
+| part | cell | thinnest wall | cells |
+|---|---|---|---|
+| clevis bracket (6 mm rib) | 1.5 mm | 5.74 mm | 3.8 |
+| space-frame node (2 mm shell) | 1.0 mm | 1.97 mm | 2.0 |
+| space-frame node | 1.5 mm | 1.06 mm | 0.7, not resolved |
+
+Each check reports and refuses nothing. Whether a clipped part, an open mesh,
+two bodies or a two-cell wall fails a build is the caller's decision.
+
+## Migrating from 0.1.1's calls
+
+A program pinned to `cadjoint==0.1.1` that called the mesher's stages
+directly moves to the calls on this page:
+
+| 0.1.1 | now |
+|---|---|
+| `fit_bounds` from `cadjoint.meshing.bounds`, then `GridSpec.from_bounds(origin, extent, ceil(extent / cell))` | `surface_grid(sdf, cell=cell)`, or `surface_grid(sdf, cell=cell, bounds=box)` with the caller's box. `fit_bounds` is exported from `cadjoint.meshing` too. |
+| `extract_mesh(sdf, grid)` with the boundary warning filtered | `extract_surface(sdf, grid=grid).mesh`. The warning is gone, replaced by `Surface.clipped`. |
+| `boundary_inside(sdf, grid)` | `Surface.clipped`, read from the samples the extraction already took. `boundary_inside` is still exported for a grid nothing was extracted on. |
+| `remove_slivers(mesh)`, then dropping unused rows | Done inside `extract_surface`. `remove_slivers` stays public for other meshes. |
+| Counting edges not shared by two triangles; a union-find for bodies | `mesh_topology(mesh)`. |
+| Building a `Mesh` by hand for `simplify_mesh(mesh, sdf, error=cell / 20)` | `SurfaceOptions(simplify=0.05)`, or `simplify_mesh(surface.mesh, sdf, error=surface.cell / 20)`. |
+| Splitting vertices at folds past 30° with area-weighted normals | `surface.render_mesh()`. The split follows the field's own Hermite normals, not the triangles' folds. |
+| No feature edges for implicit parts | `SurfaceOptions(feature_edges=True)` and `surface.feature_edges`. |
+| Sphere-tracing inward rays for the thinnest wall | `wall_thickness(sdf, surface.mesh, surface.cell)`, with `MIN_WALL_CELLS` and `WALL_CELLS`. |
+
+`surface_grid(..., cell=)` lays the same lattice as the 0.1.1 recipe, and
+`extract_surface` runs the same dual contouring on it, so the meshes are
+unchanged: 59,484 triangles for the clevis bracket at a 1 mm cell.
