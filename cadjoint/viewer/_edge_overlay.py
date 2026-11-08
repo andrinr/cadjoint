@@ -15,7 +15,7 @@ plugin kind (:class:`cadjoint.plugins.contracts.FeatureEdges`), and it is
 what :func:`_graph_layers` asks for.
 
 Without it — public cadjoint alone — the sharp layer is read off the
-lattice instead (:mod:`cadjoint.viewer._lattice_edges`): feature cells are
+lattice instead (:mod:`cadjoint.meshing.feature_edges`): feature cells are
 classified from normal spreads and exact ``min``/``max`` CSG seams, the
 seam vertices are Newton-projected onto the common zero set of the
 operands meeting there, and the surviving cell links are the chords.  It
@@ -39,11 +39,8 @@ from typing import Any
 import numpy as np
 
 from cadjoint.enums import PluginKind
-from cadjoint.meshing import DEFAULT_BOUNDS, DEFAULT_SIZE
-from cadjoint.viewer._design_leaves import (
-    _design_leaves,
-    _world_frame_leaves,
-)
+from cadjoint.meshing import DEFAULT_BOUNDS, DEFAULT_SIZE, world_frame_leaves
+from cadjoint.meshing.feature_edges import design_leaves
 from cadjoint.viewer._lattice_edges import _lattice_layers
 
 # Mesh-edge view settings.  The grid matches the raymarcher's view volume.
@@ -101,7 +98,7 @@ def _graph_layers(
         edges = component.feature_edges(
             scene,
             grid,
-            design_leaves=_design_leaves(_world_frame_leaves(scene)),
+            design_leaves=design_leaves(world_frame_leaves(scene)),
             steps=_PROJECTION_STEPS,
         )
     mesh = edges.stats.get("mesh")

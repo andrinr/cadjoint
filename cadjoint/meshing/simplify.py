@@ -365,7 +365,23 @@ def simplify_mesh(
             raise ValueError(f"feature_mask must have shape ({count},); received {mask.shape}.")
     if faces.shape[0] == 0:
         return mesh
+    return _compacted(
+        mesh, _collapsed_faces(mesh, sdf, error, preserve_features, mask, feature_angle, max_passes)
+    )[0]
 
+
+def _collapsed_faces(
+    mesh: Mesh,
+    sdf: Callable[[Array], Array],
+    error: float,
+    preserve_features: bool,
+    mask: np.ndarray | None,
+    feature_angle: float,
+    max_passes: int,
+) -> np.ndarray:
+    """:func:`simplify_mesh`'s collapses on checked arguments: the new faces, on the old rows."""
+    vertices = np.asarray(mesh.vertices, dtype=np.float64)
+    faces = np.asarray(mesh.faces, dtype=np.int64).reshape((-1, 3))
     protected = _protected_vertices(
         vertices,
         faces,
@@ -380,15 +396,25 @@ def simplify_mesh(
         faces, applied = _collapse_pass(vertices, faces, protected, quadrics, evaluate, error)
         if applied == 0:
             break
+    return faces
 
+
+def _compacted(mesh: Mesh, faces: np.ndarray) -> tuple[Mesh, np.ndarray]:
+    """``mesh`` on the collapsed ``faces``, keeping only the rows they use.
+
+    Returns the mesh and ``remap``: each input row's new index, ``-1`` for a
+    row no face uses any more.
+    """
+    count = np.asarray(mesh.vertices).shape[0]
     used = np.unique(faces)
     remap = np.full(count, -1, dtype=np.int64)
     remap[used] = np.arange(used.shape[0])
     original_vertices = np.asarray(mesh.vertices)
-    return Mesh(
+    compacted = Mesh(
         vertices=jnp.asarray(original_vertices[used]),
         faces=remap[faces].astype(np.int32),
         quads=np.empty((0, 4), dtype=np.int32),
         normals=jnp.asarray(np.asarray(mesh.normals)[used]),
         cells=np.asarray(mesh.cells)[used].copy(),
     )
+    return compacted, remap

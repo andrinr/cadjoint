@@ -83,6 +83,7 @@ quartodoc:
         contents:
           - docs/modelling.qmd
           - docs/meshing.qmd
+          - docs/integrating.qmd
           - docs/simulation.qmd
           - docs/materials.qmd
           - docs/optimization.qmd
@@ -269,10 +270,27 @@ quartodoc:
     # -- Meshing ---------------------------------------------------------------
     - title: Meshing
       desc: Dual contouring from SDF to surface mesh, export and diagnostics.
+    - subtitle: Surfaces
+      desc: "The front door an integrator builds on: a grid, a surface with split normals and feature edges, its topology and walls."
+      contents:
+        - meshing.surface_grid
+        - meshing.SurfaceOptions
+        - meshing.extract_surface
+        - meshing.Surface
+        - meshing.RenderMesh
+        - meshing.fit_bounds
+        - meshing.boundary_inside
+        - meshing.mesh_topology
+        - meshing.MeshTopology
+        - meshing.wall_thickness
+        - meshing.WallThickness
+        - meshing.lattice_feature_edges
     - subtitle: Extraction
       desc: "extract_mesh and its stages: grid sampling, edge crossings, QEF vertices, faces."
       contents:
         - meshing.extract_mesh
+        - meshing.extraction
+        - meshing.Extraction
         - meshing.Mesh
         - meshing.GridSpec
         - meshing.sample_grid
@@ -306,8 +324,6 @@ quartodoc:
       contents:
         - meshing.surface_cells
         - meshing.sparse_crossing_edges
-        - meshing.bounds.fit_bounds
-        - meshing.bounds.boundary_inside
         - meshing.simplify_mesh
     - subtitle: Export and diagnostics
       desc: OBJ, STL and STEP export; mesh quality checks.
