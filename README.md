@@ -8,7 +8,7 @@ Differentiable code-first CAD: sketches, constraints, SDF geometry, meshing and
 FEM simulation composed into one function JAX can differentiate end to end.
 
 > [!WARNING]
-> The API is not stable. Expect breaking changes.
+> This is a highly experimental project, and for now more a functional vision than a polished product. Some of the core components such as SDF modelling and constraints are pretty robust, many other features are vibe coded, buggy and in need of human attention.
 
 [![The bracket in the playground's vertex mode, with the rib's distance constraint removed. The camera turns half way around the part; the pointer drags the free handle at the tip of the gusset rib up and out, the rib and its smooth-union blend follow the drag, and on release the rib_tip Vector2 literal in the editor is rewritten. The handle is dragged back, and the camera finishes the turn.](https://raw.githubusercontent.com/andrinr/cadjoint/main/docs/assets/motion/bracket-orbit-drag.webp)](https://andrinr.github.io/cadjoint/docs/viewer.html)
 
