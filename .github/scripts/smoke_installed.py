@@ -7,6 +7,7 @@ package data the wheel must carry is there.
 
 import sys
 from importlib.metadata import version
+from importlib.resources import files
 from pathlib import Path
 
 import jax
@@ -17,7 +18,6 @@ from cadjoint import extract_parameters, functionalize
 from cadjoint.construction import PolygonProfile, SketchPlane, extrude
 from cadjoint.geometry import Scalar, Vector2
 from cadjoint.plugins.registry import builtin_specs
-from cadjoint.viewer._http import STATIC_ROOT
 
 assert "site-packages" in Path(cadjoint.__file__).parts, cadjoint.__file__
 assert version("cadjoint") == sys.argv[1], (version("cadjoint"), sys.argv[1])
@@ -31,7 +31,9 @@ free, fixed, _ = extract_parameters(block)
 grads = jax.grad(lambda p: functionalize(block)(p, fixed)(jnp.array([0.5, 0.5, 2.0])))(free)
 assert jnp.isfinite(grads["depth"]) and grads["depth"] != 0.0, grads
 
-assert (STATIC_ROOT / "index.html").is_file(), "playground build missing"
+# The playground build is package data of cadjoint.viewer; read it as data,
+# without importing the viewer's modules, which need the `viewer` extra.
+assert (files("cadjoint.viewer") / "static" / "index.html").is_file(), "playground build missing"
 missing = [name for name, spec in builtin_specs().items() if spec.version is None]
 assert not missing, f"tesseract_config.yaml missing for {missing}"
 print(f"cadjoint {version('cadjoint')}: ok")
