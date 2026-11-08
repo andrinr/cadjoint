@@ -687,17 +687,17 @@ def results():
 @pytest.mark.parametrize("name", list(CONFIGS))
 def test_no_crossing_pairs(results, name):
     """No two independent links may pass through each other mid-segment."""
-    assert (
-        results[name]["crossings"] == 0
-    ), f"{name}: {results[name]['crossings']} X-crossing link pairs"
+    assert results[name]["crossings"] == 0, (
+        f"{name}: {results[name]['crossings']} X-crossing link pairs"
+    )
 
 
 @pytest.mark.parametrize("name", list(CONFIGS))
 def test_no_debris_fragments(results, name):
     """No orphan sub-three-cell open fragments may survive."""
-    assert (
-        results[name]["debris"] == 0
-    ), f"{name}: {results[name]['debris']} short open link fragments"
+    assert results[name]["debris"] == 0, (
+        f"{name}: {results[name]['debris']} short open link fragments"
+    )
 
 
 @pytest.mark.parametrize("name", list(CONFIGS))
@@ -771,7 +771,7 @@ def test_batched_seam_projection_matches_the_per_group_reference(name, monkeypat
     382 sharp segments, identical.  It is not run here because the starter
     costs minutes per extraction on a cold XLA cache.)
     """
-    from cadjoint.viewer import _lattice_edges
+    from cadjoint.meshing import feature_edges as _lattice_edges
 
     built = SEAM_CONFIGS[name]()
     scene = built[0] if isinstance(built, tuple) else built
@@ -799,8 +799,8 @@ def test_leaf_ownership_ties_are_decided_by_geometry_not_noise():
     equidistant (mid-gap) by the lowest-numbered; a real difference still
     decides.
     """
+    from cadjoint.meshing.feature_edges import _nearest_leaves
     from cadjoint.viewer._edge_overlay import _overlay_grid
-    from cadjoint.viewer._lattice_edges import _nearest_leaves
 
     grid = _overlay_grid()
     columns = {
@@ -837,21 +837,23 @@ def _design_and_scenery():
 
 
 def test_the_design_subtree_is_the_construction_owned_leaves():
-    from cadjoint.viewer._design_leaves import _design_leaves, _world_frame_leaves
+    from cadjoint.meshing.feature_edges import design_leaves
+    from cadjoint.meshing.patch_fields import world_frame_leaves as _world_frame_leaves
 
     leaves = _world_frame_leaves(_design_and_scenery())
     assert len(leaves) == 2
     # Leaf 0 is the Solid mirror, leaf 1 the raw SDF box.
-    assert list(_design_leaves(leaves)) == [0]
+    assert list(design_leaves(leaves)) == [0]
 
 
 def test_a_scene_with_no_construction_mirror_falls_back_to_the_whole_scene():
-    from cadjoint.viewer._design_leaves import _design_leaves, _world_frame_leaves
+    from cadjoint.meshing.feature_edges import design_leaves
+    from cadjoint.meshing.patch_fields import world_frame_leaves as _world_frame_leaves
 
     scene, _curves = _staggered_slabs_config()
     leaves = _world_frame_leaves(scene)
     assert len(leaves) == 2
-    assert _design_leaves(leaves) is None
+    assert design_leaves(leaves) is None
 
 
 def test_the_sharp_layer_draws_only_the_design_and_the_wire_layer_draws_both():
