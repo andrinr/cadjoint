@@ -5,6 +5,8 @@ extrude/revolve into SDF solids → parameter extraction → gradient-based
 optimization on the constraint manifold.
 """
 
+import math
+
 import jax
 import jax.numpy as jnp
 import pytest
@@ -72,7 +74,7 @@ class TestPolygonSDF:
         assert float(polygon_sdf_2d(jnp.array([2.0, 0.0]), verts)) == pytest.approx(1.0, abs=1e-6)
         # corner distance
         d = float(polygon_sdf_2d(jnp.array([2.0, 1.75]), verts))
-        assert d == pytest.approx(jnp.sqrt(2.0), abs=1e-5)
+        assert d == pytest.approx(math.sqrt(2.0), abs=1e-5)
 
     def test_winding_invariance(self):
         verts = jnp.array(SQUARE)
